@@ -3,7 +3,7 @@
  */
 import assert from 'node:assert';
 
-const VALID_TYPES = ['Income', 'Expenses', 'Bills', 'Debt', 'Savings'];
+const VALID_TYPES = ['Income', 'Expenses', 'Bills', 'Debt', 'Savings', 'Balance'];
 
 function validateTransactionPayload(tx) {
   const errors = [];
@@ -28,7 +28,7 @@ function validateTransactionPayload(tx) {
     errors.push('Type must be one of: ' + VALID_TYPES.join(', '));
   }
 
-  if (!tx.category || typeof tx.category !== 'string' || tx.category.trim() === '') {
+  if (tx.type !== 'Balance' && (!tx.category || typeof tx.category !== 'string' || tx.category.trim() === '')) {
     errors.push('Non-empty category is required');
   }
 
@@ -103,6 +103,20 @@ const res4 = validateTransactionPayload(transferTx);
 assert.strictEqual(res4.isValid, false);
 assert.ok(res4.errors.some(e => e.includes('Type must be one of')));
 console.log('✓ Invalid type "Transfer" rejected per real spreadsheet taxonomy');
+
+// 4b. Valid Balance transaction accepted with empty category
+const balanceTx = {
+  date: '2026-09-07',
+  type: 'Balance',
+  category: '',
+  description: 'Transfer from Tower Sacco to Mpesa',
+  amount: 10000,
+  account: 'Tower Sacco',
+  transactionCode: 'TD47XYZ888'
+};
+const res4b = validateTransactionPayload(balanceTx);
+assert.strictEqual(res4b.isValid, true);
+console.log('✓ Valid Balance transaction accepted with empty category');
 
 
 // 5. Duplicate code check

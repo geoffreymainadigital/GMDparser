@@ -16,6 +16,9 @@ const COL_AMOUNT = 10;          // J
 const COL_ACCOUNT = 11;         // K
 const COL_TX_CODE = 12;         // L
 
+const SCRIPT_VERSION = '1.0.1';
+const SCRIPT_BUILD_ID = '2026-09-07-taxonomy-v2';
+
 let VALID_TYPES = ['Income', 'Expenses', 'Bills', 'Debt', 'Savings', 'Balance'];
 
 
@@ -33,6 +36,10 @@ function doGet(e) {
       return createJsonResponse({
         status: isSheetReady ? 'healthy' : 'degraded',
         service: 'gmdparser-apps-script',
+        SCRIPT_VERSION: SCRIPT_VERSION,
+        SCRIPT_BUILD_ID: SCRIPT_BUILD_ID,
+        version: SCRIPT_VERSION,
+        buildId: SCRIPT_BUILD_ID,
         spreadsheetId: ss.getId(),
         sheetName: SHEET_NAME_TRANSACTIONS,
         sheetExists: isSheetReady,
