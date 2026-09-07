@@ -5,7 +5,7 @@
 
 // Configuration Constants
 const SHEET_NAME_TRANSACTIONS = 'Transactions';
-const SHEET_NAME_SETUP = 'Set up data 2';
+const SHEET_NAME_SETUP = 'Set Up';
 
 // Column Indices in Transactions Sheet (1-based)
 const COL_DATE = 3;             // C
@@ -16,7 +16,8 @@ const COL_AMOUNT = 10;          // J
 const COL_ACCOUNT = 11;         // K
 const COL_TX_CODE = 12;         // L
 
-const VALID_TYPES = ['Income', 'Expenses', 'Bills', 'Debt', 'Savings', 'Transfer'];
+let VALID_TYPES = ['Income', 'Expenses', 'Bills', 'Debt', 'Savings'];
+
 
 /**
  * Handle HTTP GET Requests (Health check and taxonomy)
@@ -40,13 +41,30 @@ function doGet(e) {
     }
 
     if (action === 'taxonomy') {
-      const taxonomy = getTaxonomyData(ss);
+      const targetSs = (e && e.parameter && e.parameter.spreadsheetId) ? 
+        SpreadsheetApp.openById(e.parameter.spreadsheetId) : ss;
+      const taxonomy = getTaxonomyData(targetSs);
       return createJsonResponse({
         success: true,
         data: taxonomy,
         timestamp: new Date().toISOString()
       }, 200);
     }
+
+    if (action === 'diagnoseTaxonomy') {
+      const targetId = (e && e.parameter && e.parameter.spreadsheetId) || ss.getId();
+      const targetSs = SpreadsheetApp.openById(targetId);
+      const sheetNames = targetSs.getSheets().map(function(s) { return s.getName(); });
+      const taxonomy = getTaxonomyData(targetSs);
+      return createJsonResponse({
+        success: true,
+        spreadsheetId: targetId,
+        sheets: sheetNames,
+        taxonomy: taxonomy,
+        timestamp: new Date().toISOString()
+      }, 200);
+    }
+
 
     return createJsonResponse({
       success: false,
@@ -304,11 +322,6 @@ function validateTransactionPayload(tx) {
     errors.push('Non-empty description is required');
   }
 
-  if (tx.type === 'Transfer') {
-    if (!tx.destinationAccount || typeof tx.destinationAccount !== 'string' || tx.destinationAccount.trim() === '') {
-      errors.push('Transfer transactions require a non-empty destinationAccount');
-    }
-  }
 
   return {
     isValid: errors.length === 0,
@@ -362,60 +375,282 @@ function findNextAvailableRow(sheet) {
 }
 
 /**
- * Extracts taxonomy from setup sheet or returns baseline defaults
+ * Helper to locate headers in a 2D matrix
+ */
+function findHeaderLocations(values, headerText) {
+  const locations = [];
+  const target = headerText.trim().toLowerCase();
+  for (let r = 0; r < values.length; r++) {
+    for (let c = 0; c < values[r].length; c++) {
+      if (String(values[r][c] || '').trim().toLowerCase() === target) {
+        locations.push({ row: r, col: c });
+      }
+    }
+  }
+  return locations;
+}
+
+/**
+ * Dynamically extracts category values below section headers from Set Up sheet
+ */
+function extractSectionCategories(values, headerText, sheetName) {
+  const headers = findHeaderLocations(values, headerText);
+  if (headers.length === 0) {
+    throw new Error('Unable to discover required taxonomy header "' + headerText + '" from ' + sheetName + ' sheet');
+  }
+
+  const items = [];
+  const seen = {};
+  const primaryRow = headers[0].row;
+  const matchingCols = headers.filter(function(h) { return Math.abs(h.row - primaryRow) <= 2; });
+
+  for (let i = 0; i < matchingCols.length; i++) {
+    const h = matchingCols[i];
+    for (let r = h.row + 1; r < values.length; r++) {
+      let isRowBlank = true;
+      for (let c = 0; c < values[r].length; c++) {
+        if (String(values[r][c] || '').trim() !== '') {
+          isRowBlank = false;
+          break;
+        }
+      }
+      if (isRowBlank) break;
+
+      const cellVal = String(values[r][h.col] || '').trim();
+      if (cellVal && !seen[cellVal]) {
+        seen[cellVal] = true;
+        items.push(cellVal);
+      }
+    }
+  }
+
+  return {
+    items: items,
+    locations: matchingCols.map(function(h) { return { row: h.row + 1, col: h.col + 1 }; })
+  };
+}
+
+/**
+ * Resolves data validation items from a Google Sheets DataValidation rule
+ */
+function resolveDropdownFromRule(rule, contextName) {
+  if (!rule) {
+    throw new Error("No data validation rule found for " + contextName);
+  }
+
+  const criteriaType = rule.getCriteriaType();
+  const criteriaValues = rule.getCriteriaValues();
+  const resolvedItems = [];
+  let sourceRangeA1 = null;
+
+  for (let i = 0; i < criteriaValues.length; i++) {
+    const v = criteriaValues[i];
+    if (v && typeof v.getValues === 'function') {
+      try {
+        sourceRangeA1 = (v.getSheet() ? v.getSheet().getName() + '!' : '') + v.getA1Notation();
+      } catch (err) {
+        sourceRangeA1 = 'RangeObject';
+      }
+      const raw2D = v.getValues();
+      for (let r = 0; r < raw2D.length; r++) {
+        for (let c = 0; c < raw2D[r].length; c++) {
+          const item = String(raw2D[r][c] || '').trim();
+          if (item && resolvedItems.indexOf(item) === -1) {
+            resolvedItems.push(item);
+          }
+        }
+      }
+    } else if (Array.isArray(v)) {
+      for (let j = 0; j < v.length; j++) {
+        const item = String(v[j] || '').trim();
+        if (item && resolvedItems.indexOf(item) === -1) {
+          resolvedItems.push(item);
+        }
+      }
+    } else if (typeof v === 'string' && v.trim()) {
+      const item = v.trim();
+      if (resolvedItems.indexOf(item) === -1) {
+        resolvedItems.push(item);
+      }
+    }
+  }
+
+  if (resolvedItems.length === 0) {
+    throw new Error("Data validation rule for " + contextName + " resolved to 0 values.");
+  }
+
+  return {
+    criteriaType: String(criteriaType),
+    sourceRange: sourceRangeA1,
+    items: resolvedItems
+  };
+}
+
+/**
+ * Reads the authoritative taxonomy directly from live spreadsheet data-validation dropdowns
+ * (Columns D, G, K in Transactions sheet) and cross-checks against Set Up tab.
  */
 function getTaxonomyData(ss) {
-  const fallback = {
-    types: VALID_TYPES,
-    categoriesByType: {
-      'Income': ['Salary', 'Business Income', 'Dividends', 'Interest', 'Refunds', 'Gifts / Support'],
-      'Expenses': ['Groceries', 'Dining Out / Takeout', 'Transport & Fuel', 'Shopping & Clothing', 'Entertainment', 'Personal Care', 'Health & Pharmacy'],
-      'Bills': ['Rent', 'Electricity / KPLC', 'Water', 'Internet / WiFi', 'TV & Subscriptions', 'Home Maintenance'],
-      'Debt': ['Credit Card', 'Bank Loan Repayment', 'Hustler Fund', 'Personal Loan', 'Mobile Loan (M-Shwari / Fuliza)'],
-      'Savings': ['Emergency Fund', 'Money Market Fund (MMF)', 'SACCO Monthly Deposit', 'Fixed Deposit', 'Treasury Bills'],
-      'Transfer': ['Internal Account Transfer']
-    },
-    accounts: ['M-PESA', 'Bank (NCBA Loop)', 'Bank (Equity)', 'Bank (KCB)', 'SACCO Account', 'MMF Account', 'Cash']
+  const txSheet = ss.getSheetByName(SHEET_NAME_TRANSACTIONS);
+  if (!txSheet) {
+    throw new Error('Required sheet "' + SHEET_NAME_TRANSACTIONS + '" not found in spreadsheet.');
+  }
+
+  // 1. Read Type dropdown (Column D) directly from live validation rule
+  let typeCell = txSheet.getRange('D10');
+  let typeRule = typeCell.getDataValidation();
+  if (!typeRule) {
+    for (let r = 10; r <= 35; r++) {
+      const candidate = txSheet.getRange(r, COL_TYPE).getDataValidation();
+      if (candidate) {
+        typeRule = candidate;
+        typeCell = txSheet.getRange(r, COL_TYPE);
+        break;
+      }
+    }
+  }
+  if (!typeRule) {
+    throw new Error('No validation rule found for Type (Column D) in ' + SHEET_NAME_TRANSACTIONS + ' sheet.');
+  }
+  const typeValidationInfo = resolveDropdownFromRule(typeRule, 'Type (Column D at ' + typeCell.getA1Notation() + ')');
+  const resolvedTypes = typeValidationInfo.items;
+
+  // Sync VALID_TYPES in memory directly from live dropdown
+  VALID_TYPES = resolvedTypes;
+
+  // 2. Read Account dropdown (Column K) directly from live validation rule
+  let accCell = txSheet.getRange('K10');
+  let accRule = accCell.getDataValidation();
+  if (!accRule) {
+    for (let r = 10; r <= 35; r++) {
+      const candidate = txSheet.getRange(r, COL_ACCOUNT).getDataValidation();
+      if (candidate) {
+        accRule = candidate;
+        accCell = txSheet.getRange(r, COL_ACCOUNT);
+        break;
+      }
+    }
+  }
+  if (!accRule) {
+    throw new Error('No validation rule found for Account (Column K) in ' + SHEET_NAME_TRANSACTIONS + ' sheet.');
+  }
+  const accountValidationInfo = resolveDropdownFromRule(accRule, 'Account (Column K at ' + accCell.getA1Notation() + ')');
+  const resolvedAccounts = accountValidationInfo.items;
+
+  // 3. Read Category dropdown (Column G) directly from live validation rules per Type
+  // Category dropdown is dynamic per-row based on the row's Type in Column D.
+  // We locate sample rows for each discovered Type to capture every live category list.
+  const categoryValidationInfoByType = {};
+  const categoriesByType = {};
+
+  const scanLimit = Math.min(txSheet.getLastRow(), 500);
+  const typeColValues = txSheet.getRange(1, COL_TYPE, scanLimit, 1).getValues();
+
+  for (let t = 0; t < resolvedTypes.length; t++) {
+    const currentType = resolvedTypes[t];
+    let sampleRow = -1;
+
+    for (let r = 9; r < typeColValues.length; r++) { // 0-indexed, row 10 is index 9
+      const val = String(typeColValues[r][0] || '').trim();
+      if (val.toLowerCase() === currentType.toLowerCase()) {
+        sampleRow = r + 1;
+        break;
+      }
+    }
+
+    if (sampleRow === -1) {
+      throw new Error('No sample row found in Transactions sheet with Type "' + currentType + '" to inspect Category validation rule.');
+    }
+
+    const catCell = txSheet.getRange(sampleRow, COL_CATEGORY);
+    const catRule = catCell.getDataValidation();
+    if (!catRule) {
+      throw new Error('No Category validation rule found at ' + catCell.getA1Notation() + ' for Type "' + currentType + '"');
+    }
+
+    const resolvedCat = resolveDropdownFromRule(catRule, 'Category for Type "' + currentType + '" at ' + catCell.getA1Notation());
+    categoryValidationInfoByType[currentType] = {
+      row: sampleRow,
+      cell: catCell.getA1Notation(),
+      criteriaType: resolvedCat.criteriaType,
+      sourceRange: resolvedCat.sourceRange,
+      items: resolvedCat.items
+    };
+    categoriesByType[currentType] = resolvedCat.items;
+  }
+
+  // 4. Cross-check against Set Up tab (Live validation rule remains authoritative)
+  const setupSheet = ss.getSheetByName(SHEET_NAME_SETUP);
+  const discrepancies = {};
+  if (setupSheet) {
+    try {
+      const setupValues = setupSheet.getDataRange().getValues();
+      const setupHeaderMap = {
+        'Income': 'Income Source',
+        'Bills': 'Bill Category',
+        'Debt': 'Debt Category',
+        'Expenses': 'Expense Category'
+      };
+
+      Object.keys(setupHeaderMap).forEach(function(typeKey) {
+        const headerText = setupHeaderMap[typeKey];
+        try {
+          const setupExtracted = extractSectionCategories(setupValues, headerText, SHEET_NAME_SETUP);
+          const liveList = categoriesByType[typeKey] || [];
+          const setupList = setupExtracted.items || [];
+          const isDiff = JSON.stringify(liveList) !== JSON.stringify(setupList);
+          if (isDiff) {
+            discrepancies[typeKey] = {
+              liveDropdownItems: liveList,
+              setUpTabItems: setupList,
+              liveOnly: liveList.filter(function(x) { return setupList.indexOf(x) === -1; }),
+              setUpOnly: setupList.filter(function(x) { return liveList.indexOf(x) === -1; })
+            };
+            console.warn('TAXONOMY DISCREPANCY DETECTED for ' + typeKey + ':', JSON.stringify(discrepancies[typeKey]));
+          }
+        } catch (e) {
+          discrepancies[typeKey] = { error: e.message };
+        }
+      });
+    } catch (setupErr) {
+      console.warn('Cross-check against Set Up sheet encountered an error:', setupErr.message);
+    }
+  }
+
+  const taxonomy = {
+    types: resolvedTypes,
+    categoriesByType: categoriesByType,
+    accounts: resolvedAccounts,
+    discrepanciesWithSetUpTab: discrepancies
   };
 
-  const setupSheet = ss.getSheetByName(SHEET_NAME_SETUP);
-  if (!setupSheet) {
-    return fallback;
-  }
+  // Required Logging
+  console.log("FINAL TAXONOMY:", JSON.stringify(taxonomy));
+  console.log("RESOLVED FROM VALIDATION RULES:", JSON.stringify({
+    type: typeValidationInfo,
+    category: categoryValidationInfoByType,
+    account: accountValidationInfo
+  }));
 
-  try {
-    // Read categories from Setup Data 2 if populated
-    // Income: E6:E23, Bills: B27:B66, Debt: B70:B89, Expenses: B93:B122, Savings: B126:B145
-    const readRangeValues = function(rangeA1) {
-      const vals = setupSheet.getRange(rangeA1).getValues();
-      return vals.map(function(row) { return row[0]; })
-                 .filter(function(v) { return v && String(v).trim() !== ''; })
-                 .map(function(v) { return String(v).trim(); });
-    };
-
-    const incomeCats = readRangeValues('E6:E23');
-    const billsCats = readRangeValues('B27:B66');
-    const debtCats = readRangeValues('B70:B89');
-    const expensesCats = readRangeValues('B93:B122');
-    const savingsCats = readRangeValues('B126:B145');
-
-    return {
-      types: VALID_TYPES,
-      categoriesByType: {
-        'Income': incomeCats.length > 0 ? incomeCats : fallback.categoriesByType['Income'],
-        'Expenses': expensesCats.length > 0 ? expensesCats : fallback.categoriesByType['Expenses'],
-        'Bills': billsCats.length > 0 ? billsCats : fallback.categoriesByType['Bills'],
-        'Debt': debtCats.length > 0 ? debtCats : fallback.categoriesByType['Debt'],
-        'Savings': savingsCats.length > 0 ? savingsCats : fallback.categoriesByType['Savings'],
-        'Transfer': ['Internal Account Transfer']
-      },
-      accounts: fallback.accounts
-    };
-  } catch (err) {
-    console.warn('Failed reading setup sheet taxonomy, using baseline fallback: ' + err.message);
-    return fallback;
-  }
+  return taxonomy;
 }
+
+/**
+ * Diagnostic function to test taxonomy against any spreadsheet ID safely (Read-Only)
+ */
+function testTaxonomyAgainstSpreadsheet(spreadsheetId) {
+  const ss = SpreadsheetApp.openById(spreadsheetId);
+  console.log("================================");
+  console.log("SPREADSHEET:", spreadsheetId);
+  console.log("SHEETS:", JSON.stringify(ss.getSheets().map(function(s) { return s.getName(); })));
+
+  const taxonomy = getTaxonomyData(ss);
+  console.log("FINAL TAXONOMY:", JSON.stringify(taxonomy));
+  return taxonomy;
+}
+  return taxonomy;
+}
+
 
 /**
  * Creates standardized JSON HTTP Response with CORS headers

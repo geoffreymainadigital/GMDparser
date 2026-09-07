@@ -63,15 +63,15 @@ async function runTests() {
   assert.strictEqual(res2.statusCode, 405);
   console.log('✓ DELETE /api/health returned 405 Method Not Allowed');
 
-  // 3. Taxonomy fallback GET
+  // 3. Taxonomy upstream unconfigured (strict fail-closed, no silent fake data)
+  delete process.env.APPS_SCRIPT_URL;
   const req3 = createMockReq({ method: 'GET' });
   const res3 = createMockRes();
   await taxonomyHandler(req3, res3);
-  assert.strictEqual(res3.statusCode, 200);
-  assert.strictEqual(res3.body.success, true);
-  assert.ok(res3.body.data.types.includes('Income'));
-  assert.ok(res3.body.data.types.includes('Expenses'));
-  console.log('✓ GET /api/taxonomy returned 200 OK with valid types');
+  assert.strictEqual(res3.statusCode, 503);
+  assert.strictEqual(res3.body.status, 'UPSTREAM_NOT_CONFIGURED');
+  console.log('✓ GET /api/taxonomy returned 503 when upstream unconfigured (no silent fake fallback)');
+
 
   // 4. Transaction missing body
   const req4 = createMockReq({ method: 'POST', body: null });

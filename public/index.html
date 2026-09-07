@@ -122,11 +122,11 @@
 
             <div class="sample-chips">
               <span class="chip-label">Quick Test SMS:</span>
-              <button class="chip-btn" data-sample="kplc">KPLC Electricity Bill</button>
-              <button class="chip-btn" data-sample="naivas">Naivas Till (Groceries)</button>
-              <button class="chip-btn" data-sample="send">P2P Send Money</button>
-              <button class="chip-btn" data-sample="income">Salary / Received</button>
-              <button class="chip-btn" data-sample="transfer">NCBA Loop Bank Transfer</button>
+              <button class="chip-btn" data-sample="kplc">KPLC Electricity (Bills)</button>
+              <button class="chip-btn" data-sample="mamamboga">Mama Mboga (Expenses)</button>
+              <button class="chip-btn" data-sample="fare">Boda / Fare (Expenses)</button>
+              <button class="chip-btn" data-sample="income">Salary Inflow (Income)</button>
+              <button class="chip-btn" data-sample="transfer">Equity Bank Transfer</button>
             </div>
 
             <div class="actions-row">
@@ -256,21 +256,25 @@
               <div class="form-group">
                 <label>Source Account</label>
                 <select id="transfer-source">
-                  <option value="M-PESA">M-PESA</option>
-                  <option value="Bank (NCBA Loop)">Bank (NCBA Loop)</option>
-                  <option value="Bank (Equity)">Bank (Equity)</option>
+                  <option value="Mpesa">Mpesa</option>
+                  <option value="Equity Bank">Equity Bank</option>
+                  <option value="I&M Bank">I&M Bank</option>
                   <option value="Cash">Cash</option>
+                  <option value="Till Number">Till Number</option>
+                  <option value="Tower Sacco">Tower Sacco</option>
+                  <option value="Airtime">Airtime</option>
                 </select>
               </div>
               <div class="form-group">
                 <label>Destination Account (Required)</label>
                 <select id="transfer-dest">
-                  <option value="Bank (NCBA Loop)">Bank (NCBA Loop)</option>
-                  <option value="Bank (Equity)">Bank (Equity)</option>
-                  <option value="Bank (KCB)">Bank (KCB)</option>
-                  <option value="SACCO Account">SACCO Account (Stima)</option>
-                  <option value="MMF Account">CIC Money Market Fund (MMF)</option>
-                  <option value="Cash">Physical Cash</option>
+                  <option value="Equity Bank">Equity Bank</option>
+                  <option value="I&M Bank">I&M Bank</option>
+                  <option value="Cash">Cash</option>
+                  <option value="Mpesa">Mpesa</option>
+                  <option value="Tower Sacco">Tower Sacco</option>
+                  <option value="Till Number">Till Number</option>
+                  <option value="Airtime">Airtime</option>
                 </select>
               </div>
               <div class="form-group">

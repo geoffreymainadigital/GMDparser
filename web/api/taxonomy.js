@@ -1,20 +1,7 @@
 /**
  * Vercel Serverless Function: GET /api/taxonomy
- * Proxies taxonomy data from Google Sheets or returns baseline defaults
+ * Proxies taxonomy data directly from Google Apps Script / Google Sheets
  */
-
-const BASELINE_TAXONOMY = {
-  types: ['Income', 'Expenses', 'Bills', 'Debt', 'Savings', 'Transfer'],
-  categoriesByType: {
-    'Income': ['Salary', 'Business Income', 'Dividends', 'Interest', 'Refunds', 'Gifts / Support'],
-    'Expenses': ['Groceries', 'Dining Out / Takeout', 'Transport & Fuel', 'Shopping & Clothing', 'Entertainment', 'Personal Care', 'Health & Pharmacy'],
-    'Bills': ['Rent', 'Electricity / KPLC', 'Water', 'Internet / WiFi', 'TV & Subscriptions', 'Home Maintenance'],
-    'Debt': ['Credit Card', 'Bank Loan Repayment', 'Hustler Fund', 'Personal Loan', 'Mobile Loan (M-Shwari / Fuliza)'],
-    'Savings': ['Emergency Fund', 'Money Market Fund (MMF)', 'SACCO Monthly Deposit', 'Fixed Deposit', 'Treasury Bills'],
-    'Transfer': ['Internal Account Transfer']
-  },
-  accounts: ['M-PESA', 'Bank (NCBA Loop)', 'Bank (Equity)', 'Bank (KCB)', 'SACCO Account', 'MMF Account', 'Cash']
-};
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
@@ -22,23 +9,26 @@ export default async function handler(req, res) {
   }
 
   if (req.method !== 'GET') {
-    return res.status(405).json({ success: false, error: `Method ${req.method} not allowed` });
+    return res.status(405).json({
+      success: false,
+      status: 'METHOD_NOT_ALLOWED',
+      error: `Method ${req.method} not allowed. Use GET.`
+    });
   }
 
   const appsScriptUrl = process.env.APPS_SCRIPT_URL;
   if (!appsScriptUrl) {
-    // Return baseline taxonomy if backend not yet wired
-    return res.status(200).json({
-      success: true,
-      source: 'baseline_default',
-      data: BASELINE_TAXONOMY,
-      syncedAt: new Date().toISOString()
+    return res.status(503).json({
+      success: false,
+      status: 'UPSTREAM_NOT_CONFIGURED',
+      error: 'APPS_SCRIPT_URL environment variable is not configured on Vercel gateway.',
+      note: 'Please deploy the Apps Script backend and add APPS_SCRIPT_URL to Vercel dashboard.'
     });
   }
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
 
     const upstreamRes = await fetch(`${appsScriptUrl}?action=taxonomy`, {
       method: 'GET',
@@ -56,20 +46,20 @@ export default async function handler(req, res) {
       });
     }
 
-    // Fallback on upstream non-200
-    return res.status(200).json({
-      success: true,
-      source: 'fallback_after_upstream_error',
-      data: BASELINE_TAXONOMY,
-      syncedAt: new Date().toISOString()
+    const errData = await upstreamRes.json().catch(() => null);
+    return res.status(upstreamRes.status || 502).json({
+      success: false,
+      status: 'UPSTREAM_ERROR',
+      error: (errData && errData.error) || `Upstream returned status ${upstreamRes.status}`
     });
 
   } catch (err) {
-    return res.status(200).json({
-      success: true,
-      source: 'fallback_after_timeout',
-      data: BASELINE_TAXONOMY,
-      syncedAt: new Date().toISOString()
+    const isTimeout = err.name === 'AbortError';
+    return res.status(isTimeout ? 504 : 502).json({
+      success: false,
+      status: isTimeout ? 'GATEWAY_TIMEOUT' : 'BAD_GATEWAY',
+      error: isTimeout ? 'Upstream Apps Script request timed out (10s)' : `Upstream connection failure: ${err.message}`
     });
   }
 }
+

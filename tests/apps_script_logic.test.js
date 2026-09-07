@@ -3,7 +3,7 @@
  */
 import assert from 'node:assert';
 
-const VALID_TYPES = ['Income', 'Expenses', 'Bills', 'Debt', 'Savings', 'Transfer'];
+const VALID_TYPES = ['Income', 'Expenses', 'Bills', 'Debt', 'Savings'];
 
 function validateTransactionPayload(tx) {
   const errors = [];
@@ -40,17 +40,12 @@ function validateTransactionPayload(tx) {
     errors.push('Non-empty description is required');
   }
 
-  if (tx.type === 'Transfer') {
-    if (!tx.destinationAccount || typeof tx.destinationAccount !== 'string' || tx.destinationAccount.trim() === '') {
-      errors.push('Transfer transactions require a non-empty destinationAccount');
-    }
-  }
-
   return {
     isValid: errors.length === 0,
     errors: errors
   };
 }
+
 
 function checkDuplicateTransactionCode(codesList, txCode) {
   if (!txCode) return { isDuplicate: false };
@@ -94,21 +89,21 @@ assert.strictEqual(res3.isValid, false);
 assert.ok(res3.errors[0].includes('Type must be one of'));
 console.log('✓ Invalid type rejected');
 
-// 4. Require destination account for transfers
-const transferWithoutDest = {
+// 4. Reject removed 'Transfer' type (only Income, Expenses, Bills, Debt, Savings allowed)
+const transferTx = {
   date: '2026-09-07',
   type: 'Transfer',
   category: 'Internal Account Transfer',
   description: 'Transfer to NCBA',
   amount: 5000,
-  account: 'M-PESA',
-  transactionCode: 'TD47XYZ999',
-  destinationAccount: null
+  account: 'Mpesa',
+  transactionCode: 'TD47XYZ999'
 };
-const res4 = validateTransactionPayload(transferWithoutDest);
+const res4 = validateTransactionPayload(transferTx);
 assert.strictEqual(res4.isValid, false);
-assert.ok(res4.errors.some(e => e.includes('destinationAccount')));
-console.log('✓ Transfer without destinationAccount rejected');
+assert.ok(res4.errors.some(e => e.includes('Type must be one of')));
+console.log('✓ Invalid type "Transfer" rejected per real spreadsheet taxonomy');
+
 
 // 5. Duplicate code check
 const existingCodes = ['TD47XYZ123', 'TD47XYZ124', 'TD47XYZ125'];

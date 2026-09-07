@@ -3,22 +3,85 @@
  * Responsive financial operating system client
  */
 
-// Category taxonomy by transaction type
+// Category taxonomy by transaction type (Synchronized with Spreadsheet Set Up, Savings, and Accounts tabs)
 const TAXONOMY = {
-  'Income': ['Salary', 'Business Income', 'Dividends', 'Interest', 'Refunds', 'Gifts / Support'],
-  'Expenses': ['Groceries', 'Dining Out / Takeout', 'Transport & Fuel', 'Shopping & Clothing', 'Entertainment', 'Personal Care', 'Health & Pharmacy'],
-  'Bills': ['Rent', 'Electricity / KPLC', 'Water', 'Internet / WiFi', 'TV & Subscriptions', 'Home Maintenance'],
-  'Debt': ['Credit Card', 'Bank Loan Repayment', 'Hustler Fund', 'Personal Loan', 'Mobile Loan (M-Shwari / Fuliza)'],
-  'Savings': ['Emergency Fund', 'Money Market Fund (MMF)', 'SACCO Monthly Deposit', 'Fixed Deposit', 'Treasury Bills'],
-  'Transfer': ['Internal Account Transfer']
+  'Income': [
+    'Salary',
+    'Livestream/Photo/Video',
+    'Camera Income',
+    'Money Diary Kenya',
+    'Return On Investments',
+    'Random Money',
+    'Paradise Point Resort Tokens',
+    'Loans',
+    'Work Allowances',
+    'Wifi Clients',
+    'Work Airtime'
+  ],
+  'Bills': [
+    'Rent',
+    'Monthly Shopping',
+    'WIFI',
+    'Minutes',
+    'Electricity',
+    'Water'
+  ],
+  'Debt': [
+    'Equity Loan',
+    'NCA Sacco Loan',
+    'Helb Loan'
+  ],
+  'Expenses': [
+    'Mama Mboga',
+    'Eating Out',
+    'Work costs',
+    'Side Hustle Costs',
+    'Bundles',
+    'Transaction Cost',
+    'Kinyozi',
+    'Mama Fua',
+    'Fare',
+    'MDK',
+    'Boda',
+    'Wife Allowances',
+    'Black Tax',
+    'Car Hire',
+    'Shoes',
+    'Clothes',
+    'Suits',
+    'Electronics',
+    'Kitchenwares',
+    'Marriage Process',
+    'Gas',
+    'House Supplies',
+    'Water Refilling',
+    'Donations'
+  ],
+  'Savings': [
+    'Sanlam MMF',
+    'Britam EQ and MMF',
+    'Etica MMF',
+    'AIB Stocks',
+    'SOL',
+    'USDT',
+    'BTC',
+    'Other Crypto Coins',
+    'NCA Sacco',
+    'Tower Sacco',
+    'Ziidi MMF',
+    'Faida Stocks',
+    'Ziidi Stocks',
+    'ETH',
+    'Arvocap'
+  ]
 };
 
 const SAMPLE_MESSAGES = {
   kplc: 'TD47XYZ123 Confirmed. Ksh3,500.00 sent to Kenya Power and Lighting Company for account 12345678 on 7/9/26 at 8:15 PM. New M-PESA balance is Ksh12,450.00. Transaction cost, Ksh23.00.',
-  naivas: 'TD48ABC456 Confirmed. Ksh1,250.00 paid to NAIVAS SUPERMARKET. on 7/9/26 at 2:30 PM. New M-PESA balance is Ksh11,200.00. Transaction cost, Ksh0.00.',
-  send: 'TD49DEF789 Confirmed. Ksh2,000.00 sent to JANE DOE 0712345678 on 7/9/26 at 10:05 AM. New M-PESA balance is Ksh9,200.00. Transaction cost, Ksh15.00.',
-  income: 'TD50GHI012 Confirmed. You have received Ksh50,000.00 from ACME TECH LTD 0798765432 on 7/9/26 at 9:00 AM. New M-PESA balance is Ksh59,200.00.',
-  transfer: 'TD51JKL345 Confirmed. Ksh10,000.00 sent to NCBA LOOP for account 0123456789 on 7/9/26 at 1:15 PM. New M-PESA balance is Ksh49,200.00.'
+  mamamboga: 'TD48ABC456 Confirmed. Ksh450.00 paid to MAMA MBOGA GROCERIES. on 7/9/26 at 2:30 PM. New M-PESA balance is Ksh11,200.00. Transaction cost, Ksh0.00.',
+  fare: 'TD49DEF789 Confirmed. Ksh300.00 sent to JOHN BODA 0712345678 on 7/9/26 at 10:05 AM. New M-PESA balance is Ksh9,200.00. Transaction cost, Ksh0.00.',
+  income: 'TD50GHI012 Confirmed. You have received Ksh85,000.00 from EMPLOYER LTD 0798765432 on 7/9/26 at 9:00 AM. New M-PESA balance is Ksh94,200.00.',
+  transfer: 'TD51JKL345 Confirmed. Ksh10,000.00 sent to EQUITY BANK for account 0123456789 on 7/9/26 at 1:15 PM. New M-PESA balance is Ksh84,200.00.'
 };
 
 // Application State
@@ -26,20 +89,21 @@ const state = {
   pendingReviews: [],
   confirmedRecords: [],
   accounts: [
-    { name: 'M-PESA', type: 'Mobile Money', balance: 12450.00 },
-    { name: 'NCBA Loop', type: 'Bank Account', balance: 45200.00 },
-    { name: 'Equity Bank', type: 'Bank Account', balance: 18500.00 },
-    { name: 'Stima Sacco', type: 'SACCO Account', balance: 120000.00 },
-    { name: 'CIC Money Market Fund', type: 'MMF Account', balance: 85000.00 },
-    { name: 'Physical Cash', type: 'Cash Wallet', balance: 3200.00 }
+    { name: 'Mpesa', type: 'Mobile Money', balance: 0.00 },
+    { name: 'Equity Bank', type: 'Bank Account', balance: 0.00 },
+    { name: 'I&M Bank', type: 'Bank Account', balance: 0.00 },
+    { name: 'Cash', type: 'Cash Wallet', balance: 0.00 },
+    { name: 'Till Number', type: 'Merchant Till', balance: 0.00 },
+    { name: 'Tower Sacco', type: 'SACCO Account', balance: 0.00 },
+    { name: 'Airtime', type: 'Airtime Account', balance: 0.00 }
   ],
   budgets: [
-    { category: 'Groceries', spent: 14500, limit: 20000 },
-    { category: 'Transport & Fuel', spent: 8200, limit: 10000 },
-    { category: 'Dining Out / Takeout', spent: 4500, limit: 6000 },
-    { category: 'Electricity / KPLC', spent: 3500, limit: 4000 },
-    { category: 'Internet / WiFi', spent: 3000, limit: 3000 },
-    { category: 'Shopping & Clothing', spent: 5500, limit: 5000 }
+    { category: 'Monthly Shopping', spent: 0, limit: 15000 },
+    { category: 'Mama Mboga', spent: 0, limit: 8000 },
+    { category: 'Electricity', spent: 0, limit: 3500 },
+    { category: 'Rent', spent: 0, limit: 25000 },
+    { category: 'WIFI', spent: 0, limit: 3000 },
+    { category: 'Fare', spent: 0, limit: 6000 }
   ]
 };
 
@@ -62,7 +126,7 @@ function parseMpesaMessage(smsBody) {
   const costMatch = trimmed.match(/Transaction cost,?\s*Ksh([\d,]+\.?\d*)/i);
   if (costMatch) cost = parseFloat(costMatch[1].replace(/,/g, ''));
 
-  // 1. Sent to (Paybill / Send Money / Transfer)
+  // 1. Sent to (Paybill / Send Money / Bank Transfer)
   const sentMatch = trimmed.match(/Ksh([\d,]+\.?\d*)\s+sent to\s+(.+?)\s+on\s+(\d{1,2}\/\d{1,2}\/\d{2,4})\s+at\s+(\d{1,2}:\d{2}\s*(?:AM|PM))/i);
   if (sentMatch) {
     const amount = parseFloat(sentMatch[1].replace(/,/g, ''));
@@ -79,25 +143,23 @@ function parseMpesaMessage(smsBody) {
 
     const lower = targetRaw.toLowerCase();
     let type = 'Expenses';
-    let category = 'Gifts / Support';
+    let category = 'Fare';
     let destAccount = null;
 
-    if (lower.includes('kenya power') || lower.includes('kplc')) {
-      type = 'Bills'; category = 'Electricity / KPLC';
+    if (lower.includes('kenya power') || lower.includes('kplc') || lower.includes('electricity')) {
+      type = 'Bills'; category = 'Electricity';
     } else if (lower.includes('water')) {
       type = 'Bills'; category = 'Water';
-    } else if (lower.includes('safaricom home') || lower.includes('zuku') || lower.includes('faiba') || lower.includes('poa')) {
-      type = 'Bills'; category = 'Internet / WiFi';
-    } else if (lower.includes('ncba loop') || lower.includes('loop')) {
-      type = 'Transfer'; category = 'Internal Account Transfer'; destAccount = 'Bank (NCBA Loop)';
+    } else if (lower.includes('safaricom home') || lower.includes('zuku') || lower.includes('faiba') || lower.includes('wifi') || lower.includes('poa')) {
+      type = 'Bills'; category = 'WIFI';
     } else if (lower.includes('equity')) {
-      type = 'Transfer'; category = 'Internal Account Transfer'; destAccount = 'Bank (Equity)';
-    } else if (lower.includes('kcb')) {
-      type = 'Transfer'; category = 'Internal Account Transfer'; destAccount = 'Bank (KCB)';
-    } else if (lower.includes('sacco') || lower.includes('stima')) {
-      type = 'Transfer'; category = 'Internal Account Transfer'; destAccount = 'SACCO Account';
-    } else if (lower.includes('cic') || lower.includes('mmf')) {
-      type = 'Savings'; category = 'Money Market Fund (MMF)'; destAccount = 'MMF Account';
+      type = 'Bills'; destAccount = 'Equity Bank'; category = 'Monthly Shopping';
+    } else if (lower.includes('tower') || lower.includes('sacco')) {
+      type = 'Savings'; category = 'Tower Sacco'; destAccount = 'Tower Sacco';
+    } else if (lower.includes('sanlam')) {
+      type = 'Savings'; category = 'Sanlam MMF';
+    } else if (lower.includes('boda') || lower.includes('fare')) {
+      type = 'Expenses'; category = 'Boda';
     }
 
     return {
@@ -111,7 +173,7 @@ function parseMpesaMessage(smsBody) {
       description: targetRaw + (accountRef ? ` (${accountRef})` : ''),
       type,
       category,
-      account: 'M-PESA',
+      account: 'Mpesa',
       destinationAccount: destAccount,
       rawText: trimmed
     };
@@ -126,13 +188,17 @@ function parseMpesaMessage(smsBody) {
     const timeStr = paidMatch[4];
 
     const lower = merchant.toLowerCase();
-    let category = 'Shopping & Clothing';
-    if (lower.includes('naivas') || lower.includes('carrefour') || lower.includes('quickmart')) {
-      category = 'Groceries';
-    } else if (lower.includes('kfc') || lower.includes('java') || lower.includes('artcaffe')) {
-      category = 'Dining Out / Takeout';
-    } else if (lower.includes('total') || lower.includes('shell') || lower.includes('uber')) {
-      category = 'Transport & Fuel';
+    let category = 'House Supplies';
+    let type = 'Expenses';
+    if (lower.includes('mboga') || lower.includes('market') || lower.includes('fruit') || lower.includes('veg')) {
+      category = 'Mama Mboga';
+    } else if (lower.includes('supermarket') || lower.includes('naivas') || lower.includes('carrefour') || lower.includes('quickmart')) {
+      type = 'Bills';
+      category = 'Monthly Shopping';
+    } else if (lower.includes('kfc') || lower.includes('java') || lower.includes('artcaffe') || lower.includes('restaurant') || lower.includes('hotel') || lower.includes('cafe')) {
+      category = 'Eating Out';
+    } else if (lower.includes('boda') || lower.includes('fare') || lower.includes('uber') || lower.includes('bolt') || lower.includes('matatu')) {
+      category = 'Fare';
     }
 
     return {
@@ -144,9 +210,9 @@ function parseMpesaMessage(smsBody) {
       time: timeStr,
       recipient: merchant,
       description: merchant,
-      type: 'Expenses',
+      type,
       category,
-      account: 'M-PESA',
+      account: 'Mpesa',
       destinationAccount: null,
       rawText: trimmed
     };
@@ -171,11 +237,14 @@ function parseMpesaMessage(smsBody) {
       description: `Received from ${sender}`,
       type: 'Income',
       category: 'Salary',
-      account: 'M-PESA',
+      account: 'Mpesa',
       destinationAccount: null,
       rawText: trimmed
     };
   }
+
+  return null;
+}
 
   return null;
 }
@@ -315,7 +384,7 @@ function renderReviewCards() {
         <div class="form-group">
           <label>Transaction Type</label>
           <select id="tx-type-${index}">
-            ${['Expenses', 'Bills', 'Income', 'Transfer', 'Savings', 'Debt'].map(t =>
+            ${Object.keys(TAXONOMY).map(t =>
               `<option value="${t}" ${t === tx.type ? 'selected' : ''}>${t}</option>`
             ).join('')}
           </select>
@@ -334,11 +403,15 @@ function renderReviewCards() {
         </div>
         <div class="form-group">
           <label>Funding Account</label>
-          <input type="text" value="${tx.account}" id="tx-account-${index}" />
+          <select id="tx-account-${index}">
+            ${state.accounts.map(a => `<option value="${a.name}" ${a.name === tx.account ? 'selected' : ''}>${a.name}</option>`).join('')}
+          </select>
         </div>
         <div class="form-group" id="tx-dest-group-${index}" style="${isTransfer ? '' : 'display: none;'}">
           <label style="color: var(--color-cyan);">Destination Account (Transfer Only)</label>
-          <input type="text" value="${tx.destinationAccount || 'Bank (NCBA Loop)'}" id="tx-dest-${index}" placeholder="e.g. Bank (NCBA Loop)" />
+          <select id="tx-dest-${index}">
+            ${state.accounts.map(a => `<option value="${a.name}" ${a.name === tx.destinationAccount ? 'selected' : ''}>${a.name}</option>`).join('')}
+          </select>
         </div>
       </div>
 
@@ -614,12 +687,68 @@ async function checkNetworkStatus() {
   }
 }
 
+// Account Dropdown Synchronizer
+function populateAccountDropdowns(accounts) {
+  const srcSelect = document.getElementById('transfer-source');
+  const destSelect = document.getElementById('transfer-dest');
+  if (!accounts || accounts.length === 0) return;
+
+  const optionsHtml = accounts.map(acc => `<option value="${acc}">${acc}</option>`).join('');
+  if (srcSelect) {
+    const curVal = srcSelect.value;
+    srcSelect.innerHTML = optionsHtml;
+    if (accounts.includes(curVal)) srcSelect.value = curVal;
+  }
+  if (destSelect) {
+    const curVal = destSelect.value;
+    destSelect.innerHTML = optionsHtml;
+    if (accounts.includes(curVal)) {
+      destSelect.value = curVal;
+    } else if (accounts.length > 1) {
+      destSelect.value = accounts[1];
+    }
+  }
+}
+
+// Dynamic Taxonomy Synchronizer (Fetches authoritative taxonomy from /api/taxonomy)
+async function fetchTaxonomyFromApi() {
+  try {
+    const res = await fetch('/api/taxonomy');
+    if (!res.ok) {
+      console.warn('Taxonomy API responded with status', res.status);
+      return;
+    }
+    const json = await res.json();
+    if (json.success && json.data) {
+      const data = json.data;
+      if (data.categoriesByType) {
+        Object.keys(data.categoriesByType).forEach(typeKey => {
+          TAXONOMY[typeKey] = data.categoriesByType[typeKey];
+        });
+      }
+      if (Array.isArray(data.accounts) && data.accounts.length > 0) {
+        state.accounts = data.accounts.map(name => ({
+          name,
+          type: name.includes('Bank') ? 'Bank Account' : (name.includes('Sacco') ? 'SACCO Account' : (name.includes('Cash') ? 'Cash Wallet' : 'Asset Account')),
+          balance: 0.00
+        }));
+        populateAccountDropdowns(data.accounts);
+        renderAccountsAndBudgets();
+      }
+      console.log('✓ Dynamic taxonomy synchronized successfully from /api/taxonomy:', TAXONOMY);
+    }
+  } catch (err) {
+    console.warn('Could not fetch dynamic taxonomy:', err.message);
+  }
+}
+
 // Main Initialization
 document.addEventListener('DOMContentLoaded', () => {
   initNavigation();
   renderAccountsAndBudgets();
   renderLedgerTables();
   checkNetworkStatus();
+  fetchTaxonomyFromApi();
 
   // Quick SMS Parse button
   const parseBtn = document.getElementById('btn-parse-sms');

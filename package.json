@@ -5,8 +5,9 @@
   "type": "module",
   "description": "GMDParser - Clean-Slate Personal Financial Operating System",
   "scripts": {
-    "test": "node tests/apps_script_logic.test.js && node tests/vercel_proxy.test.js && node tests/mpesa_parser.test.js",
+    "test": "node tests/apps_script_logic.test.js && node tests/vercel_proxy.test.js && node tests/mpesa_parser.test.js && node tests/test_taxonomy_extraction.js",
     "test:parser": "node tests/mpesa_parser.test.js"
+
   },
   "workspaces": [
     "web"
