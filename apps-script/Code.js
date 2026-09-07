@@ -24,7 +24,7 @@ let VALID_TYPES = ['Income', 'Expenses', 'Bills', 'Debt', 'Savings', 'Balance'];
 
 /**
  * Handle HTTP GET Requests (Health check and taxonomy)
- */
+ */aa
 function doGet(e) {
   try {
     const action = (e && e.parameter && e.parameter.action) || 'health';
@@ -48,7 +48,7 @@ function doGet(e) {
     }
 
     if (action === 'taxonomy') {
-      const targetSs = (e && e.parameter && e.parameter.spreadsheetId) ? 
+      const targetSs = (e && e.parameter && e.parameter.spreadsheetId) ?
         SpreadsheetApp.openById(e.parameter.spreadsheetId) : ss;
       const taxonomy = getTaxonomyData(targetSs);
       return createJsonResponse({
@@ -61,7 +61,7 @@ function doGet(e) {
     if (action === 'diagnoseTaxonomy') {
       const targetId = (e && e.parameter && e.parameter.spreadsheetId) || ss.getId();
       const targetSs = SpreadsheetApp.openById(targetId);
-      const sheetNames = targetSs.getSheets().map(function(s) { return s.getName(); });
+      const sheetNames = targetSs.getSheets().map(function (s) { return s.getName(); });
       const taxonomy = getTaxonomyData(targetSs);
       return createJsonResponse({
         success: true,
@@ -127,8 +127,8 @@ function doPost(e) {
     const scriptProperties = PropertiesService.getScriptProperties();
     const configuredSecret = scriptProperties.getProperty('GMD_AUTH_SECRET');
     if (configuredSecret) {
-      const clientAuthKey = (payload && payload.authKey) || 
-                            (e && e.headers && (e.headers['X-GMD-Auth-Key'] || e.headers['x-gmd-auth-key']));
+      const clientAuthKey = (payload && payload.authKey) ||
+        (e && e.headers && (e.headers['X-GMD-Auth-Key'] || e.headers['x-gmd-auth-key']));
       if (clientAuthKey !== configuredSecret) {
         return createJsonResponse({
           success: false,
@@ -409,7 +409,7 @@ function extractSectionCategories(values, headerText, sheetName) {
   const items = [];
   const seen = {};
   const primaryRow = headers[0].row;
-  const matchingCols = headers.filter(function(h) { return Math.abs(h.row - primaryRow) <= 2; });
+  const matchingCols = headers.filter(function (h) { return Math.abs(h.row - primaryRow) <= 2; });
 
   for (let i = 0; i < matchingCols.length; i++) {
     const h = matchingCols[i];
@@ -433,7 +433,7 @@ function extractSectionCategories(values, headerText, sheetName) {
 
   return {
     items: items,
-    locations: matchingCols.map(function(h) { return { row: h.row + 1, col: h.col + 1 }; })
+    locations: matchingCols.map(function (h) { return { row: h.row + 1, col: h.col + 1 }; })
   };
 }
 
@@ -599,7 +599,7 @@ function getTaxonomyData(ss) {
         'Expenses': 'Expense Category'
       };
 
-      Object.keys(setupHeaderMap).forEach(function(typeKey) {
+      Object.keys(setupHeaderMap).forEach(function (typeKey) {
         const headerText = setupHeaderMap[typeKey];
         try {
           const setupExtracted = extractSectionCategories(setupValues, headerText, SHEET_NAME_SETUP);
@@ -610,8 +610,8 @@ function getTaxonomyData(ss) {
             discrepancies[typeKey] = {
               liveDropdownItems: liveList,
               setUpTabItems: setupList,
-              liveOnly: liveList.filter(function(x) { return setupList.indexOf(x) === -1; }),
-              setUpOnly: setupList.filter(function(x) { return liveList.indexOf(x) === -1; })
+              liveOnly: liveList.filter(function (x) { return setupList.indexOf(x) === -1; }),
+              setUpOnly: setupList.filter(function (x) { return liveList.indexOf(x) === -1; })
             };
             console.warn('TAXONOMY DISCREPANCY DETECTED for ' + typeKey + ':', JSON.stringify(discrepancies[typeKey]));
           }
@@ -649,12 +649,10 @@ function testTaxonomyAgainstSpreadsheet(spreadsheetId) {
   const ss = SpreadsheetApp.openById(spreadsheetId);
   console.log("================================");
   console.log("SPREADSHEET:", spreadsheetId);
-  console.log("SHEETS:", JSON.stringify(ss.getSheets().map(function(s) { return s.getName(); })));
+  console.log("SHEETS:", JSON.stringify(ss.getSheets().map(function (s) { return s.getName(); })));
 
   const taxonomy = getTaxonomyData(ss);
   console.log("FINAL TAXONOMY:", JSON.stringify(taxonomy));
-  return taxonomy;
-}
   return taxonomy;
 }
 
