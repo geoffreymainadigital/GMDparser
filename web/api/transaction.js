@@ -79,11 +79,19 @@ export default async function handler(req, res) {
     });
     clearTimeout(timeoutId);
 
-    const upstreamData = await upstreamRes.json().catch(err => ({
-      success: false,
-      status: 'PARSE_ERROR',
-      error: 'Failed parsing upstream Apps Script response: ' + err.message
-    }));
+    const rawText = await upstreamRes.text();
+    let upstreamData;
+    try {
+      upstreamData = JSON.parse(rawText);
+    } catch (_) {
+      const match = rawText.match(/<div[^>]*>([^<]*(?:Error|Exception)[^<]*)<\/div>/i) || rawText.match(/(ReferenceError[^\n<]*)/);
+      const gasError = match ? match[1].replace(/&quot;/g, '"') : 'Apps Script returned non-JSON HTML';
+      return res.status(502).json({
+        success: false,
+        status: 'UPSTREAM_SCRIPT_ERROR',
+        error: `Apps Script error: ${gasError}. Please check line 27 in code.gs.`
+      });
+    }
 
     // Pass through exact status code from Apps Script (e.g. 201, 409, 400)
     const statusCode = upstreamRes.status !== 200 ? upstreamRes.status : (upstreamData.success ? 201 : (upstreamData.status === 'DUPLICATE_TRANSACTION_CODE' ? 409 : 400));
