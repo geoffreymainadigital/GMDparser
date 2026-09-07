@@ -88,4 +88,46 @@ const r8 = MpesaParser.parse(promoMessage);
 assert.strictEqual(r8.isFinancial, false);
 console.log('✓ TC-SMS-08 (Promotional SMS Ignored) passed');
 
+// 9. Tower Sacco Payment via Paybill (Must classify as Type: Savings, Category: Tower Sacco, Account: Mpesa - NOT Balance and NOT Account: Tower Sacco)
+const towerSaccoMessage = 'TD54TWR123 Confirmed. Ksh5,000.00 sent to TOWER SACCO for account 12345 on 7/9/26 at 11:30 AM. New M-PESA balance is Ksh15,000.00. Transaction cost, Ksh23.00.';
+const r9 = MpesaParser.parse(towerSaccoMessage);
+assert.strictEqual(r9.isFinancial, true);
+assert.strictEqual(r9.transactionCode, 'TD54TWR123');
+assert.strictEqual(r9.amount, 5000.00);
+assert.strictEqual(r9.type, 'Savings', 'Payment to Tower Sacco must be classified as Savings');
+assert.strictEqual(r9.category, 'Tower Sacco', 'Category must be Tower Sacco');
+assert.strictEqual(r9.account, 'Mpesa', 'Source account must be Mpesa (where the SMS originated)');
+assert.strictEqual(r9.destinationAccount, null, 'destinationAccount must be null (not a balance transfer)');
+assert.notStrictEqual(r9.type, 'Balance', 'Must NOT be classified as Balance');
+assert.notStrictEqual(r9.account, 'Tower Sacco', 'Account must NOT be set to Tower Sacco');
+console.log('✓ TC-SMS-09 (Tower Sacco Savings via Paybill) passed');
+
+// 10. NCA Sacco Savings Payment
+const ncaSaccoMessage = 'TD55NCA123 Confirmed. Ksh4,000.00 sent to NCA SACCO for account 67890 on 7/9/26 at 12:00 PM. New M-PESA balance is Ksh11,000.00. Transaction cost, Ksh23.00.';
+const r10 = MpesaParser.parse(ncaSaccoMessage);
+assert.strictEqual(r10.isFinancial, true);
+assert.strictEqual(r10.type, 'Savings', 'NCA Sacco deposit must be classified as Savings');
+assert.strictEqual(r10.category, 'NCA Sacco');
+assert.strictEqual(r10.account, 'Mpesa');
+assert.strictEqual(r10.destinationAccount, null);
+console.log('✓ TC-SMS-10 (NCA Sacco Savings) passed');
+
+// 11. NCA Sacco Loan Repayment (Debt collision disambiguation)
+const ncaLoanMessage = 'TD56LON123 Confirmed. Ksh2,500.00 sent to NCA SACCO LOAN for account 67890 on 7/9/26 at 12:15 PM. New M-PESA balance is Ksh8,500.00. Transaction cost, Ksh23.00.';
+const r11 = MpesaParser.parse(ncaLoanMessage);
+assert.strictEqual(r11.isFinancial, true);
+assert.strictEqual(r11.type, 'Debt', 'NCA Sacco Loan must be classified as Debt, not Savings');
+assert.strictEqual(r11.category, 'NCA Sacco Loan');
+assert.strictEqual(r11.account, 'Mpesa');
+console.log('✓ TC-SMS-11 (NCA Sacco Loan Repayment vs Savings disambiguation) passed');
+
+// 12. Matatu Transport Sacco (Super Metro SACCO - must not match savings or bank transfer)
+const matatuMessage = 'TD57MET123 Confirmed. Ksh100.00 sent to SUPER METRO SACCO on 7/9/26 at 7:30 AM. New M-PESA balance is Ksh8,400.00. Transaction cost, Ksh0.00.';
+const r12 = MpesaParser.parse(matatuMessage);
+assert.strictEqual(r12.isFinancial, true);
+assert.strictEqual(r12.type, 'Expenses');
+assert.strictEqual(r12.category, 'Fare', 'Matatu sacco payment must be Fare');
+assert.strictEqual(r12.account, 'Mpesa');
+console.log('✓ TC-SMS-12 (Matatu Sacco Transport Fare) passed');
+
 console.log('\nAll Kenyan M-PESA parser unit tests PASSED successfully!');

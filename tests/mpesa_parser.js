@@ -85,7 +85,7 @@ export class MpesaParser {
         phone,
         type: classification.type,
         category: classification.category,
-        account: 'M-PESA',
+        account: 'Mpesa',
         destinationAccount: classification.destinationAccount || null,
         rawText: trimmed
       };
@@ -116,7 +116,7 @@ export class MpesaParser {
         description: merchant,
         type: classification.type,
         category: classification.category,
-        account: 'M-PESA',
+        account: 'Mpesa',
         destinationAccount: null,
         rawText: trimmed
       };
@@ -153,7 +153,7 @@ export class MpesaParser {
         phone,
         type: 'Income',
         category: 'Salary', // Default suggestion, reviewed by user
-        account: 'M-PESA',
+        account: 'Mpesa',
         destinationAccount: null,
         rawText: trimmed
       };
@@ -182,7 +182,7 @@ export class MpesaParser {
         description: `Withdrawal: ${agent}`,
         type: 'Transfer',
         category: 'Internal Account Transfer',
-        account: 'M-PESA',
+        account: 'Mpesa',
         destinationAccount: 'Cash',
         rawText: trimmed
       };
@@ -198,7 +198,7 @@ export class MpesaParser {
       date: new Date().toISOString().split('T')[0],
       type: 'Expenses',
       category: 'Uncategorized',
-      account: 'M-PESA',
+      account: 'Mpesa',
       destinationAccount: null,
       rawText: trimmed,
       note: 'Ambiguous SMS pattern: manual input required'
@@ -213,7 +213,51 @@ function classifySentTransaction(recipient, accountRef) {
   const r = (recipient || '').toLowerCase();
   const a = (accountRef || '').toLowerCase();
 
-  // Utilities / Bills
+  // 1. Debt & Loans (check loan keywords first to avoid Sacco vs Sacco Loan collision)
+  if (r.includes('equity loan') || (r.includes('equity') && (r.includes('loan') || a.includes('loan')))) {
+    return { type: 'Debt', category: 'Equity Loan' };
+  }
+  if (r.includes('nca sacco loan') || (r.includes('nca') && (r.includes('loan') || a.includes('loan')))) {
+    return { type: 'Debt', category: 'NCA Sacco Loan' };
+  }
+  if (r.includes('helb')) {
+    return { type: 'Debt', category: 'Helb Loan' };
+  }
+  if (r.includes('fuliza') || r.includes('m-shwari') || r.includes('tala') || r.includes('branch')) {
+    return { type: 'Debt', category: 'Equity Loan' };
+  }
+
+  // 2. Specific Savings Institutions
+  // Tower Sacco: Payment to Tower Sacco via SMS is a Savings contribution funded from Mpesa
+  if (r.includes('tower sacco') || r.includes('tower')) {
+    return { type: 'Savings', category: 'Tower Sacco', destinationAccount: null };
+  }
+  // NCA Sacco: Payment to NCA Sacco (without loan) is a Savings contribution
+  if (r.includes('nca sacco') || r.includes('nca')) {
+    return { type: 'Savings', category: 'NCA Sacco', destinationAccount: null };
+  }
+  if (r.includes('sanlam')) {
+    return { type: 'Savings', category: 'Sanlam MMF', destinationAccount: null };
+  }
+  if (r.includes('britam')) {
+    return { type: 'Savings', category: 'Britam EQ and MMF', destinationAccount: null };
+  }
+  if (r.includes('etica')) {
+    return { type: 'Savings', category: 'Etica MMF', destinationAccount: null };
+  }
+  if (r.includes('ziidi')) {
+    return { type: 'Savings', category: 'Ziidi MMF', destinationAccount: null };
+  }
+  if (r.includes('cic') || r.includes('mmf') || r.includes('money market')) {
+    return { type: 'Savings', category: 'Money Market Fund (MMF)', destinationAccount: 'MMF Account' };
+  }
+
+  // 3. Matatu Transport Saccos (Expenses -> Fare)
+  if (r.includes('super metro') || r.includes('2nk') || r.includes('lopha') || r.includes('kbs') || r.includes('city hoppa') || r.includes('metro') || r.includes('matatu')) {
+    return { type: 'Expenses', category: 'Fare' };
+  }
+
+  // 4. Utilities / Bills
   if (r.includes('kenya power') || r.includes('kplc')) {
     return { type: 'Bills', category: 'Electricity / KPLC' };
   }
@@ -224,7 +268,7 @@ function classifySentTransaction(recipient, accountRef) {
     return { type: 'Bills', category: 'Internet / WiFi' };
   }
 
-  // Bank Transfers
+  // 5. Bank Transfers
   if (r.includes('ncba loop') || r.includes('loop')) {
     return { type: 'Transfer', category: 'Internal Account Transfer', destinationAccount: 'Bank (NCBA Loop)' };
   }
@@ -236,14 +280,6 @@ function classifySentTransaction(recipient, accountRef) {
   }
   if (r.includes('sacco') || r.includes('stima')) {
     return { type: 'Transfer', category: 'Internal Account Transfer', destinationAccount: 'SACCO Account' };
-  }
-  if (r.includes('cic') || r.includes('sanlam') || r.includes('mmf') || r.includes('money market')) {
-    return { type: 'Savings', category: 'Money Market Fund (MMF)', destinationAccount: 'MMF Account' };
-  }
-
-  // Loans / Debt
-  if (r.includes('fuliza') || r.includes('m-shwari') || r.includes('tala') || r.includes('branch')) {
-    return { type: 'Debt', category: 'Mobile Loan (M-Shwari / Fuliza)' };
   }
 
   // Default P2P

@@ -146,20 +146,39 @@ function parseMpesaMessage(smsBody) {
     let category = 'Fare';
     let destAccount = null;
 
-    if (lower.includes('kenya power') || lower.includes('kplc') || lower.includes('electricity')) {
+    // 1. Debt & Loan Repayments
+    if (lower.includes('equity loan') || (lower.includes('equity') && lower.includes('loan'))) {
+      type = 'Debt'; category = 'Equity Loan';
+    } else if (lower.includes('nca sacco loan') || (lower.includes('nca') && lower.includes('loan'))) {
+      type = 'Debt'; category = 'NCA Sacco Loan';
+    } else if (lower.includes('helb')) {
+      type = 'Debt'; category = 'Helb Loan';
+    // 2. Savings Contributions (Tower Sacco & NCA Sacco)
+    } else if (lower.includes('tower sacco') || lower.includes('tower')) {
+      type = 'Savings'; category = 'Tower Sacco'; destAccount = null;
+    } else if (lower.includes('nca sacco') || lower.includes('nca')) {
+      type = 'Savings'; category = 'NCA Sacco'; destAccount = null;
+    } else if (lower.includes('sanlam')) {
+      type = 'Savings'; category = 'Sanlam MMF'; destAccount = null;
+    } else if (lower.includes('britam')) {
+      type = 'Savings'; category = 'Britam EQ and MMF'; destAccount = null;
+    } else if (lower.includes('etica')) {
+      type = 'Savings'; category = 'Etica MMF'; destAccount = null;
+    // 3. Matatu Transport Saccos
+    } else if (lower.includes('super metro') || lower.includes('2nk') || lower.includes('lopha') || lower.includes('metro')) {
+      type = 'Expenses'; category = 'Fare';
+    // 4. Utilities & Bills
+    } else if (lower.includes('kenya power') || lower.includes('kplc') || lower.includes('electricity')) {
       type = 'Bills'; category = 'Electricity';
     } else if (lower.includes('water')) {
       type = 'Bills'; category = 'Water';
     } else if (lower.includes('safaricom home') || lower.includes('zuku') || lower.includes('faiba') || lower.includes('wifi') || lower.includes('poa')) {
       type = 'Bills'; category = 'WIFI';
+    // 5. Bank Transfers
     } else if (lower.includes('equity')) {
       type = 'Bills'; destAccount = 'Equity Bank'; category = 'Monthly Shopping';
-    } else if (lower.includes('tower') || lower.includes('sacco')) {
-      type = 'Savings'; category = 'Tower Sacco'; destAccount = 'Tower Sacco';
-    } else if (lower.includes('sanlam')) {
-      type = 'Savings'; category = 'Sanlam MMF';
     } else if (lower.includes('boda') || lower.includes('fare')) {
-      type = 'Expenses'; category = 'Boda';
+      type = 'Expenses'; category = 'Fare';
     }
 
     return {

@@ -196,33 +196,75 @@ object MpesaParser {
 
     private fun classifySentTarget(target: String, accountRef: String?): Classification {
         val t = target.lowercase(Locale.ROOT)
+        val a = accountRef?.lowercase(Locale.ROOT) ?: ""
 
-        if (t.contains("kenya power") || t.contains("kplc")) {
+        // 1. Debt & Loans
+        if (t.contains("equity loan") || (t.contains("equity") && (t.contains("loan") || a.contains("loan")))) {
+            return Classification("Debt", "Equity Loan")
+        }
+        if (t.contains("nca sacco loan") || (t.contains("nca") && (t.contains("loan") || a.contains("loan")))) {
+            return Classification("Debt", "NCA Sacco Loan")
+        }
+        if (t.contains("helb")) {
+            return Classification("Debt", "Helb Loan")
+        }
+        if (t.contains("fuliza") || t.contains("m-shwari") || t.contains("tala") || t.contains("branch")) {
+            return Classification("Debt", "Equity Loan")
+        }
+
+        // 2. Specific Savings Institutions
+        // Tower Sacco: Payment to Tower Sacco via SMS is a Savings contribution funded from Mpesa
+        if (t.contains("tower sacco") || t.contains("tower")) {
+            return Classification("Savings", "Tower Sacco", null)
+        }
+        // NCA Sacco: Payment to NCA Sacco (without loan) is a Savings contribution
+        if (t.contains("nca sacco") || t.contains("nca")) {
+            return Classification("Savings", "NCA Sacco", null)
+        }
+        if (t.contains("sanlam")) {
+            return Classification("Savings", "Sanlam MMF", null)
+        }
+        if (t.contains("britam")) {
+            return Classification("Savings", "Britam EQ and MMF", null)
+        }
+        if (t.contains("etica")) {
+            return Classification("Savings", "Etica MMF", null)
+        }
+        if (t.contains("ziidi")) {
+            return Classification("Savings", "Ziidi MMF", null)
+        }
+        if (t.contains("cic") || t.contains("mmf") || t.contains("money market")) {
+            return Classification("Savings", "Sanlam MMF", null)
+        }
+
+        // 3. Matatu Transport Saccos (Expenses -> Fare)
+        if (t.contains("super metro") || t.contains("2nk") || t.contains("lopha") || t.contains("metro") || t.contains("kbs") || t.contains("city hoppa") || t.contains("matatu")) {
+            return Classification("Expenses", "Fare")
+        }
+
+        // 4. Utilities / Bills
+        if (t.contains("kenya power") || t.contains("kplc") || t.contains("electricity")) {
             return Classification("Bills", "Electricity / KPLC")
         }
         if (t.contains("nairobi water") || t.contains("water")) {
             return Classification("Bills", "Water")
         }
-        if (t.contains("safaricom home") || t.contains("zuku") || t.contains("faiba") || t.contains("poa")) {
+        if (t.contains("safaricom home") || t.contains("zuku") || t.contains("faiba") || t.contains("wifi") || t.contains("poa")) {
             return Classification("Bills", "Internet / WiFi")
+        }
+
+        // 5. Bank Transfers
+        if (t.contains("equity") || t.contains("equity bank")) {
+            return Classification("Transfer", "Monthly Shopping", "Equity Bank")
+        }
+        if (t.contains("i&m") || t.contains("i and m")) {
+            return Classification("Transfer", "Monthly Shopping", "I&M Bank")
         }
         if (t.contains("ncba loop") || t.contains("loop")) {
             return Classification("Transfer", "Internal Account Transfer", "Bank (NCBA Loop)")
         }
-        if (t.contains("equity") || t.contains("equity bank")) {
-            return Classification("Transfer", "Internal Account Transfer", "Bank (Equity)")
-        }
         if (t.contains("kcb") || t.contains("kcb bank")) {
             return Classification("Transfer", "Internal Account Transfer", "Bank (KCB)")
-        }
-        if (t.contains("sacco") || t.contains("stima")) {
-            return Classification("Transfer", "Internal Account Transfer", "SACCO Account")
-        }
-        if (t.contains("cic") || t.contains("sanlam") || t.contains("mmf") || t.contains("money market")) {
-            return Classification("Savings", "Money Market Fund (MMF)", "MMF Account")
-        }
-        if (t.contains("fuliza") || t.contains("m-shwari") || t.contains("tala") || t.contains("branch")) {
-            return Classification("Debt", "Mobile Loan (M-Shwari / Fuliza)")
         }
 
         return Classification("Expenses", "Gifts / Support")

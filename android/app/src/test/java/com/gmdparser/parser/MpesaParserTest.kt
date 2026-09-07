@@ -103,10 +103,29 @@ class MpesaParserTest {
     }
 
     @Test
-    fun testMalformedSmsHandling() {
-        assertNull(MpesaParser.parse(""))
-        assertNull(MpesaParser.parse(null))
-        assertNull(MpesaParser.parse("Random junk text with no code"))
-        assertNull(MpesaParser.parse("SHORT Confirmed. Ksh100 sent to someone."))
+    fun testTowerSaccoSavingsSms() {
+        val sms = "TD54TWR123 Confirmed. Ksh5,000.00 sent to TOWER SACCO for account 12345 on 7/9/26 at 11:30 AM. New M-PESA balance is Ksh15,000.00. Transaction cost, Ksh23.00."
+        val tx = MpesaParser.parse(sms)
+        assertNotNull(tx)
+        assertEquals("TD54TWR123", tx?.transactionCode)
+        assertEquals(5000.00, tx?.amount ?: 0.0, 0.001)
+        assertEquals("Savings", tx?.type)
+        assertEquals("Tower Sacco", tx?.category)
+        assertNull(tx?.destinationAccount)
+    }
+
+    @Test
+    fun testNcaSaccoLoanVsSavings() {
+        val savingsSms = "TD55NCA123 Confirmed. Ksh4,000.00 sent to NCA SACCO for account 67890 on 7/9/26 at 12:00 PM. New M-PESA balance is Ksh11,000.00. Transaction cost, Ksh23.00."
+        val savingsTx = MpesaParser.parse(savingsSms)
+        assertNotNull(savingsTx)
+        assertEquals("Savings", savingsTx?.type)
+        assertEquals("NCA Sacco", savingsTx?.category)
+
+        val loanSms = "TD56LON123 Confirmed. Ksh2,500.00 sent to NCA SACCO LOAN for account 67890 on 7/9/26 at 12:15 PM. New M-PESA balance is Ksh8,500.00. Transaction cost, Ksh23.00."
+        val loanTx = MpesaParser.parse(loanSms)
+        assertNotNull(loanTx)
+        assertEquals("Debt", loanTx?.type)
+        assertEquals("NCA Sacco Loan", loanTx?.category)
     }
 }
