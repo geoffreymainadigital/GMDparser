@@ -24,7 +24,7 @@ let VALID_TYPES = ['Income', 'Expenses', 'Bills', 'Debt', 'Savings', 'Balance'];
 
 /**
  * Handle HTTP GET Requests (Health check and taxonomy)
- */aa
+ */
 function doGet(e) {
   try {
     const action = (e && e.parameter && e.parameter.action) || 'health';
