@@ -1,0 +1,418 @@
+package com.gmdparser.ui.screens
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.gmdparser.data.model.Transaction
+import com.gmdparser.data.repository.TransactionRepository
+import com.gmdparser.ui.theme.*
+import kotlinx.coroutines.launch
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ReviewConfirmScreen(
+    onNavigateBack: () -> Unit = {}
+) {
+    val pendingList by TransactionRepository.pendingTransactions.collectAsState()
+    val scope = rememberCoroutineScope()
+
+    var isSubmitting by remember { mutableStateOf(false) }
+    var feedbackMessage by remember { mutableStateOf<String?>(null) }
+    var isError by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(DarkBackground)
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState())
+    ) {
+        // Mandatory Confirmation Policy Banner
+        Card(
+            colors = CardDefaults.cardColors(containerColor = DarkSurfaceCard),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, MpesaGreen.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+        ) {
+            Row(
+                modifier = Modifier.padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = "Confirmation Policy",
+                    tint = MpesaGreen,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = "Explicit Confirmation Enforced",
+                        color = TextPrimary,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = "AutoSync is locked to false. Transactions are never silently written to Google Sheets without review.",
+                        color = TextSecondary,
+                        fontSize = 12.sp
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        if (feedbackMessage != null) {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isError) AccentRed.copy(alpha = 0.2f) else MpesaGreen.copy(alpha = 0.2f)
+                ),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = feedbackMessage!!,
+                    color = if (isError) AccentRed else MpesaGreen,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(12.dp),
+                    fontSize = 13.sp
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        if (pendingList.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(260.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "No Pending Transactions",
+                        color = TextPrimary,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "New M-PESA SMS messages will appear here for review.",
+                        color = TextSecondary,
+                        fontSize = 14.sp
+                    )
+                }
+            }
+        } else {
+            Text(
+                text = "Pending Review (${pendingList.size})",
+                color = TextPrimary,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Display current transaction to review
+            val activeTx = pendingList.first()
+            TransactionReviewCard(
+                transaction = activeTx,
+                isSubmitting = isSubmitting,
+                onConfirm = { editedTx ->
+                    scope.launch {
+                        isSubmitting = true
+                        feedbackMessage = null
+                        val result = TransactionRepository.confirmAndSubmitTransaction(editedTx)
+                        isSubmitting = false
+                        result.fold(
+                            onSuccess = { res ->
+                                isError = false
+                                feedbackMessage = "✓ Transaction ${editedTx.transactionCode} recorded in row ${res.data?.row ?: "sheet"}"
+                            },
+                            onFailure = { err ->
+                                isError = true
+                                feedbackMessage = err.message ?: "Failed to record transaction"
+                            }
+                        )
+                    }
+                },
+                onDismiss = {
+                    TransactionRepository.removePendingTransaction(activeTx.transactionCode)
+                    feedbackMessage = "Transaction dismissed without recording."
+                    isError = false
+                }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TransactionReviewCard(
+    transaction: Transaction,
+    isSubmitting: Boolean,
+    onConfirm: (Transaction) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var amountText by remember(transaction) { mutableStateOf(transaction.amount.toString()) }
+    var selectedType by remember(transaction) { mutableStateOf(transaction.type) }
+    var selectedCategory by remember(transaction) { mutableStateOf(transaction.category) }
+    var descriptionText by remember(transaction) { mutableStateOf(transaction.description) }
+    var selectedAccount by remember(transaction) { mutableStateOf(transaction.account) }
+    var destinationAccountText by remember(transaction) { mutableStateOf(transaction.destinationAccount ?: "") }
+
+    val typesList = listOf("Income", "Expenses", "Bills", "Debt", "Savings", "Transfer")
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, DarkSurfaceBorder, RoundedCornerShape(16.dp))
+    ) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            // Header Row: Code & Time
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    color = AccentCyan.copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(6.dp)
+                ) {
+                    Text(
+                        text = transaction.transactionCode,
+                        color = AccentCyan,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+
+                Text(
+                    text = "${transaction.date} ${transaction.time}".trim(),
+                    color = TextMuted,
+                    fontSize = 12.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Amount Input
+            OutlinedTextField(
+                value = amountText,
+                onValueChange = { amountText = it },
+                label = { Text("Amount (Ksh)") },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MpesaGreen,
+                    unfocusedBorderColor = DarkSurfaceBorder,
+                    focusedTextColor = TextPrimary,
+                    unfocusedTextColor = TextPrimary
+                ),
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Type Selection
+            Text("Transaction Type", color = TextSecondary, fontSize = 12.sp)
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                typesList.take(3).forEach { t ->
+                    FilterChip(
+                        selected = selectedType == t,
+                        onClick = {
+                            selectedType = t
+                            if (t == "Transfer" && destinationAccountText.isBlank()) {
+                                destinationAccountText = "Bank (NCBA Loop)"
+                            }
+                        },
+                        label = { Text(t, fontSize = 11.sp) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MpesaGreen,
+                            selectedLabelColor = Color.White
+                        )
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                typesList.drop(3).forEach { t ->
+                    FilterChip(
+                        selected = selectedType == t,
+                        onClick = {
+                            selectedType = t
+                            if (t == "Transfer" && destinationAccountText.isBlank()) {
+                                destinationAccountText = "Bank (NCBA Loop)"
+                            }
+                        },
+                        label = { Text(t, fontSize = 11.sp) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MpesaGreen,
+                            selectedLabelColor = Color.White
+                        )
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Category Input
+            OutlinedTextField(
+                value = selectedCategory,
+                onValueChange = { selectedCategory = it },
+                label = { Text("Category") },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MpesaGreen,
+                    unfocusedBorderColor = DarkSurfaceBorder,
+                    focusedTextColor = TextPrimary,
+                    unfocusedTextColor = TextPrimary
+                ),
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Description Input
+            OutlinedTextField(
+                value = descriptionText,
+                onValueChange = { descriptionText = it },
+                label = { Text("Description / Payee") },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MpesaGreen,
+                    unfocusedBorderColor = DarkSurfaceBorder,
+                    focusedTextColor = TextPrimary,
+                    unfocusedTextColor = TextPrimary
+                ),
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Account Input
+            OutlinedTextField(
+                value = selectedAccount,
+                onValueChange = { selectedAccount = it },
+                label = { Text("Funding Account") },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MpesaGreen,
+                    unfocusedBorderColor = DarkSurfaceBorder,
+                    focusedTextColor = TextPrimary,
+                    unfocusedTextColor = TextPrimary
+                ),
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+
+            // If Transfer, show destination account field
+            if (selectedType == "Transfer") {
+                Spacer(modifier = Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = destinationAccountText,
+                    onValueChange = { destinationAccountText = it },
+                    label = { Text("Destination Account (Required for Transfers)") },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = AccentCyan,
+                        unfocusedBorderColor = DarkSurfaceBorder,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Raw SMS expander / preview
+            if (transaction.rawText.isNotBlank()) {
+                Surface(
+                    color = DarkBackground,
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = transaction.rawText,
+                        color = TextMuted,
+                        fontSize = 11.sp,
+                        modifier = Modifier.padding(10.dp),
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            // Action Buttons: Explicit Confirmation vs Dismiss
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onDismiss,
+                    enabled = !isSubmitting,
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentRed),
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(Icons.Default.Close, contentDescription = "Dismiss", modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Dismiss")
+                }
+
+                Button(
+                    onClick = {
+                        val parsedAmt = amountText.toDoubleOrNull() ?: transaction.amount
+                        val confirmedTx = transaction.copy(
+                            amount = parsedAmt,
+                            type = selectedType,
+                            category = selectedCategory,
+                            description = descriptionText,
+                            account = selectedAccount,
+                            destinationAccount = if (selectedType == "Transfer") destinationAccountText.trim() else null
+                        )
+                        onConfirm(confirmedTx)
+                    },
+                    enabled = !isSubmitting,
+                    colors = ButtonDefaults.buttonColors(containerColor = MpesaGreen),
+                    modifier = Modifier.weight(2f),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    if (isSubmitting) {
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    } else {
+                        Icon(Icons.Default.Check, contentDescription = "Confirm", modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Confirm & Record", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}

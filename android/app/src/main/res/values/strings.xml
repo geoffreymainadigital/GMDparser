@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">GMDParser</string>
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_review">Review &amp; Confirm</string>
+    <string name="nav_history">History</string>
+    <string name="nav_accounts">Accounts</string>
+    <string name="nav_categories">Categories</string>
+    <string name="nav_budgets">Budgets</string>
+    <string name="nav_savings">Savings</string>
+    <string name="nav_debts">Debts</string>
+    <string name="nav_goals">Goals</string>
+    <string name="nav_settings">Settings</string>
+</resources>
