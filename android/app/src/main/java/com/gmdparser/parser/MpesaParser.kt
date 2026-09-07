@@ -76,7 +76,7 @@ object MpesaParser {
                 type = classification.type,
                 category = classification.category,
                 description = targetRaw + if (!accountRef.isNullOrBlank()) " ($accountRef)" else "",
-                account = "M-PESA",
+                account = "Mpesa",
                 date = formatIsoDate(dateStr),
                 time = timeStr,
                 destinationAccount = classification.destinationAccount,
@@ -104,7 +104,7 @@ object MpesaParser {
                 type = classification.type,
                 category = classification.category,
                 description = merchant,
-                account = "M-PESA",
+                account = "Mpesa",
                 date = formatIsoDate(dateStr),
                 time = timeStr,
                 destinationAccount = null,
@@ -135,7 +135,7 @@ object MpesaParser {
                 type = "Income",
                 category = "Salary",
                 description = "Received from $sender",
-                account = "M-PESA",
+                account = "Mpesa",
                 date = formatIsoDate(dateStr),
                 time = timeStr,
                 destinationAccount = null,
@@ -161,7 +161,7 @@ object MpesaParser {
                 type = "Transfer",
                 category = "Internal Account Transfer",
                 description = "Withdrawal: $agent",
-                account = "M-PESA",
+                account = "Mpesa",
                 date = formatIsoDate(dateStr),
                 time = timeStr,
                 destinationAccount = "Cash",
@@ -180,7 +180,7 @@ object MpesaParser {
             type = "Expenses",
             category = "Uncategorized",
             description = "Unparsed M-PESA Transaction",
-            account = "M-PESA",
+            account = "Mpesa",
             date = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(Date()),
             time = "",
             destinationAccount = null,
@@ -188,6 +188,28 @@ object MpesaParser {
             cost = cost,
             senderOrRecipient = "",
             rawText = trimmed,
+            status = TransactionStatus.PENDING_REVIEW
+        )
+    }
+
+    fun createManualBalanceTransaction(
+        sourceAccount: String,
+        destinationAccount: String,
+        amount: Double,
+        transactionCode: String? = null,
+        date: String? = null
+    ): Transaction {
+        val code = transactionCode ?: "BAL-${System.currentTimeMillis()}"
+        val today = date ?: SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(Date())
+        return Transaction(
+            transactionCode = code,
+            amount = amount,
+            type = "Balance",
+            category = "",
+            description = "Transfer from $sourceAccount to $destinationAccount",
+            account = sourceAccount,
+            destinationAccount = destinationAccount,
+            date = today,
             status = TransactionStatus.PENDING_REVIEW
         )
     }
@@ -202,7 +224,7 @@ object MpesaParser {
         if (t.contains("equity loan") || (t.contains("equity") && (t.contains("loan") || a.contains("loan")))) {
             return Classification("Debt", "Equity Loan")
         }
-        if (t.contains("nca sacco loan") || (t.contains("nca") && (t.contains("loan") || a.contains("loan")))) {
+        if (t.contains("nca sacco loan") || (t.contains("nca sacco") && (t.contains("loan") || a.contains("loan")))) {
             return Classification("Debt", "NCA Sacco Loan")
         }
         if (t.contains("helb")) {
@@ -214,11 +236,11 @@ object MpesaParser {
 
         // 2. Specific Savings Institutions
         // Tower Sacco: Payment to Tower Sacco via SMS is a Savings contribution funded from Mpesa
-        if (t.contains("tower sacco") || t.contains("tower")) {
+        if (t.contains("tower sacco")) {
             return Classification("Savings", "Tower Sacco", null)
         }
         // NCA Sacco: Payment to NCA Sacco (without loan) is a Savings contribution
-        if (t.contains("nca sacco") || t.contains("nca")) {
+        if (t.contains("nca sacco")) {
             return Classification("Savings", "NCA Sacco", null)
         }
         if (t.contains("sanlam")) {

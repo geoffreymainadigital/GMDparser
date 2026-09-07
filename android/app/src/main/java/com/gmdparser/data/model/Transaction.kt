@@ -16,7 +16,7 @@ data class Transaction(
     val type: String,
     val category: String,
     val description: String,
-    val account: String = "M-PESA",
+    val account: String = "Mpesa",
     val date: String,
     val time: String = "",
     val destinationAccount: String? = null,

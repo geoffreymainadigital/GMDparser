@@ -1,6 +1,7 @@
 package com.gmdparser.parser
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -111,7 +112,18 @@ class MpesaParserTest {
         assertEquals(5000.00, tx?.amount ?: 0.0, 0.001)
         assertEquals("Savings", tx?.type)
         assertEquals("Tower Sacco", tx?.category)
+        assertEquals("Mpesa", tx?.account)
         assertNull(tx?.destinationAccount)
+    }
+
+    @Test
+    fun testEastgateTowersNotSavings() {
+        val sms = "TD58TWR999 Confirmed. Ksh1,500.00 sent to EASTGATE TOWERS on 7/9/26 at 2:00 PM. New M-PESA balance is Ksh13,500.00. Transaction cost, Ksh15.00."
+        val tx = MpesaParser.parse(sms)
+        assertNotNull(tx)
+        assertNotEquals("Tower Sacco", tx?.category)
+        assertNotEquals("Savings", tx?.type)
+        assertEquals("Mpesa", tx?.account)
     }
 
     @Test
@@ -121,11 +133,31 @@ class MpesaParserTest {
         assertNotNull(savingsTx)
         assertEquals("Savings", savingsTx?.type)
         assertEquals("NCA Sacco", savingsTx?.category)
+        assertEquals("Mpesa", savingsTx?.account)
 
         val loanSms = "TD56LON123 Confirmed. Ksh2,500.00 sent to NCA SACCO LOAN for account 67890 on 7/9/26 at 12:15 PM. New M-PESA balance is Ksh8,500.00. Transaction cost, Ksh23.00."
         val loanTx = MpesaParser.parse(loanSms)
         assertNotNull(loanTx)
         assertEquals("Debt", loanTx?.type)
         assertEquals("NCA Sacco Loan", loanTx?.category)
+        assertEquals("Mpesa", loanTx?.account)
+    }
+
+    @Test
+    fun testManualBalanceTransactionWithTowerSacco() {
+        val tx = MpesaParser.createManualBalanceTransaction(
+            sourceAccount = "Tower Sacco",
+            destinationAccount = "Mpesa",
+            amount = 10000.0,
+            transactionCode = "BAL-TWR-001"
+        )
+        assertNotNull(tx)
+        assertEquals("BAL-TWR-001", tx.transactionCode)
+        assertEquals(10000.0, tx.amount, 0.001)
+        assertEquals("Balance", tx.type)
+        assertEquals("Tower Sacco", tx.account)
+        assertEquals("Mpesa", tx.destinationAccount)
+        assertNotEquals("Savings", tx.type)
+        assertNotEquals("Tower Sacco", tx.category)
     }
 }

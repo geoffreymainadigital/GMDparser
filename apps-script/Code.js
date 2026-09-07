@@ -16,7 +16,7 @@ const COL_AMOUNT = 10;          // J
 const COL_ACCOUNT = 11;         // K
 const COL_TX_CODE = 12;         // L
 
-let VALID_TYPES = ['Income', 'Expenses', 'Bills', 'Debt', 'Savings'];
+let VALID_TYPES = ['Income', 'Expenses', 'Bills', 'Debt', 'Savings', 'Balance'];
 
 
 /**
@@ -310,7 +310,7 @@ function validateTransactionPayload(tx) {
     errors.push('Type must be one of: ' + VALID_TYPES.join(', '));
   }
 
-  if (!tx.category || typeof tx.category !== 'string' || tx.category.trim() === '') {
+  if (tx.type !== 'Balance' && (!tx.category || typeof tx.category !== 'string' || tx.category.trim() === '')) {
     errors.push('Non-empty category is required');
   }
 

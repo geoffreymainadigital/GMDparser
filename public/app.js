@@ -73,7 +73,8 @@ const TAXONOMY = {
     'Ziidi Stocks',
     'ETH',
     'Arvocap'
-  ]
+  ],
+  'Balance': []
 };
 
 const SAMPLE_MESSAGES = {
@@ -147,16 +148,16 @@ function parseMpesaMessage(smsBody) {
     let destAccount = null;
 
     // 1. Debt & Loan Repayments
-    if (lower.includes('equity loan') || (lower.includes('equity') && lower.includes('loan'))) {
+    if (lower.includes('equity loan') || (lower.includes('equity') && (lower.includes('loan') || (accountRef && accountRef.toLowerCase().includes('loan'))))) {
       type = 'Debt'; category = 'Equity Loan';
-    } else if (lower.includes('nca sacco loan') || (lower.includes('nca') && lower.includes('loan'))) {
+    } else if (lower.includes('nca sacco loan') || (lower.includes('nca sacco') && (lower.includes('loan') || (accountRef && accountRef.toLowerCase().includes('loan'))))) {
       type = 'Debt'; category = 'NCA Sacco Loan';
     } else if (lower.includes('helb')) {
       type = 'Debt'; category = 'Helb Loan';
     // 2. Savings Contributions (Tower Sacco & NCA Sacco)
-    } else if (lower.includes('tower sacco') || lower.includes('tower')) {
+    } else if (lower.includes('tower sacco')) {
       type = 'Savings'; category = 'Tower Sacco'; destAccount = null;
-    } else if (lower.includes('nca sacco') || lower.includes('nca')) {
+    } else if (lower.includes('nca sacco')) {
       type = 'Savings'; category = 'NCA Sacco'; destAccount = null;
     } else if (lower.includes('sanlam')) {
       type = 'Savings'; category = 'Sanlam MMF'; destAccount = null;
@@ -383,8 +384,8 @@ function renderReviewCards() {
     const card = document.createElement('div');
     card.className = 'review-item-card';
 
-    const isTransfer = tx.type === 'Transfer';
-    const categoriesForType = TAXONOMY[tx.type] || ['General'];
+    const isTransfer = tx.type === 'Transfer' || tx.type === 'Balance';
+    const categoriesForType = TAXONOMY[tx.type] || (tx.type === 'Balance' ? [''] : ['General']);
 
     card.innerHTML = `
       <div class="review-item-header">
@@ -454,9 +455,9 @@ function renderReviewCards() {
 
     typeSelect.addEventListener('change', (e) => {
       const selectedType = e.target.value;
-      const cats = TAXONOMY[selectedType] || ['General'];
+      const cats = TAXONOMY[selectedType] || (selectedType === 'Balance' ? [''] : ['General']);
       catSelect.innerHTML = cats.map(c => `<option value="${c}">${c}</option>`).join('');
-      destGroup.style.display = selectedType === 'Transfer' ? 'block' : 'none';
+      destGroup.style.display = (selectedType === 'Transfer' || selectedType === 'Balance') ? 'block' : 'none';
     });
 
     // Dismiss Handler
@@ -825,8 +826,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const tx = {
         transactionCode: code.toUpperCase(),
         amount: amt,
-        type: 'Transfer',
-        category: 'Internal Account Transfer',
+        type: 'Balance',
+        category: '',
         description: `Transfer from ${src} to ${dest}`,
         account: src,
         destinationAccount: dest,

@@ -204,6 +204,27 @@ export class MpesaParser {
       note: 'Ambiguous SMS pattern: manual input required'
     };
   }
+
+  /**
+   * Creates a manual Balance transfer transaction between accounts.
+   * Preserves Type: 'Balance' and Account: sourceAccount.
+   * Ensures recipient-name savings rules do not overwrite a manually selected Balance transaction.
+   */
+  static createManualBalanceTransaction({ sourceAccount, destinationAccount, amount, transactionCode, date, time }) {
+    return {
+      isFinancial: true,
+      transactionCode: transactionCode || `BAL-${Date.now()}`,
+      amount: Number(amount),
+      type: 'Balance',
+      category: '',
+      account: sourceAccount,
+      destinationAccount: destinationAccount,
+      description: `Transfer from ${sourceAccount} to ${destinationAccount}`,
+      date: date || new Date().toISOString().split('T')[0],
+      time: time || '12:00 PM',
+      rawText: `Direct balance transfer: KES ${amount} from ${sourceAccount} to ${destinationAccount}`
+    };
+  }
 }
 
 /**
@@ -217,7 +238,7 @@ function classifySentTransaction(recipient, accountRef) {
   if (r.includes('equity loan') || (r.includes('equity') && (r.includes('loan') || a.includes('loan')))) {
     return { type: 'Debt', category: 'Equity Loan' };
   }
-  if (r.includes('nca sacco loan') || (r.includes('nca') && (r.includes('loan') || a.includes('loan')))) {
+  if (r.includes('nca sacco loan') || (r.includes('nca sacco') && (r.includes('loan') || a.includes('loan')))) {
     return { type: 'Debt', category: 'NCA Sacco Loan' };
   }
   if (r.includes('helb')) {
@@ -229,11 +250,11 @@ function classifySentTransaction(recipient, accountRef) {
 
   // 2. Specific Savings Institutions
   // Tower Sacco: Payment to Tower Sacco via SMS is a Savings contribution funded from Mpesa
-  if (r.includes('tower sacco') || r.includes('tower')) {
+  if (r.includes('tower sacco')) {
     return { type: 'Savings', category: 'Tower Sacco', destinationAccount: null };
   }
   // NCA Sacco: Payment to NCA Sacco (without loan) is a Savings contribution
-  if (r.includes('nca sacco') || r.includes('nca')) {
+  if (r.includes('nca sacco')) {
     return { type: 'Savings', category: 'NCA Sacco', destinationAccount: null };
   }
   if (r.includes('sanlam')) {
