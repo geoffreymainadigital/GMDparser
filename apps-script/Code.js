@@ -275,8 +275,8 @@ function validateTransactionPayload(tx) {
     return { isValid: false, errors: ['Transaction object is missing or invalid'] };
   }
 
-  if (!tx.transactionCode || typeof tx.transactionCode !== 'string' || tx.transactionCode.trim().length < 8) {
-    errors.push('Valid transactionCode is required (min 8 characters)');
+  if (!tx.transactionCode || typeof tx.transactionCode !== 'string' || tx.transactionCode.trim().length < 8 || tx.transactionCode.trim().length > 12) {
+    errors.push('Valid transactionCode is required (8-12 characters)');
   }
 
   const amount = Number(tx.amount);

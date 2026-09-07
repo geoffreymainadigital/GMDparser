@@ -8,7 +8,7 @@ import java.util.Locale
 
 object MpesaParser {
 
-    private val CONFIRMED_CODE_REGEX = Regex("^([A-Z0-9]{10})\\s+Confirmed\\.", RegexOption.IGNORE_CASE)
+    private val CONFIRMED_CODE_REGEX = Regex("^([A-Z0-9]{8,12})\\s+Confirmed\\.", RegexOption.IGNORE_CASE)
     private val BALANCE_REGEX = Regex("New M-PESA balance is Ksh([\\d,]+\\.?\\d*)", RegexOption.IGNORE_CASE)
     private val COST_REGEX = Regex("Transaction cost,?\\s*Ksh([\\d,]+\\.?\\d*)", RegexOption.IGNORE_CASE)
 

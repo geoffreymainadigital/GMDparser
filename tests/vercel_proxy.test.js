@@ -5,6 +5,7 @@ import assert from 'node:assert';
 import healthHandler from '../web/api/health.js';
 import taxonomyHandler from '../web/api/taxonomy.js';
 import transactionHandler from '../web/api/transaction.js';
+import testConnectionHandler from '../web/api/test-connection.js';
 
 // Mock request / response helpers
 function createMockReq(options = {}) {
@@ -102,6 +103,15 @@ async function runTests() {
   assert.strictEqual(res5.statusCode, 503);
   assert.strictEqual(res5.body.status, 'UPSTREAM_NOT_CONFIGURED');
   console.log('✓ POST /api/transaction handled unconfigured upstream with 503');
+
+  // 6. Test connection diagnostics endpoint
+  const req6 = createMockReq({ method: 'GET' });
+  const res6 = createMockRes();
+  await testConnectionHandler(req6, res6);
+  assert.strictEqual(res6.statusCode, 200);
+  assert.strictEqual(res6.body.vercel.status, 'online');
+  assert.strictEqual(res6.body.vercel.productionUrl, 'https://gmdparser.vercel.app');
+  console.log('✓ GET /api/test-connection returned 200 OK with diagnostic report');
 
   console.log('\nAll Vercel API proxy unit tests PASSED successfully.');
 }

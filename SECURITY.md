@@ -63,7 +63,7 @@ Financial writes are strictly gated behind deliberate human action:
 
 1. **Zero Google Credentials on Mobile**:
    - The Android client binary contains no Google Cloud Service Account keys, no Google Sheet IDs, and no Apps Script direct deployment URLs.
-   - All client traffic routes through the public Vercel API gateway (`https://gmdarser.vercel.app`).
+   - All client traffic routes through the public Vercel API gateway (`https://gmdparser.vercel.app`).
 2. **Environment Variable Storage on Vercel**:
    - The private Apps Script execution URL and backend shared authorization token reside exclusively in Vercel secure environment variables:
      - `APPS_SCRIPT_URL`: Private deployment endpoint.

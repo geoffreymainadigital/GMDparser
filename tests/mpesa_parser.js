@@ -16,8 +16,8 @@ export class MpesaParser {
 
     const trimmed = smsBody.trim();
 
-    // Must contain Confirmed and a 10-char alphanumeric transaction code at start
-    const codeMatch = trimmed.match(/^([A-Z0-9]{10})\s+Confirmed\./i);
+    // Must contain Confirmed and an 8-12 char alphanumeric transaction code at start
+    const codeMatch = trimmed.match(/^([A-Z0-9]{8,12})\s+Confirmed\./i);
     if (!codeMatch) {
       return {
         isFinancial: false,

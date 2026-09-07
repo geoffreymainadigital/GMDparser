@@ -2,12 +2,12 @@
 
 ## 1. Gateway Overview
 
-* **Base URL**: `https://gmdarser.vercel.app`
+* **Base URL**: `https://gmdparser.vercel.app`
 * **Protocol**: HTTPS (TLS 1.3 / 1.2)
 * **Content-Type**: `application/json`
 * **Authentication**: Token-based via `X-GMD-Auth-Key` request header.
 
-The Android client targets `https://gmdarser.vercel.app` as its production base URL. Path endpoints are decoupled from the base URL.
+The Android client targets `https://gmdparser.vercel.app` as its production base URL. Path endpoints are decoupled from the base URL.
 
 ---
 
@@ -41,7 +41,7 @@ Submits a user-confirmed M-PESA transaction for validation and insertion into Go
 #### Request Headers:
 ```http
 POST /api/transaction HTTP/1.1
-Host: gmdarser.vercel.app
+Host: gmdparser.vercel.app
 Content-Type: application/json
 X-GMD-Auth-Key: <client_auth_secret>
 ```

@@ -25,7 +25,7 @@ The end-to-end data pipeline consists of four strictly decoupled layers:
 ```mermaid
 flowchart TD
     SMS["M-PESA SMS Received"] --> Android["Android App<br/>(Local Parse, Review UI, Confirmation)"]
-    Android -- "HTTPS POST (Confirmed Only)" --> Vercel["Vercel Public API Layer<br/>(https://gmdarser.vercel.app)"]
+    Android -- "HTTPS POST (Confirmed Only)" --> Vercel["Vercel Public API Layer<br/>(https://gmdparser.vercel.app)"]
     Vercel -- "Proxy HTTPS POST" --> GAS["Google Apps Script Backend<br/>(Validation, Idempotency, Strict Range Writes)"]
     GAS -- "Append to Defined Cells" --> Sheet["Google Sheets Financial Model<br/>(Source of Truth, Formulas, Budgets)"]
 ```
@@ -38,7 +38,7 @@ flowchart TD
    - Never exposes backend secrets or directly mutates Google Sheets.
 
 2. **Vercel Network Layer (`web/`)**:
-   - Hosted at `https://gmdarser.vercel.app`.
+   - Hosted at `https://gmdparser.vercel.app`.
    - Provides a stable, universally accessible public HTTPS gateway for the Android client.
    - Proxies authenticated API requests to the Google Apps Script Web App.
    - Stores no financial data.
@@ -80,7 +80,7 @@ flowchart TD
 
 * [ ] **Phase 1: Financial Model / Spreadsheet** – Inspect spreadsheet contract, column bounds, validation rules, category/account taxonomy.
 * [ ] **Phase 2: Apps Script Backend** – Implement health check, duplicate check, validation, and safe row appending.
-* [ ] **Phase 3: Vercel API Layer** – Build thin HTTPS proxy and contract tests targeting `https://gmdarser.vercel.app`.
+* [ ] **Phase 3: Vercel API Layer** – Build thin HTTPS proxy and contract tests targeting `https://gmdparser.vercel.app`.
 * [ ] **Phase 4: Android Network Client** – Native HTTP client with configurable base URL and error resilience.
 * [ ] **Phase 5: Android M-PESA Parser** – Local regex/grammar parser covering Kenyan transaction types with unit tests.
 * [ ] **Phase 6: Full Integration** – End-to-end integration and user confirmation workflow.

@@ -38,7 +38,7 @@ GMDParser enforces strict architectural separation of concerns. Every layer has 
 
 ### 2.2 Vercel API Layer (`web/`)
 * **Role**: Public network ingress and routing proxy.
-* **Domain**: `https://gmdarser.vercel.app`
+* **Domain**: `https://gmdparser.vercel.app`
 * **Responsibilities**:
   - Exposes standardized public endpoints:
     - `/api/health`

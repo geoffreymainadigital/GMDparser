@@ -1,6 +1,6 @@
 # Vercel Public API Layer (`web/`)
 
-This directory will contain the thin public API gateway deployed to `https://gmdarser.vercel.app`.
+This directory will contain the thin public API gateway deployed to `https://gmdparser.vercel.app`.
 
 ## Planned Components:
 - **Serverless API Routes**:

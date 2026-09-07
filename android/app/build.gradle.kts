@@ -19,7 +19,7 @@ android {
             useSupportLibrary = true
         }
 
-        buildConfigField("String", "BASE_URL", "\"https://gmdarser.vercel.app\"")
+        buildConfigField("String", "BASE_URL", "\"https://gmdparser.vercel.app\"")
         buildConfigField("Boolean", "AUTO_SYNC_ENABLED", "false")
     }
 

@@ -52,7 +52,7 @@
    - Configure Root Directory to `web/` (or repository root with `web/` serverless functions).
    - Set production branch to **`main`**. Do not use preview deployments as the production backend.
 2. **Production Domain**:
-   - Ensure the assigned production domain matches: `https://gmdarser.vercel.app`.
+   - Ensure the assigned production domain matches: `https://gmdparser.vercel.app`.
 3. **Environment Variables**:
    Configure in the Vercel Dashboard for Production:
    - `APPS_SCRIPT_URL`: The full Google Apps Script web app URL (`https://script.google.com/macros/s/.../exec`).
@@ -60,7 +60,7 @@
    - `CLIENT_API_KEY`: The public/client authentication token verified by Vercel for requests from Android.
 4. **Deployment Verification**:
    ```bash
-   curl -I https://gmdarser.vercel.app/api/health
+   curl -I https://gmdparser.vercel.app/api/health
    ```
 
 ---
@@ -70,7 +70,7 @@
 1. **Base URL Configuration**:
    - In `gradle.properties` or `BuildConfig`:
      ```kotlin
-     buildConfigField("String", "BASE_URL", "\"https://gmdarser.vercel.app\"")
+     buildConfigField("String", "BASE_URL", "\"https://gmdparser.vercel.app\"")
      buildConfigField("Boolean", "AUTO_SYNC_ENABLED", "false")
      ```
    - Endpoint paths remain decoupled:
