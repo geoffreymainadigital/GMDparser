@@ -79,3 +79,14 @@ data class TaxonomyResponse(
     @SerializedName("success") val success: Boolean,
     @SerializedName("data") val data: TaxonomyData
 )
+
+data class AuthCheckResponse(
+    @SerializedName("success") val success: Boolean,
+    @SerializedName("status") val status: String,
+    @SerializedName("service") val service: String? = null,
+    @SerializedName("serverUrl") val serverUrl: String? = null,
+    @SerializedName("autoSyncAllowed") val autoSyncAllowed: Boolean = false,
+    @SerializedName("timestamp") val timestamp: String? = null,
+    @SerializedName("error") val error: String? = null
+)
+

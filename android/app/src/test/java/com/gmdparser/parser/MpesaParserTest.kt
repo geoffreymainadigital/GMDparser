@@ -56,9 +56,57 @@ class MpesaParserTest {
     }
 
     @Test
+    fun testEightCharTransactionCode() {
+        val sms = "QA12BC34 Confirmed. Ksh500.00 sent to JOHN DOE 0712345678 on 7/9/26 at 9:00 AM. New M-PESA balance is Ksh8,700.00."
+        val tx = MpesaParser.parse(sms)
+        assertNotNull(tx)
+        assertEquals("QA12BC34", tx?.transactionCode)
+        assertEquals(500.0, tx?.amount ?: 0.0, 0.001)
+    }
+
+    @Test
+    fun testTwelveCharTransactionCode() {
+        val sms = "ABCDEFGHIJ12 Confirmed. Ksh1,000.00 sent to JANE DOE 0722334455 on 7/9/26 at 11:30 AM. New M-PESA balance is Ksh7,700.00."
+        val tx = MpesaParser.parse(sms)
+        assertNotNull(tx)
+        assertEquals("ABCDEFGHIJ12", tx?.transactionCode)
+        assertEquals(1000.0, tx?.amount ?: 0.0, 0.001)
+    }
+
+    @Test
+    fun testReceivedMoneyIncome() {
+        val sms = "TD50GHI012 Confirmed. You have received Ksh50,000.00 from EMPLOYER CO LTD on 7/9/26 at 8:00 AM. New M-PESA balance is Ksh59,200.00."
+        val tx = MpesaParser.parse(sms)
+        assertNotNull(tx)
+        assertEquals("TD50GHI012", tx?.transactionCode)
+        assertEquals(50000.00, tx?.amount ?: 0.0, 0.001)
+        assertEquals("Income", tx?.type)
+        assertEquals("Salary", tx?.category)
+    }
+
+    @Test
+    fun testWithdrawalToCash() {
+        val sms = "TD53PQR901 Confirmed. on 7/9/26 at 4:20 PM Withdraw Ksh3,000.00 from 123456 - AGENT COMMUNICATIONS New M-PESA balance is Ksh44,970.00. Transaction cost, Ksh30.00."
+        val tx = MpesaParser.parse(sms)
+        assertNotNull(tx)
+        assertEquals("TD53PQR901", tx?.transactionCode)
+        assertEquals(3000.00, tx?.amount ?: 0.0, 0.001)
+        assertEquals("Transfer", tx?.type)
+        assertEquals("Cash", tx?.destinationAccount)
+    }
+
+    @Test
     fun testPromotionalSmsIgnored() {
         val promo = "Dear Customer, get 500MB for Ksh50 valid for 24hrs. Dial *544#."
         val tx = MpesaParser.parse(promo)
         assertNull(tx)
+    }
+
+    @Test
+    fun testMalformedSmsHandling() {
+        assertNull(MpesaParser.parse(""))
+        assertNull(MpesaParser.parse(null))
+        assertNull(MpesaParser.parse("Random junk text with no code"))
+        assertNull(MpesaParser.parse("SHORT Confirmed. Ksh100 sent to someone."))
     }
 }

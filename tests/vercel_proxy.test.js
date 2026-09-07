@@ -113,6 +113,26 @@ async function runTests() {
   assert.strictEqual(res6.body.vercel.productionUrl, 'https://gmdparser.vercel.app');
   console.log('✓ GET /api/test-connection returned 200 OK with diagnostic report');
 
+  // 7. Auth check endpoint
+  const authHandler = (await import('../web/api/auth-check.js')).default;
+  const req7 = createMockReq({ method: 'GET' });
+  const res7 = createMockRes();
+  await authHandler(req7, res7);
+  assert.strictEqual(res7.statusCode, 200);
+  assert.strictEqual(res7.body.status, 'AUTHORIZED');
+  assert.strictEqual(res7.body.autoSyncAllowed, false);
+  console.log('✓ GET /api/auth-check returned 200 OK with autoSyncAllowed=false');
+
+  // 8. Auto-sync SMS rejection (fail-closed invariant)
+  const autoSyncHandler = (await import('../web/api/auto-sync-sms.js')).default;
+  const req8 = createMockReq({ method: 'POST', body: { rawSms: 'Test SMS' } });
+  const res8 = createMockRes();
+  await autoSyncHandler(req8, res8);
+  assert.strictEqual(res8.statusCode, 403);
+  assert.strictEqual(res8.body.status, 'CONFIRMATION_REQUIRED');
+  assert.strictEqual(res8.body.isAutoSync, false);
+  console.log('✓ POST /api/auto-sync-sms correctly rejected unconfirmed write with 403');
+
   console.log('\nAll Vercel API proxy unit tests PASSED successfully.');
 }
 
