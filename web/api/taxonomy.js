@@ -101,14 +101,16 @@ export default async function handler(req, res) {
       try {
         const json = JSON.parse(rawText);
         const data = json.data || json;
-        if (data && data.types && Array.isArray(data.types)) {
+        const cats = data.categoriesByType || data.categories;
+        const hasCompleteCategories = cats && cats.Expenses && cats.Expenses.length >= 5;
+        if (data && data.types && Array.isArray(data.types) && hasCompleteCategories) {
           return res.status(200).json({
             success: true,
             source: 'apps_script_live',
             data: {
               types: data.types,
-              categoriesByType: data.categoriesByType || data.categories,
-              categories: data.categories || data.categoriesByType,
+              categoriesByType: cats,
+              categories: cats,
               accounts: data.accounts,
               destinationAccounts: data.destinationAccounts || data.accounts
             },

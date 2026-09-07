@@ -438,6 +438,61 @@ function extractSectionCategories(values, headerText, sheetName) {
 }
 
 /**
+ * Dynamically extracts category values and accounts from 'Set up data 2' sheet
+ */
+function extractCategoriesFromSetUpData2(ss) {
+  const sheet = ss.getSheetByName('Set up data 2');
+  if (!sheet) return null;
+
+  const lastRow = Math.min(sheet.getLastRow(), 200);
+  if (lastRow < 10) return null;
+
+  const values = sheet.getRange(1, 2, lastRow, 4).getValues(); // B1:E{lastRow}
+  const categoriesByType = {
+    Income: ['Rollover from Previous Month (+)'],
+    Bills: [],
+    Debt: [],
+    Expenses: [],
+    Savings: [],
+    Balance: []
+  };
+  const accounts = [];
+
+  let currentSection = 'Income';
+  for (let i = 0; i < values.length; i++) {
+    const b = String(values[i][0] || '').trim();
+    const e = String(values[i][3] || '').trim();
+
+    if (b === 'Bills and Subscription Title') { currentSection = 'Bills'; continue; }
+    if (b === 'Debt Title') { currentSection = 'Debt'; continue; }
+    if (b === 'Expenses Title') { currentSection = 'Expenses'; continue; }
+    if (b === 'Savings Title') { currentSection = 'Savings'; continue; }
+    if (b === 'Bank Accounts Title') { currentSection = 'Accounts'; continue; }
+    if (b === 'Start month' || b.indexOf('Month ') === 0) { currentSection = 'Done'; continue; }
+
+    if (currentSection === 'Income') {
+      const item = e || b;
+      if (item && item.indexOf('Title') === -1 && categoriesByType.Income.indexOf(item) === -1) {
+        categoriesByType.Income.push(item);
+      }
+    } else if (currentSection === 'Accounts') {
+      if (b && b.indexOf('Title') === -1 && isNaN(Number(b)) && accounts.indexOf(b) === -1) {
+        accounts.push(b);
+      }
+    } else if (currentSection !== 'Done' && categoriesByType[currentSection]) {
+      if (b && b.indexOf('Title') === -1 && isNaN(Number(b)) && categoriesByType[currentSection].indexOf(b) === -1) {
+        categoriesByType[currentSection].push(b);
+      }
+    }
+  }
+
+  return {
+    categoriesByType: categoriesByType,
+    accounts: accounts
+  };
+}
+
+/**
  * Resolves data validation items from a Google Sheets DataValidation rule
  */
 function resolveDropdownFromRule(rule, contextName) {
@@ -547,6 +602,8 @@ function getTaxonomyData(ss) {
   // 3. Read Category dropdown (Column G) directly from live validation rules per Type
   // Category dropdown is dynamic per-row based on the row's Type in Column D.
   // We locate sample rows for each discovered Type to capture every live category list.
+  // 3. Read Category dropdown: Prioritize 'Set up data 2' for complete master category catalogs
+  const setup2Catalog = extractCategoriesFromSetUpData2(ss);
   const categoryValidationInfoByType = {};
   const categoriesByType = {};
 
@@ -558,6 +615,15 @@ function getTaxonomyData(ss) {
     if (currentType === 'Balance') {
       categoriesByType[currentType] = [];
       categoryValidationInfoByType[currentType] = { items: [] };
+      continue;
+    }
+
+    if (setup2Catalog && setup2Catalog.categoriesByType[currentType] && setup2Catalog.categoriesByType[currentType].length > 0) {
+      categoriesByType[currentType] = setup2Catalog.categoriesByType[currentType];
+      categoryValidationInfoByType[currentType] = {
+        sourceRange: 'Set up data 2!B:E',
+        items: setup2Catalog.categoriesByType[currentType]
+      };
       continue;
     }
 
@@ -595,32 +661,8 @@ function getTaxonomyData(ss) {
       };
       categoriesByType[currentType] = resolvedCat.items;
     } else {
-      const setup2 = ss.getSheetByName('Set up data 2');
-      if (setup2) {
-        const rangeMap = {
-          'Income': 'E6:E23',
-          'Bills': 'B27:B66',
-          'Debt': 'B70:B89',
-          'Expenses': 'B93:B122',
-          'Savings': 'B126:B145'
-        };
-        const a1 = rangeMap[currentType];
-        if (a1) {
-          const rawItems = setup2.getRange(a1).getValues();
-          const items = [];
-          for (let ri = 0; ri < rawItems.length; ri++) {
-            const v = String(rawItems[ri][0] || '').trim();
-            if (v && isNaN(Number(v)) && !v.startsWith('#') && !v.includes('Title') && items.indexOf(v) === -1) {
-              items.push(v);
-            }
-          }
-          categoriesByType[currentType] = items;
-          categoryValidationInfoByType[currentType] = {
-            items: items,
-            sourceRange: 'Set up data 2!' + a1
-          };
-        }
-      }
+      categoriesByType[currentType] = [];
+      categoryValidationInfoByType[currentType] = { items: [] };
     }
   }
 
