@@ -12,17 +12,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.gmdparser.data.model.TaxonomyDefaults
 import com.gmdparser.ui.theme.*
 
 @Composable
 fun CategoriesScreen() {
-    val categoryTaxonomy = mapOf(
-        "Income" to listOf("Salary", "Business Income", "Dividends", "Interest", "Refunds", "Gifts / Support"),
-        "Expenses" to listOf("Groceries", "Dining Out / Takeout", "Transport & Fuel", "Shopping & Clothing", "Entertainment", "Personal Care", "Health & Pharmacy"),
-        "Bills" to listOf("Rent", "Electricity / KPLC", "Water", "Internet / WiFi", "TV & Subscriptions", "Home Maintenance"),
-        "Debt" to listOf("Credit Card", "Bank Loan Repayment", "Hustler Fund", "Personal Loan", "Mobile Loan (M-Shwari / Fuliza)"),
-        "Savings" to listOf("Emergency Fund", "Money Market Fund (MMF)", "SACCO Monthly Deposit", "Fixed Deposit", "Treasury Bills")
-    )
+    val categoryTaxonomy = TaxonomyDefaults.CATEGORIES_BY_TYPE
 
     Column(
         modifier = Modifier
@@ -55,7 +50,7 @@ fun CategoriesScreen() {
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
                         Text(
-                            text = entry.key,
+                            text = "${entry.key} (${entry.value.size})",
                             color = AccentCyan,
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp

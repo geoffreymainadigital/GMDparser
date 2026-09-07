@@ -23,7 +23,6 @@ import com.gmdparser.ui.theme.*
 data class AccountItem(
     val name: String,
     val type: String,
-    val balance: Double,
     val icon: ImageVector,
     val isDefault: Boolean = false
 )
@@ -31,12 +30,13 @@ data class AccountItem(
 @Composable
 fun AccountsScreen() {
     val accounts = listOf(
-        AccountItem("M-PESA", "Mobile Money", 12450.00, Icons.Default.PhoneAndroid, isDefault = true),
-        AccountItem("NCBA Loop", "Bank Account", 45200.00, Icons.Default.AccountBalance),
-        AccountItem("Equity Bank", "Bank Account", 18500.00, Icons.Default.AccountBalance),
-        AccountItem("Stima Sacco", "SACCO Account", 120000.00, Icons.Default.Savings),
-        AccountItem("CIC Money Market Fund", "MMF / Liquid", 85000.00, Icons.Default.Savings),
-        AccountItem("Cash Wallet", "Physical Cash", 3200.00, Icons.Default.AccountBalance)
+        AccountItem("Mpesa", "Mobile Money", Icons.Default.PhoneAndroid, isDefault = true),
+        AccountItem("Equity Bank", "Bank Account", Icons.Default.AccountBalance),
+        AccountItem("I&M Bank", "Bank Account", Icons.Default.AccountBalance),
+        AccountItem("Cash", "Physical Cash", Icons.Default.AccountBalance),
+        AccountItem("Till Number", "Merchant Account", Icons.Default.PhoneAndroid),
+        AccountItem("Tower Sacco", "SACCO Account", Icons.Default.Savings),
+        AccountItem("Airtime", "Telecom", Icons.Default.PhoneAndroid)
     )
 
     Column(
@@ -52,7 +52,7 @@ fun AccountsScreen() {
             fontWeight = FontWeight.Bold
         )
         Text(
-            text = "Asset stores and funding accounts defined in financial model",
+            text = "Funding and destination accounts configured in production spreadsheet",
             color = TextSecondary,
             fontSize = 12.sp
         )
@@ -70,29 +70,54 @@ fun AccountsScreen() {
                 ) {
                     Row(
                         modifier = Modifier
-                            .padding(16.dp)
-                            .fillMaxWidth(),
+                            .fillMaxWidth()
+                            .padding(14.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(acc.icon, contentDescription = null, tint = AccentCyan, modifier = Modifier.size(24.dp))
+                            Surface(
+                                color = AccentCyan.copy(alpha = 0.15f),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.size(40.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = acc.icon,
+                                        contentDescription = acc.name,
+                                        tint = AccentCyan,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
-                                Text(acc.name, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                Text(acc.type, color = TextMuted, fontSize = 11.sp)
+                                Text(
+                                    text = acc.name,
+                                    color = TextPrimary,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 15.sp
+                                )
+                                Text(
+                                    text = acc.type,
+                                    color = TextSecondary,
+                                    fontSize = 12.sp
+                                )
                             }
                         }
 
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text(
-                                "Ksh ${String.format("%,.2f", acc.balance)}",
-                                color = TextPrimary,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
-                            )
-                            if (acc.isDefault) {
-                                Text("Primary Capture", color = MpesaGreen, fontSize = 10.sp, fontWeight = FontWeight.Medium)
+                        if (acc.isDefault) {
+                            Surface(
+                                color = MpesaGreen.copy(alpha = 0.2f),
+                                shape = RoundedCornerShape(6.dp)
+                            ) {
+                                Text(
+                                    text = "DEFAULT",
+                                    color = MpesaGreen,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                )
                             }
                         }
                     }

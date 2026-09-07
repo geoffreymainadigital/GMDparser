@@ -2,6 +2,7 @@ package com.gmdparser.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -19,6 +20,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.gmdparser.data.model.TaxonomyDefaults
 import com.gmdparser.data.model.Transaction
 import com.gmdparser.data.repository.TransactionRepository
 import com.gmdparser.ui.theme.*
@@ -178,7 +180,9 @@ fun TransactionReviewCard(
     var selectedAccount by remember(transaction) { mutableStateOf(transaction.account) }
     var destinationAccountText by remember(transaction) { mutableStateOf(transaction.destinationAccount ?: "") }
 
-    val typesList = listOf("Income", "Expenses", "Bills", "Debt", "Savings", "Transfer")
+    val typesList = TaxonomyDefaults.TYPES
+    val availableCategories = TaxonomyDefaults.CATEGORIES_BY_TYPE[selectedType] ?: emptyList()
+    val availableAccounts = TaxonomyDefaults.ACCOUNTS
 
     Card(
         colors = CardDefaults.cardColors(containerColor = DarkSurface),
@@ -232,10 +236,10 @@ fun TransactionReviewCard(
                 singleLine = true
             )
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             // Type Selection
-            Text("Transaction Type", color = TextSecondary, fontSize = 12.sp)
+            Text("Transaction Type (from Spreadsheet)", color = TextSecondary, fontSize = 12.sp)
             Spacer(modifier = Modifier.height(4.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -246,8 +250,11 @@ fun TransactionReviewCard(
                         selected = selectedType == t,
                         onClick = {
                             selectedType = t
-                            if (t == "Transfer" && destinationAccountText.isBlank()) {
-                                destinationAccountText = "Bank (NCBA Loop)"
+                            if (t == "Balance" && destinationAccountText.isBlank()) {
+                                destinationAccountText = "Mpesa"
+                            }
+                            if (t == "Balance") {
+                                selectedCategory = ""
                             }
                         },
                         label = { Text(t, fontSize = 11.sp) },
@@ -267,8 +274,11 @@ fun TransactionReviewCard(
                         selected = selectedType == t,
                         onClick = {
                             selectedType = t
-                            if (t == "Transfer" && destinationAccountText.isBlank()) {
-                                destinationAccountText = "Bank (NCBA Loop)"
+                            if (t == "Balance" && destinationAccountText.isBlank()) {
+                                destinationAccountText = "Mpesa"
+                            }
+                            if (t == "Balance") {
+                                selectedCategory = ""
                             }
                         },
                         label = { Text(t, fontSize = 11.sp) },
@@ -280,13 +290,15 @@ fun TransactionReviewCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // Category Input
+            // Category Input & Chips
+            Text("Category", color = TextSecondary, fontSize = 12.sp)
+            Spacer(modifier = Modifier.height(4.dp))
             OutlinedTextField(
                 value = selectedCategory,
                 onValueChange = { selectedCategory = it },
-                label = { Text("Category") },
+                label = { Text(if (selectedType == "Balance") "Category (Leave blank for Balance)" else "Category") },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MpesaGreen,
                     unfocusedBorderColor = DarkSurfaceBorder,
@@ -297,7 +309,27 @@ fun TransactionReviewCard(
                 singleLine = true
             )
 
-            Spacer(modifier = Modifier.height(10.dp))
+            if (availableCategories.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    availableCategories.forEach { cat ->
+                        AssistChip(
+                            onClick = { selectedCategory = cat },
+                            label = { Text(cat, fontSize = 11.sp) },
+                            colors = AssistChipDefaults.assistChipColors(
+                                containerColor = if (selectedCategory == cat) MpesaGreen.copy(alpha = 0.3f) else DarkSurfaceCard
+                            )
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
 
             // Description Input
             OutlinedTextField(
@@ -314,13 +346,15 @@ fun TransactionReviewCard(
                 singleLine = true
             )
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // Account Input
+            // Account Input & Chips
+            Text("Funding Account", color = TextSecondary, fontSize = 12.sp)
+            Spacer(modifier = Modifier.height(4.dp))
             OutlinedTextField(
                 value = selectedAccount,
                 onValueChange = { selectedAccount = it },
-                label = { Text("Funding Account") },
+                label = { Text("Account") },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MpesaGreen,
                     unfocusedBorderColor = DarkSurfaceBorder,
@@ -331,13 +365,31 @@ fun TransactionReviewCard(
                 singleLine = true
             )
 
-            // If Transfer, show destination account field
-            if (selectedType == "Transfer") {
-                Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                availableAccounts.forEach { acc ->
+                    AssistChip(
+                        onClick = { selectedAccount = acc },
+                        label = { Text(acc, fontSize = 11.sp) },
+                        colors = AssistChipDefaults.assistChipColors(
+                            containerColor = if (selectedAccount == acc) MpesaGreen.copy(alpha = 0.3f) else DarkSurfaceCard
+                        )
+                    )
+                }
+            }
+
+            // If Balance or Transfer, show destination account field
+            if (selectedType == "Balance" || selectedType == "Transfer") {
+                Spacer(modifier = Modifier.height(12.dp))
                 OutlinedTextField(
                     value = destinationAccountText,
                     onValueChange = { destinationAccountText = it },
-                    label = { Text("Destination Account (Required for Transfers)") },
+                    label = { Text("Destination Account (for Balance transfers)") },
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = AccentCyan,
                         unfocusedBorderColor = DarkSurfaceBorder,
@@ -347,6 +399,24 @@ fun TransactionReviewCard(
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
+
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    availableAccounts.forEach { acc ->
+                        AssistChip(
+                            onClick = { destinationAccountText = acc },
+                            label = { Text(acc, fontSize = 11.sp) },
+                            colors = AssistChipDefaults.assistChipColors(
+                                containerColor = if (destinationAccountText == acc) AccentCyan.copy(alpha = 0.3f) else DarkSurfaceCard
+                            )
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(14.dp))
@@ -395,7 +465,7 @@ fun TransactionReviewCard(
                             category = selectedCategory,
                             description = descriptionText,
                             account = selectedAccount,
-                            destinationAccount = if (selectedType == "Transfer") destinationAccountText.trim() else null
+                            destinationAccount = if (selectedType == "Balance" || selectedType == "Transfer") destinationAccountText.trim().ifEmpty { null } else null
                         )
                         onConfirm(confirmedTx)
                     },
