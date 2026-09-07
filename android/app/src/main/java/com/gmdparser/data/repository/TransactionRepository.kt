@@ -96,7 +96,15 @@ object TransactionRepository {
                 _confirmedTransactions.update { listOf(dup) + it }
                 Result.failure(Exception("Duplicate transaction code: ${body?.error ?: "Already recorded in sheet"}"))
             } else {
-                val errorMsg = body?.error ?: "Server error (${response.code()}): ${response.message()}"
+                val errBodyStr = response.errorBody()?.string()
+                val parsedErrMsg = try {
+                    if (!errBodyStr.isNullOrBlank()) {
+                        org.json.JSONObject(errBodyStr).optString("error", errBodyStr)
+                    } else null
+                } catch (_: Exception) {
+                    errBodyStr
+                }
+                val errorMsg = parsedErrMsg ?: body?.error ?: "Server error (${response.code()}): ${response.message()}"
                 Result.failure(Exception(errorMsg))
             }
         } catch (e: Exception) {
