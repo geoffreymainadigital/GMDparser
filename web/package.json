@@ -1,0 +1,17 @@
+{
+  "name": "gmdparser-api",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Vercel Public API gateway and network proxy for GMDParser",
+  "main": "api/health.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "test": "node ../tests/vercel_proxy.test.js"
+  },
+  "keywords": ["gmdparser", "mpesa", "finance", "vercel", "api"],
+  "author": "Geoffrey Maina",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

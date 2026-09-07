@@ -1,7 +1,7 @@
 /**
  * Automated Verification for Google Apps Script Validation Engine & Contracts
  */
-const assert = require('assert');
+import assert from 'node:assert';
 
 const VALID_TYPES = ['Income', 'Expenses', 'Bills', 'Debt', 'Savings', 'Transfer'];
 
