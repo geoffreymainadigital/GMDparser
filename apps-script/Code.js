@@ -16,8 +16,8 @@ const COL_AMOUNT = 10;          // J
 const COL_ACCOUNT = 11;         // K
 const COL_TX_CODE = 12;         // L
 
-const SCRIPT_VERSION = '1.0.1';
-const SCRIPT_BUILD_ID = '2026-09-07-taxonomy-v2';
+const SCRIPT_VERSION = '2026.09.06.v5_production';
+const SCRIPT_BUILD_ID = 'GMD_GAS_20260906_PROD_01';
 
 let VALID_TYPES = ['Income', 'Expenses', 'Bills', 'Debt', 'Savings', 'Balance'];
 
