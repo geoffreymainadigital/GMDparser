@@ -361,13 +361,13 @@ function checkDuplicateTransactionCode(sheet, txCode) {
  */
 function findNextAvailableRow(sheet) {
   const lastRow = sheet.getLastRow();
-  if (lastRow < 2) {
-    return 2; // Row 1 is header, first data row is 2
+  if (lastRow < 10) {
+    return 10; // Rows 1-9 are template title/headers, first data row is 10
   }
 
-  // Scan columns C and L from bottom or row 2 downwards
+  // Scan columns C and L from row 10 downwards
   const values = sheet.getRange(1, COL_DATE, lastRow, 1).getValues();
-  for (let r = 1; r < values.length; r++) { // 0-indexed: row 2 is index 1
+  for (let r = 9; r < values.length; r++) { // 0-indexed: row 10 is index 9
     const cellValue = values[r][0];
     if (!cellValue || String(cellValue).trim() === '') {
       // Confirm column L is also empty
