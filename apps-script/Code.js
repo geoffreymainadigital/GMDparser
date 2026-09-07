@@ -555,8 +555,13 @@ function getTaxonomyData(ss) {
 
   for (let t = 0; t < resolvedTypes.length; t++) {
     const currentType = resolvedTypes[t];
-    let sampleRow = -1;
+    if (currentType === 'Balance') {
+      categoriesByType[currentType] = [];
+      categoryValidationInfoByType[currentType] = { items: [] };
+      continue;
+    }
 
+    let sampleRow = -1;
     for (let r = 9; r < typeColValues.length; r++) { // 0-indexed, row 10 is index 9
       const val = String(typeColValues[r][0] || '').trim();
       if (val.toLowerCase() === currentType.toLowerCase()) {
@@ -566,24 +571,57 @@ function getTaxonomyData(ss) {
     }
 
     if (sampleRow === -1) {
-      throw new Error('No sample row found in Transactions sheet with Type "' + currentType + '" to inspect Category validation rule.');
+      sampleRow = 10;
     }
 
     const catCell = txSheet.getRange(sampleRow, COL_CATEGORY);
     const catRule = catCell.getDataValidation();
-    if (!catRule) {
-      throw new Error('No Category validation rule found at ' + catCell.getA1Notation() + ' for Type "' + currentType + '"');
+    let resolvedCat = null;
+    if (catRule) {
+      try {
+        resolvedCat = resolveDropdownFromRule(catRule, 'Category for Type "' + currentType + '" at ' + catCell.getA1Notation());
+      } catch (e) {
+        resolvedCat = null;
+      }
     }
 
-    const resolvedCat = resolveDropdownFromRule(catRule, 'Category for Type "' + currentType + '" at ' + catCell.getA1Notation());
-    categoryValidationInfoByType[currentType] = {
-      row: sampleRow,
-      cell: catCell.getA1Notation(),
-      criteriaType: resolvedCat.criteriaType,
-      sourceRange: resolvedCat.sourceRange,
-      items: resolvedCat.items
-    };
-    categoriesByType[currentType] = resolvedCat.items;
+    if (resolvedCat && resolvedCat.items && resolvedCat.items.length > 0) {
+      categoryValidationInfoByType[currentType] = {
+        row: sampleRow,
+        cell: catCell.getA1Notation(),
+        criteriaType: resolvedCat.criteriaType,
+        sourceRange: resolvedCat.sourceRange,
+        items: resolvedCat.items
+      };
+      categoriesByType[currentType] = resolvedCat.items;
+    } else {
+      const setup2 = ss.getSheetByName('Set up data 2');
+      if (setup2) {
+        const rangeMap = {
+          'Income': 'E6:E23',
+          'Bills': 'B27:B66',
+          'Debt': 'B70:B89',
+          'Expenses': 'B93:B122',
+          'Savings': 'B126:B145'
+        };
+        const a1 = rangeMap[currentType];
+        if (a1) {
+          const rawItems = setup2.getRange(a1).getValues();
+          const items = [];
+          for (let ri = 0; ri < rawItems.length; ri++) {
+            const v = String(rawItems[ri][0] || '').trim();
+            if (v && isNaN(Number(v)) && !v.startsWith('#') && !v.includes('Title') && items.indexOf(v) === -1) {
+              items.push(v);
+            }
+          }
+          categoriesByType[currentType] = items;
+          categoryValidationInfoByType[currentType] = {
+            items: items,
+            sourceRange: 'Set up data 2!' + a1
+          };
+        }
+      }
+    }
   }
 
   // 4. Cross-check against Set Up tab (Live validation rule remains authoritative)
