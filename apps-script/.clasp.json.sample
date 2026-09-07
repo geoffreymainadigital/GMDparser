@@ -1,0 +1,4 @@
+{
+  "scriptId": "<YOUR_DEPLOYED_APPS_SCRIPT_ID>",
+  "rootDir": "."
+}
