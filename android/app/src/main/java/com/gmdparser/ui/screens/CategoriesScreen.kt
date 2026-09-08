@@ -12,12 +12,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.gmdparser.data.model.TaxonomyDefaults
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import com.gmdparser.data.repository.TaxonomyRepository
 import com.gmdparser.ui.theme.*
 
 @Composable
 fun CategoriesScreen() {
-    val categoryTaxonomy = TaxonomyDefaults.CATEGORIES_BY_TYPE
+    val categoryTaxonomy by TaxonomyRepository.categoriesByType.collectAsState()
 
     Column(
         modifier = Modifier

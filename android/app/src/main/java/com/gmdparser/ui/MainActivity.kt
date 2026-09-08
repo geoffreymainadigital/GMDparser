@@ -19,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import com.gmdparser.data.repository.TaxonomyRepository
 import com.gmdparser.data.repository.TransactionRepository
 import com.gmdparser.ui.screens.*
 import com.gmdparser.ui.theme.DarkBackground
@@ -88,6 +89,10 @@ class MainActivity : ComponentActivity() {
 fun MainAppHost(initialScreen: Screen = Screen.DASHBOARD) {
     var currentScreen by remember { mutableStateOf(initialScreen) }
     val pendingCount by TransactionRepository.pendingTransactions.collectAsState()
+
+    LaunchedEffect(Unit) {
+        TaxonomyRepository.refreshTaxonomy()
+    }
 
     Scaffold(
         topBar = {

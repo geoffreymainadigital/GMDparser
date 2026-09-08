@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gmdparser.data.model.TaxonomyDefaults
 import com.gmdparser.data.model.Transaction
+import com.gmdparser.data.repository.TaxonomyRepository
 import com.gmdparser.data.repository.TransactionRepository
 import com.gmdparser.ui.theme.*
 import kotlinx.coroutines.launch
@@ -180,9 +181,13 @@ fun TransactionReviewCard(
     var selectedAccount by remember(transaction) { mutableStateOf(transaction.account) }
     var destinationAccountText by remember(transaction) { mutableStateOf(transaction.destinationAccount ?: "") }
 
-    val typesList = TaxonomyDefaults.TYPES
-    val availableCategories = TaxonomyDefaults.CATEGORIES_BY_TYPE[selectedType] ?: emptyList()
-    val availableAccounts = TaxonomyDefaults.ACCOUNTS
+    val liveTypes by TaxonomyRepository.types.collectAsState()
+    val liveCategoriesByType by TaxonomyRepository.categoriesByType.collectAsState()
+    val liveAccounts by TaxonomyRepository.accounts.collectAsState()
+
+    val typesList = liveTypes
+    val availableCategories = liveCategoriesByType[selectedType] ?: emptyList()
+    val availableAccounts = liveAccounts
 
     Card(
         colors = CardDefaults.cardColors(containerColor = DarkSurface),
@@ -479,7 +484,7 @@ fun TransactionReviewCard(
                     } else {
                         Icon(Icons.Default.Check, contentDescription = "Confirm", modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Confirm & Record", fontWeight = FontWeight.Bold)
+                        Text("Confirm & Save", fontWeight = FontWeight.Bold)
                     }
                 }
             }
