@@ -8,6 +8,10 @@ import com.gmdparser.data.model.Transaction
 import com.gmdparser.data.model.TransactionPayload
 import com.gmdparser.data.model.TransactionStatus
 import com.gmdparser.data.network.NetworkClient
+import android.content.Context
+import android.content.SharedPreferences
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -18,33 +22,97 @@ object TransactionRepository {
     // Immutable Invariant: AutoSync is permanently disabled to enforce user confirmation
     fun isAutoSync(): Boolean = false
 
+    private const val PREFS_NAME = "gmdparser_tx_repo"
+    private const val KEY_PENDING = "pending_transactions"
+    private const val KEY_CONFIRMED = "confirmed_transactions"
+
+    private var prefs: SharedPreferences? = null
+    private val gson = Gson()
+
     private val _pendingTransactions = MutableStateFlow<List<Transaction>>(emptyList())
     val pendingTransactions: StateFlow<List<Transaction>> = _pendingTransactions.asStateFlow()
 
     private val _confirmedTransactions = MutableStateFlow<List<Transaction>>(emptyList())
     val confirmedTransactions: StateFlow<List<Transaction>> = _confirmedTransactions.asStateFlow()
 
+    fun init(context: Context) {
+        if (prefs != null) return
+        val sp = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs = sp
+
+        // Restore pending transactions from persistent storage
+        val pendingJson = sp.getString(KEY_PENDING, null)
+        if (!pendingJson.isNullOrBlank()) {
+            try {
+                val type = object : TypeToken<List<Transaction>>() {}.type
+                val loaded: List<Transaction> = gson.fromJson(pendingJson, type)
+                _pendingTransactions.value = loaded
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
+        // Restore confirmed history from persistent storage
+        val confirmedJson = sp.getString(KEY_CONFIRMED, null)
+        if (!confirmedJson.isNullOrBlank()) {
+            try {
+                val type = object : TypeToken<List<Transaction>>() {}.type
+                val loaded: List<Transaction> = gson.fromJson(confirmedJson, type)
+                _confirmedTransactions.value = loaded
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    private fun persistPending(list: List<Transaction>) {
+        prefs?.edit()?.putString(KEY_PENDING, gson.toJson(list))?.apply()
+    }
+
+    private fun persistConfirmed(list: List<Transaction>) {
+        prefs?.edit()?.putString(KEY_CONFIRMED, gson.toJson(list))?.apply()
+    }
+
     fun addPendingTransaction(tx: Transaction) {
         _pendingTransactions.update { current ->
-            // Prevent duplicate pending entries with same transaction code
-            if (current.none { it.transactionCode == tx.transactionCode }) {
+            if (current.none { it.transactionCode == tx.transactionCode } &&
+                _confirmedTransactions.value.none { it.transactionCode == tx.transactionCode }) {
                 listOf(tx) + current
             } else {
                 current
             }
         }
+        persistPending(_pendingTransactions.value)
+    }
+
+    fun addPendingTransactions(list: List<Transaction>): Int {
+        var addedCount = 0
+        _pendingTransactions.update { current ->
+            val newItems = list.filter { item ->
+                current.none { it.transactionCode == item.transactionCode } &&
+                _confirmedTransactions.value.none { it.transactionCode == item.transactionCode }
+            }
+            addedCount = newItems.size
+            newItems + current
+        }
+        if (addedCount > 0) {
+            persistPending(_pendingTransactions.value)
+        }
+        return addedCount
     }
 
     fun updatePendingTransaction(updated: Transaction) {
         _pendingTransactions.update { current ->
             current.map { if (it.transactionCode == updated.transactionCode) updated else it }
         }
+        persistPending(_pendingTransactions.value)
     }
 
     fun removePendingTransaction(txCode: String) {
         _pendingTransactions.update { current ->
             current.filter { it.transactionCode != txCode }
         }
+        persistPending(_pendingTransactions.value)
     }
 
     /**
@@ -119,12 +187,14 @@ object TransactionRepository {
                 removePendingTransaction(tx.transactionCode)
                 val confirmed = tx.copy(status = TransactionStatus.SYNCED)
                 _confirmedTransactions.update { listOf(confirmed) + it }
+                persistConfirmed(_confirmedTransactions.value)
                 Result.success(body)
             } else if (isDuplicate) {
                 // Duplicate transaction code detected by backend
                 removePendingTransaction(tx.transactionCode)
                 val dup = tx.copy(status = TransactionStatus.DUPLICATE)
                 _confirmedTransactions.update { listOf(dup) + it }
+                persistConfirmed(_confirmedTransactions.value)
                 val existingRow = errJson?.optJSONObject("existingRecord")?.optInt("row")
                     ?: body?.existingRecord?.row
                     ?: errJson?.optInt("row")

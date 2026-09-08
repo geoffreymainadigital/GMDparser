@@ -33,7 +33,6 @@ enum class Screen(val title: String, val icon: ImageVector) {
     HISTORY("History", Icons.Default.ReceiptLong),
     ACCOUNTS("Accounts", Icons.Default.AccountBalance),
     CATEGORIES("Categories", Icons.Default.Category),
-    BUDGETS("Budgets", Icons.Default.PieChart),
     SAVINGS("Savings", Icons.Default.Savings),
     DEBTS("Debts", Icons.Default.Payment),
     GOALS("Goals", Icons.Default.TrackChanges),
@@ -157,13 +156,12 @@ fun MainAppHost(initialScreen: Screen = Screen.DASHBOARD) {
                     onNavigateToReview = { currentScreen = Screen.REVIEW },
                     onNavigateToHistory = { currentScreen = Screen.HISTORY },
                     onNavigateToAccounts = { currentScreen = Screen.ACCOUNTS },
-                    onNavigateToBudgets = { currentScreen = Screen.BUDGETS }
+                    onNavigateToCategories = { currentScreen = Screen.CATEGORIES }
                 )
                 Screen.REVIEW -> ReviewConfirmScreen()
                 Screen.HISTORY -> HistoryScreen()
                 Screen.ACCOUNTS -> AccountsScreen()
                 Screen.CATEGORIES -> CategoriesScreen()
-                Screen.BUDGETS -> BudgetsScreen()
                 Screen.SAVINGS -> SavingsScreen()
                 Screen.DEBTS -> DebtsScreen()
                 Screen.GOALS -> GoalsScreen()

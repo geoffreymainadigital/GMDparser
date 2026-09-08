@@ -27,7 +27,7 @@ fun DashboardScreen(
     onNavigateToReview: () -> Unit,
     onNavigateToHistory: () -> Unit,
     onNavigateToAccounts: () -> Unit,
-    onNavigateToBudgets: () -> Unit
+    onNavigateToCategories: () -> Unit
 ) {
     val pendingList by TransactionRepository.pendingTransactions.collectAsState()
     val confirmedList by TransactionRepository.confirmedTransactions.collectAsState()
@@ -147,12 +147,12 @@ fun DashboardScreen(
                 onClick = onNavigateToAccounts
             )
             MetricQuickCard(
-                title = "Budgets",
-                value = "Active Limits",
-                icon = Icons.Default.PieChart,
-                color = AccentBlue,
+                title = "Categories",
+                value = "Taxonomy",
+                icon = Icons.Default.Category,
+                color = AccentPurple,
                 modifier = Modifier.weight(1f),
-                onClick = onNavigateToBudgets
+                onClick = onNavigateToCategories
             )
         }
 

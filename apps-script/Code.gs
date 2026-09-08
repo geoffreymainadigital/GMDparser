@@ -16,8 +16,8 @@ const COL_AMOUNT = 10;          // J (Amount)
 const COL_ACCOUNT = 11;         // K (Account)
 const COL_NOTES = 12;           // L (Notes)
 
-const SCRIPT_VERSION = '2026.09.08.v12_fee_length_and_safe_validation';
-const SCRIPT_BUILD_ID = 'GMD_GAS_20260908_PROD_12';
+const SCRIPT_VERSION = '2026.09.08.v13_date_last_orphan_prevention';
+const SCRIPT_BUILD_ID = 'GMD_GAS_20260908_PROD_13';
 
 let VALID_TYPES = ['Income', 'Expenses', 'Bills', 'Debt', 'Savings', 'Balance'];
 
@@ -68,6 +68,20 @@ function doGet(e) {
         spreadsheetId: targetId,
         sheets: sheetNames,
         taxonomy: taxonomy,
+        timestamp: new Date().toISOString()
+      }, 200);
+    }
+
+    if (action === 'findOrphanedRows') {
+      const sheet = ss.getSheetByName(SHEET_NAME_TRANSACTIONS);
+      if (!sheet) {
+        return createJsonResponse({ success: false, error: 'Transactions sheet not found' }, 500);
+      }
+      const orphans = findOrphanedRows(sheet);
+      return createJsonResponse({
+        success: true,
+        count: orphans.length,
+        orphanedRows: orphans,
         timestamp: new Date().toISOString()
       }, 200);
     }
@@ -227,63 +241,76 @@ function handleCreateTransaction(tx) {
   const formattedNotes = formatNotesWithCode(baseNotes, tx.transactionCode);
 
   // Write strictly to safe raw transaction write boundaries:
-  // 1. Range C:D (Date, Type)
-  sheet.getRange(targetRow, COL_DATE, 1, 2).setValues([[
-    formattedDate,
-    tx.type
-  ]]);
-
-  // CRITICAL: Flush after setting Type so Google Sheets calculates the dynamic categories in X:AU for this Type!
-  SpreadsheetApp.flush();
-
-  // 2. Range G:H (Category, Description)
-  // With X:AU calculated, tx.category is valid and accepted naturally without validation rejections
+  // WRITE SEQUENCE (Orphaned Row Prevention):
+  // Date (Column C) is written LAST because findLastTransactionRow scans Column C.
+  // If an error or timeout happens during Type, Category, or Amount/Account, Column C remains
+  // completely blank. The next transaction write will naturally reuse this row without orphaning it.
   try {
-    sheet.getRange(targetRow, COL_CATEGORY, 1, 2).setValues([[
-      tx.category,
-      tx.description
-    ]]);
-  } catch (valErr) {
-    // Fallback: If calculation was delayed, write safely and preserve dropdown with warning mode
-    const catCell = sheet.getRange(targetRow, COL_CATEGORY);
-    const catRule = catCell.getDataValidation();
-    if (catRule) catCell.clearDataValidations();
-    sheet.getRange(targetRow, COL_CATEGORY, 1, 2).setValues([[
-      tx.category,
-      tx.description
-    ]]);
-    if (catRule) {
-      try {
-        catCell.setDataValidation(catRule.copy().setAllowInvalid(true).build());
-      } catch (_) {
-        // Safe fallback if rule build fails
+    // 1. Range D (Type) alone
+    sheet.getRange(targetRow, COL_TYPE).setValue(tx.type);
+
+    // CRITICAL: Flush after setting Type so Google Sheets calculates the dynamic categories in X:AU for this Type!
+    SpreadsheetApp.flush();
+
+    // 2. Range G:H (Category, Description)
+    // With X:AU calculated, tx.category is valid and accepted naturally without validation rejections
+    try {
+      sheet.getRange(targetRow, COL_CATEGORY, 1, 2).setValues([[
+        tx.category,
+        tx.description
+      ]]);
+    } catch (valErr) {
+      // Fallback: If calculation was delayed, write safely and preserve dropdown with warning mode
+      const catCell = sheet.getRange(targetRow, COL_CATEGORY);
+      const catRule = catCell.getDataValidation();
+      if (catRule) catCell.clearDataValidations();
+      sheet.getRange(targetRow, COL_CATEGORY, 1, 2).setValues([[
+        tx.category,
+        tx.description
+      ]]);
+      if (catRule) {
+        try {
+          catCell.setDataValidation(catRule.copy().setAllowInvalid(true).build());
+        } catch (_) {
+          // Safe fallback if rule build fails
+        }
       }
     }
-  }
 
-  // 3. Range J:L (Amount, Account, Notes)
-  // CRITICAL: Column I (currency formula 'Set Up'!$C$10) is preserved and NEVER overwritten!
-  // Columns A:B, E:F (F has VLOOKUP formula), and P:BR are also preserved.
-  try {
-    sheet.getRange(targetRow, COL_AMOUNT, 1, 3).setValues([[
-      Number(tx.amount),
-      tx.account,
-      formattedNotes
-    ]]);
-  } catch (accErr) {
-    const accCell = sheet.getRange(targetRow, COL_ACCOUNT);
-    const accRule = accCell.getDataValidation();
-    if (accRule) accCell.clearDataValidations();
-    sheet.getRange(targetRow, COL_AMOUNT, 1, 3).setValues([[
-      Number(tx.amount),
-      tx.account,
-      formattedNotes
-    ]]);
-    if (accRule) accCell.setDataValidation(accRule);
-  }
+    // 3. Range J:L (Amount, Account, Notes)
+    // CRITICAL: Column I (currency formula 'Set Up'!$C$10) is preserved and NEVER overwritten!
+    // Columns A:B, E:F (F has VLOOKUP formula), and P:BR are also preserved.
+    try {
+      sheet.getRange(targetRow, COL_AMOUNT, 1, 3).setValues([[
+        Number(tx.amount),
+        tx.account,
+        formattedNotes
+      ]]);
+    } catch (accErr) {
+      const accCell = sheet.getRange(targetRow, COL_ACCOUNT);
+      const accRule = accCell.getDataValidation();
+      if (accRule) accCell.clearDataValidations();
+      sheet.getRange(targetRow, COL_AMOUNT, 1, 3).setValues([[
+        Number(tx.amount),
+        tx.account,
+        formattedNotes
+      ]]);
+      if (accRule) accCell.setDataValidation(accRule);
+    }
 
-  // Final flush to guarantee persistence quickly
-  SpreadsheetApp.flush();
+    // 4. Write Date to Column C LAST - this commits the row for findLastTransactionRow
+    sheet.getRange(targetRow, COL_DATE).setValue(formattedDate);
+
+    // Final flush to guarantee persistence quickly
+    SpreadsheetApp.flush();
+
+  } catch (writeErr) {
+    // If write failed before Date was written, clean up Type from Column D so row stays blank
+    try {
+      sheet.getRange(targetRow, COL_TYPE).clearContent();
+    } catch (_) {}
+    throw writeErr;
+  }
 
   return createJsonResponse({
     success: true,
@@ -426,6 +453,53 @@ function findLastTransactionRow(sheet) {
  */
 function findNextTransactionRow(sheet) {
   return findLastTransactionRow(sheet) + 1;
+}
+
+/**
+ * Scans the Transactions sheet to find orphaned blank or partial rows:
+ * Rows where Date (C) or Type (D) is present, but Amount (J), Category (G), or Description (H) is missing.
+ * Read-only diagnostic function.
+ */
+function findOrphanedRows(sheet) {
+  const maxRows = sheet.getMaxRows ? sheet.getMaxRows() : 5000;
+  if (maxRows < 10) return [];
+  const numRows = Math.min(maxRows - 9, 3000);
+
+  // Read C (Date) through L (Notes) -> 10 columns (cols 3 to 12)
+  const rangeValues = sheet.getRange(10, COL_DATE, numRows, 10).getValues();
+
+  const orphaned = [];
+  for (let i = 0; i < rangeValues.length; i++) {
+    const rowNum = 10 + i;
+    const row = rangeValues[i];
+    const dateVal = String(row[0] || '').trim();  // COL_DATE (3)
+    const typeVal = String(row[1] || '').trim();  // COL_TYPE (4)
+    const catVal = String(row[4] || '').trim();   // COL_CATEGORY (7)
+    const descVal = String(row[5] || '').trim();  // COL_DESCRIPTION (8)
+    const amtVal = row[7];                        // COL_AMOUNT (10)
+    const notesVal = String(row[9] || '').trim(); // COL_NOTES (12)
+
+    const hasHeaderOrLabel = dateVal.toLowerCase() === 'date' || typeVal.toLowerCase() === 'type';
+    if (hasHeaderOrLabel) continue;
+
+    const hasDateOrType = dateVal !== '' || typeVal !== '';
+    const hasAmount = amtVal !== null && amtVal !== undefined && String(amtVal).trim() !== '' && Number(amtVal) > 0;
+    const hasCatOrDesc = catVal !== '' || descVal !== '';
+
+    // If Date or Type is present, but Amount is missing/0 and Category or Description is missing
+    if (hasDateOrType && (!hasAmount && (!catVal || !descVal))) {
+      orphaned.push({
+        row: rowNum,
+        date: dateVal,
+        type: typeVal,
+        category: catVal,
+        description: descVal,
+        amount: amtVal,
+        notes: notesVal
+      });
+    }
+  }
+  return orphaned;
 }
 
 /**

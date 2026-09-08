@@ -39,10 +39,6 @@
           <svg class="nav-icon" viewBox="0 0 24 24"><path d="M4 10h3v7H4zM10.5 10h3v7h-3zM2 19h20v3H2zM17 10h3v7h-3zM12 1L2 6v2h20V6z"/></svg>
           <span>Accounts & Transfers</span>
         </a>
-        <a href="#budgets" class="nav-item" data-tab="budgets">
-          <svg class="nav-icon" viewBox="0 0 24 24"><path d="M11 2v20c-5.07-.5-9-4.79-9-10s3.93-9.5 9-10zm2 0v8.99H22c-.47-4.74-4.24-8.52-9-8.99zm0 11.01V22c4.76-.47 8.53-4.25 9-8.99H13z"/></svg>
-          <span>Budgets</span>
-        </a>
         <a href="#diagnostics" class="nav-item" data-tab="diagnostics">
           <svg class="nav-icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
           <span>System Diagnostics</span>
@@ -291,20 +287,6 @@
           </div>
         </section>
 
-        <!-- 5. BUDGETS VIEW -->
-        <section id="view-budgets" class="tab-view">
-          <div class="card">
-            <div class="card-header">
-              <h3>Monthly Spending Budgets & Limits</h3>
-              <span class="tag tag-amber">Kenyan Category Tracking</span>
-            </div>
-            <p class="card-desc">Budget thresholds defined in the financial model. Category limits prevent lifestyle creep on discretionary expenditures.</p>
-
-            <div class="budget-list" id="budget-list">
-              <!-- Rendered via JS -->
-            </div>
-          </div>
-        </section>
 
         <!-- 6. SYSTEM DIAGNOSTICS VIEW -->
         <section id="view-diagnostics" class="tab-view">
@@ -369,16 +351,6 @@
                 </div>
                 <div class="settings-value">
                   <code>https://gmdparser.vercel.app/</code>
-                </div>
-              </div>
-
-              <div class="settings-item">
-                <div class="settings-info">
-                  <strong>AutoSync Invariant</strong>
-                  <span>Automatic background spreadsheet writing is strictly prohibited</span>
-                </div>
-                <div class="settings-value">
-                  <span class="tag tag-red">isAutoSync() == false (Locked)</span>
                 </div>
               </div>
 

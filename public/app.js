@@ -97,14 +97,6 @@ const state = {
     { name: 'Till Number', type: 'Merchant Till', balance: 0.00 },
     { name: 'Tower Sacco', type: 'SACCO Account', balance: 0.00 },
     { name: 'Airtime', type: 'Airtime Account', balance: 0.00 }
-  ],
-  budgets: [
-    { category: 'Monthly Shopping', spent: 0, limit: 15000 },
-    { category: 'Mama Mboga', spent: 0, limit: 8000 },
-    { category: 'Electricity', spent: 0, limit: 3500 },
-    { category: 'Rent', spent: 0, limit: 25000 },
-    { category: 'WIFI', spent: 0, limit: 3000 },
-    { category: 'Fare', spent: 0, limit: 6000 }
   ]
 };
 
@@ -324,7 +316,6 @@ function switchTab(tabId) {
     review: 'Review & Confirm',
     history: 'Ledger History',
     accounts: 'Accounts & Transfers',
-    budgets: 'Budgets & Limits',
     diagnostics: 'System Diagnostics',
     settings: 'Settings'
   };
@@ -580,7 +571,7 @@ function updateDashboardMetrics() {
   if (elTrans) elTrans.textContent = `Ksh ${transfers.toLocaleString('en-KE', { minimumFractionDigits: 2 })}`;
 }
 
-// Accounts & Budgets Initializer
+// Accounts Initializer
 function renderAccountsAndBudgets() {
   const accountsGrid = document.getElementById('accounts-grid');
   if (accountsGrid) {
@@ -593,27 +584,6 @@ function renderAccountsAndBudgets() {
         <div class="acc-bal">Ksh ${a.balance.toLocaleString('en-KE', { minimumFractionDigits: 2 })}</div>
       </div>
     `).join('');
-  }
-
-  const budgetList = document.getElementById('budget-list');
-  if (budgetList) {
-    budgetList.innerHTML = state.budgets.map(b => {
-      const pct = Math.min(Math.round((b.spent / b.limit) * 100), 100);
-      const isExceeded = b.spent > b.limit;
-      return `
-        <div class="budget-row">
-          <div class="budget-info">
-            <span>${b.category}</span>
-            <span style="color: ${isExceeded ? 'var(--color-red)' : 'var(--text-secondary)'};">
-              Ksh ${b.spent.toLocaleString()} / Ksh ${b.limit.toLocaleString()} (${pct}%)
-            </span>
-          </div>
-          <div class="progress-track">
-            <div class="progress-bar ${isExceeded ? 'exceeded' : ''}" style="width: ${pct}%;"></div>
-          </div>
-        </div>
-      `;
-    }).join('');
   }
 }
 
