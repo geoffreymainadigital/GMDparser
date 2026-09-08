@@ -16,8 +16,8 @@ const COL_AMOUNT = 10;          // J (Amount)
 const COL_ACCOUNT = 11;         // K (Account)
 const COL_NOTES = 12;           // L (Notes)
 
-const SCRIPT_VERSION = '2026.09.08.v11_flush_before_category';
-const SCRIPT_BUILD_ID = 'GMD_GAS_20260908_PROD_11';
+const SCRIPT_VERSION = '2026.09.08.v12_fee_length_and_safe_validation';
+const SCRIPT_BUILD_ID = 'GMD_GAS_20260908_PROD_12';
 
 let VALID_TYPES = ['Income', 'Expenses', 'Bills', 'Debt', 'Savings', 'Balance'];
 
@@ -244,7 +244,7 @@ function handleCreateTransaction(tx) {
       tx.description
     ]]);
   } catch (valErr) {
-    // Fallback: If calculation was delayed, write safely
+    // Fallback: If calculation was delayed, write safely and preserve dropdown with warning mode
     const catCell = sheet.getRange(targetRow, COL_CATEGORY);
     const catRule = catCell.getDataValidation();
     if (catRule) catCell.clearDataValidations();
@@ -252,7 +252,13 @@ function handleCreateTransaction(tx) {
       tx.category,
       tx.description
     ]]);
-    if (catRule) catCell.setDataValidation(catRule);
+    if (catRule) {
+      try {
+        catCell.setDataValidation(catRule.copy().setAllowInvalid(true).build());
+      } catch (_) {
+        // Safe fallback if rule build fails
+      }
+    }
   }
 
   // 3. Range J:L (Amount, Account, Notes)
@@ -340,8 +346,9 @@ function validateTransactionPayload(tx) {
     return { isValid: false, errors: ['Transaction object is missing or invalid'] };
   }
 
-  if (!tx.transactionCode || typeof tx.transactionCode !== 'string' || tx.transactionCode.trim().length < 8 || tx.transactionCode.trim().length > 12) {
-    errors.push('Valid transactionCode is required (8-12 characters)');
+  const txCode = typeof tx.transactionCode === 'string' ? tx.transactionCode.trim() : '';
+  if (!txCode || txCode.length < 8 || txCode.length > 25) {
+    errors.push('Valid transactionCode is required (8-25 characters)');
   }
 
   const amount = Number(tx.amount);

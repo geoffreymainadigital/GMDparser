@@ -146,6 +146,7 @@ fun ReviewConfirmScreen(
                         feedbackMessage = null
                         val result = TransactionRepository.confirmAndSubmitTransaction(editedTx)
                         if (result.isSuccess && shouldRecordFee && editedTx.cost != null && editedTx.cost > 0.0) {
+                            kotlinx.coroutines.delay(1000)
                             val feeTx = Transaction(
                                 transactionCode = "${editedTx.transactionCode}-FEE",
                                 amount = editedTx.cost,
@@ -159,10 +160,16 @@ fun ReviewConfirmScreen(
                             )
                             val feeResult = TransactionRepository.confirmAndSubmitTransaction(feeTx)
                             isSubmitting = false
-                            val feeRow = feeResult.getOrNull()?.data?.row
                             val mainRow = result.getOrNull()?.data?.row
-                            feedbackMessage = "✓ Transaction recorded (row ${mainRow ?: ""}) + Fee recorded (row ${feeRow ?: ""})"
-                            isError = false
+                            if (feeResult.isSuccess) {
+                                val feeRow = feeResult.getOrNull()?.data?.row
+                                feedbackMessage = "✓ Transaction recorded (row ${mainRow ?: ""}) + Fee recorded (row ${feeRow ?: ""})"
+                                isError = false
+                            } else {
+                                val feeError = feeResult.exceptionOrNull()?.message ?: "Failed to record fee"
+                                feedbackMessage = "✓ Transaction recorded (row ${mainRow ?: ""}), but Fee failed: $feeError"
+                                isError = true
+                            }
                         } else {
                             isSubmitting = false
                             result.fold(
