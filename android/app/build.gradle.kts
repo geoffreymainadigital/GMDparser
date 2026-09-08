@@ -19,7 +19,11 @@ android {
             useSupportLibrary = true
         }
 
+        val appsScriptUrl = (project.findProperty("APPS_SCRIPT_URL") as String?)
+            ?: "https://script.google.com/macros/s/AKfycbzLo8NZHU3rmGIT6R-une9xrjUqwIdSbUG6to1O_ZwohEbvST1-3MjpNvCaNq2TOF4_Xw/exec"
+
         buildConfigField("String", "BASE_URL", "\"https://gmdparser.vercel.app\"")
+        buildConfigField("String", "APPS_SCRIPT_URL", "\"$appsScriptUrl\"")
         buildConfigField("Boolean", "AUTO_SYNC_ENABLED", "false")
     }
 

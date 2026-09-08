@@ -10,6 +10,7 @@ import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.POST
+import retrofit2.http.Url
 
 interface ApiService {
 
@@ -26,6 +27,13 @@ interface ApiService {
 
     @POST("/api/transaction")
     suspend fun recordTransaction(
+        @Body request: CreateTransactionRequest,
+        @Header("X-GMD-Auth-Key") authKey: String? = null
+    ): Response<ApiResponse>
+
+    @POST
+    suspend fun recordTransactionDirect(
+        @Url url: String,
         @Body request: CreateTransactionRequest,
         @Header("X-GMD-Auth-Key") authKey: String? = null
     ): Response<ApiResponse>

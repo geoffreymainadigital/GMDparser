@@ -1,5 +1,6 @@
 package com.gmdparser.data.repository
 
+import com.gmdparser.BuildConfig
 import com.gmdparser.data.model.ApiResponse
 import com.gmdparser.data.model.CreateTransactionRequest
 import com.gmdparser.data.model.Transaction
@@ -46,7 +47,8 @@ object TransactionRepository {
     }
 
     /**
-     * Executes the mandatory confirmed transaction write pipeline
+     * Executes the mandatory confirmed transaction write pipeline.
+     * Per Section 11 architecture: writes directly to Apps Script (/exec)
      */
     suspend fun confirmAndSubmitTransaction(
         tx: Transaction,
@@ -80,7 +82,12 @@ object TransactionRepository {
         )
 
         return try {
-            val response = NetworkClient.apiService.recordTransaction(request, authKey)
+            val directAppsScriptUrl = BuildConfig.APPS_SCRIPT_URL
+            val response = if (directAppsScriptUrl.isNotBlank()) {
+                NetworkClient.apiService.recordTransactionDirect(directAppsScriptUrl, request, authKey)
+            } else {
+                NetworkClient.apiService.recordTransaction(request, authKey)
+            }
             val body = response.body()
 
             if (response.isSuccessful && body != null && body.success) {

@@ -158,8 +158,8 @@ object MpesaParser {
             return Transaction(
                 transactionCode = txCode,
                 amount = amount,
-                type = "Transfer",
-                category = "Internal Account Transfer",
+                type = "Balance",
+                category = "",
                 description = "Withdrawal: $agent",
                 account = "Mpesa",
                 date = formatIsoDate(dateStr),
@@ -178,7 +178,7 @@ object MpesaParser {
             transactionCode = txCode,
             amount = 0.0,
             type = "Expenses",
-            category = "Uncategorized",
+            category = "House Supplies",
             description = "Unparsed M-PESA Transaction",
             account = "Mpesa",
             date = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(Date()),
@@ -264,49 +264,69 @@ object MpesaParser {
             return Classification("Expenses", "Fare")
         }
 
-        // 4. Utilities / Bills
+        // 4. Utilities / Bills (Matching verified sheet: Electricity, Water, WIFI, Minutes, Rent, Monthly Shopping)
         if (t.contains("kenya power") || t.contains("kplc") || t.contains("electricity")) {
-            return Classification("Bills", "Electricity / KPLC")
+            return Classification("Bills", "Electricity")
         }
         if (t.contains("nairobi water") || t.contains("water")) {
             return Classification("Bills", "Water")
         }
-        if (t.contains("safaricom home") || t.contains("zuku") || t.contains("faiba") || t.contains("wifi") || t.contains("poa")) {
-            return Classification("Bills", "Internet / WiFi")
+        if (t.contains("safaricom home") || t.contains("zuku") || t.contains("faiba") || t.contains("wifi") || t.contains("poa") || t.contains("internet")) {
+            return Classification("Bills", "WIFI")
+        }
+        if (t.contains("airtime") || t.contains("minutes")) {
+            return Classification("Bills", "Minutes")
+        }
+        if (t.contains("rent")) {
+            return Classification("Bills", "Rent")
         }
 
-        // 5. Bank Transfers
+        // 5. Bank Transfers / Balance adjustments
         if (t.contains("equity") || t.contains("equity bank")) {
-            return Classification("Transfer", "Monthly Shopping", "Equity Bank")
+            return Classification("Balance", "", "Equity Bank")
         }
         if (t.contains("i&m") || t.contains("i and m")) {
-            return Classification("Transfer", "Monthly Shopping", "I&M Bank")
-        }
-        if (t.contains("ncba loop") || t.contains("loop")) {
-            return Classification("Transfer", "Internal Account Transfer", "Bank (NCBA Loop)")
-        }
-        if (t.contains("kcb") || t.contains("kcb bank")) {
-            return Classification("Transfer", "Internal Account Transfer", "Bank (KCB)")
+            return Classification("Balance", "", "I&M Bank")
         }
 
-        return Classification("Expenses", "Gifts / Support")
+        // Default P2P or personal expense
+        return Classification("Expenses", "House Supplies")
     }
 
     private fun classifyMerchant(merchant: String): Classification {
         val m = merchant.lowercase(Locale.ROOT)
+        // Supermarkets / Shopping -> Bills: Monthly Shopping
         if (m.contains("naivas") || m.contains("carrefour") || m.contains("quickmart") || m.contains("chandarana") || m.contains("cleanshelf")) {
-            return Classification("Expenses", "Groceries")
+            return Classification("Bills", "Monthly Shopping")
         }
-        if (m.contains("kfc") || m.contains("java") || m.contains("artcaffe") || m.contains("pizza") || m.contains("restaurant") || m.contains("cafe")) {
-            return Classification("Expenses", "Dining Out / Takeout")
+        // Restaurants / Dining -> Expenses: Eating Out
+        if (m.contains("kfc") || m.contains("java") || m.contains("artcaffe") || m.contains("pizza") || m.contains("restaurant") || m.contains("cafe") || m.contains("hotel")) {
+            return Classification("Expenses", "Eating Out")
         }
-        if (m.contains("total") || m.contains("shell") || m.contains("rubis") || m.contains("ola") || m.contains("uber") || m.contains("bolt")) {
-            return Classification("Expenses", "Transport & Fuel")
+        // Matatus / Fare -> Expenses: Fare
+        if (m.contains("super metro") || m.contains("2nk") || m.contains("metro") || m.contains("matatu") || m.contains("uber") || m.contains("bolt") || m.contains("fare")) {
+            return Classification("Expenses", "Fare")
         }
-        if (m.contains("pharmacy") || m.contains("chemist") || m.contains("hospital") || m.contains("clinic")) {
-            return Classification("Expenses", "Health & Pharmacy")
+        // Fuel / Gas -> Expenses: Gas
+        if (m.contains("total") || m.contains("shell") || m.contains("rubis") || m.contains("ola") || m.contains("gas") || m.contains("energy")) {
+            return Classification("Expenses", "Gas")
         }
-        return Classification("Expenses", "Shopping & Clothing")
+        // Groceries / Vegetables -> Expenses: Mama Mboga
+        if (m.contains("mboga") || m.contains("grocer") || m.contains("market") || m.contains("veg")) {
+            return Classification("Expenses", "Mama Mboga")
+        }
+        // Barber / Salon -> Expenses: Kinyozi
+        if (m.contains("kinyozi") || m.contains("barber") || m.contains("salon")) {
+            return Classification("Expenses", "Kinyozi")
+        }
+        // Clothes / Shoes -> Expenses: Clothes / Shoes
+        if (m.contains("shoe") || m.contains("footwear")) {
+            return Classification("Expenses", "Shoes")
+        }
+        if (m.contains("clothe") || m.contains("apparel") || m.contains("boutique")) {
+            return Classification("Expenses", "Clothes")
+        }
+        return Classification("Expenses", "House Supplies")
     }
 
     private fun formatIsoDate(rawDate: String): String {
