@@ -8,16 +8,16 @@ const SHEET_NAME_TRANSACTIONS = 'Transactions';
 const SHEET_NAME_SETUP = 'Set Up';
 
 // Column Indices in Transactions Sheet (1-based)
-const COL_DATE = 3;             // C
-const COL_TYPE = 4;             // D
-const COL_CATEGORY = 7;         // G
-const COL_DESCRIPTION = 8;      // H
-const COL_AMOUNT = 10;          // J
-const COL_ACCOUNT = 11;         // K
-const COL_TX_CODE = 12;         // L
+const COL_DATE = 3;             // C (Date)
+const COL_TYPE = 4;             // D (Transactions - Type)
+const COL_CATEGORY = 7;         // G (Category)
+const COL_DESCRIPTION = 8;      // H (Description)
+const COL_AMOUNT = 10;          // J (Amount)
+const COL_ACCOUNT = 11;         // K (Account)
+const COL_NOTES = 12;           // L (Notes)
 
-const SCRIPT_VERSION = '2026.09.08.v7_production';
-const SCRIPT_BUILD_ID = 'GMD_GAS_20260908_PROD_02';
+const SCRIPT_VERSION = '2026.09.08.v8_spreadsheet_grounded';
+const SCRIPT_BUILD_ID = 'GMD_GAS_20260908_GROUNDED_01';
 
 let VALID_TYPES = ['Income', 'Expenses', 'Bills', 'Debt', 'Savings', 'Balance'];
 
@@ -188,12 +188,12 @@ function handleCreateTransaction(tx) {
     }, 500);
   }
 
-  // Duplicate Check against Column L (Transaction Code)
+  // Duplicate Check against Column L (Notes)
   const duplicateCheck = checkDuplicateTransactionCode(sheet, tx.transactionCode);
   if (duplicateCheck.isDuplicate) {
     return createJsonResponse({
       success: false,
-      status: 'DUPLICATE_TRANSACTION_CODE',
+      status: 'DUPLICATE',
       error: 'Transaction code ' + tx.transactionCode + ' already exists at row ' + duplicateCheck.row,
       existingRecord: {
         row: duplicateCheck.row,
@@ -202,8 +202,9 @@ function handleCreateTransaction(tx) {
     }, 409);
   }
 
-  // Find next available row safely
-  const targetRow = findNextAvailableRow(sheet);
+  // Find next transaction row dynamically by inspecting Date column C
+  // CRITICAL: NEVER hardcodes row 13/1464 and never uses sheet.getLastRow()
+  const targetRow = findNextTransactionRow(sheet);
 
   // Parse and format date
   let formattedDate = tx.date;
@@ -216,24 +217,35 @@ function handleCreateTransaction(tx) {
     // Keep raw string if parsing fails
   }
 
-  // Write strictly to permitted boundaries:
-  // Range C:D (Date, Type)
+  // Format Notes: preserve existing notes and append machine-readable M-PESA Code marker
+  const userNotes = (tx.notes || '').trim();
+  const cellNotes = String(sheet.getRange(targetRow, COL_NOTES).getValue() || '').trim();
+  let baseNotes = userNotes;
+  if (cellNotes && cellNotes !== userNotes) {
+    baseNotes = userNotes ? (cellNotes + ' | ' + userNotes) : cellNotes;
+  }
+  const formattedNotes = formatNotesWithCode(baseNotes, tx.transactionCode);
+
+  // Write strictly to safe raw transaction write boundaries:
+  // 1. Range C:D (Date, Type)
   sheet.getRange(targetRow, COL_DATE, 1, 2).setValues([[
     formattedDate,
     tx.type
   ]]);
 
-  // Range G:H (Category, Description)
+  // 2. Range G:H (Category, Description)
   sheet.getRange(targetRow, COL_CATEGORY, 1, 2).setValues([[
     tx.category,
     tx.description
   ]]);
 
-  // Range J:L (Amount, Account, Transaction Code)
+  // 3. Range J:L (Amount, Account, Notes)
+  // CRITICAL: Column I (currency formula 'Set Up'!$C$10) is preserved and NEVER overwritten!
+  // Columns A:B, E:F (F has VLOOKUP formula), and P:BR are also preserved.
   sheet.getRange(targetRow, COL_AMOUNT, 1, 3).setValues([[
     Number(tx.amount),
     tx.account,
-    tx.transactionCode.trim().toUpperCase()
+    formattedNotes
   ]]);
 
   // Flush writes immediately to guarantee persistence
@@ -251,7 +263,7 @@ function handleCreateTransaction(tx) {
       category: tx.category,
       account: tx.account,
       date: formattedDate,
-      destinationAccount: tx.destinationAccount || null,
+      notes: formattedNotes,
       timestamp: new Date().toISOString()
     }
   }, 201);
@@ -278,7 +290,7 @@ function handleValidateOnly(tx) {
     if (dup.isDuplicate) {
       return createJsonResponse({
         success: false,
-        status: 'DUPLICATE_TRANSACTION_CODE',
+        status: 'DUPLICATE',
         error: 'Transaction code ' + tx.transactionCode + ' already exists at row ' + dup.row
       }, 409);
     }
@@ -337,48 +349,75 @@ function validateTransactionPayload(tx) {
 }
 
 /**
- * Duplicate check on Column L (Transaction Code)
+ * Formats Notes with M-PESA transaction code marker:
+ * - If Notes is empty: "M-PESA Code: <code>"
+ * - If Notes already contains text: "<existing notes> | M-PESA Code: <code>"
  */
-function checkDuplicateTransactionCode(sheet, txCode) {
-  if (!txCode) return { isDuplicate: false };
-  const targetCode = txCode.trim().toUpperCase();
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 2) return { isDuplicate: false };
-
-  // Fetch Column L values
-  const codes = sheet.getRange(1, COL_TX_CODE, lastRow, 1).getValues();
-  for (let i = 0; i < codes.length; i++) {
-    const val = codes[i][0];
-    if (val && String(val).trim().toUpperCase() === targetCode) {
-      return { isDuplicate: true, row: i + 1 };
-    }
+function formatNotesWithCode(existingNotes, txCode) {
+  const code = (txCode || '').trim().toUpperCase();
+  const marker = 'M-PESA Code: ' + code;
+  const notes = (existingNotes || '').trim();
+  if (!notes) {
+    return marker;
   }
-  return { isDuplicate: false };
+  if (notes.indexOf(marker) !== -1 || notes.indexOf(code) !== -1) {
+    return notes;
+  }
+  return notes + ' | ' + marker;
 }
 
 /**
- * Finds next empty row by inspecting columns C and L
+ * Scans Column C (Date) to find the last transaction row.
+ * CRITICAL: NEVER uses sheet.getLastRow() because formulas/helper content extend far below real ledger.
  */
-function findNextAvailableRow(sheet) {
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 10) {
-    return 10; // Rows 1-9 are template title/headers, first data row is 10
-  }
-
-  // Scan columns C and L from row 10 downwards
-  const values = sheet.getRange(1, COL_DATE, lastRow, 1).getValues();
-  for (let r = 9; r < values.length; r++) { // 0-indexed: row 10 is index 9
-    const cellValue = values[r][0];
-    if (!cellValue || String(cellValue).trim() === '') {
-      // Confirm column L is also empty
-      const codeValue = sheet.getRange(r + 1, COL_TX_CODE).getValue();
-      if (!codeValue || String(codeValue).trim() === '') {
-        return r + 1;
-      }
+function findLastTransactionRow(sheet) {
+  const maxRows = sheet.getMaxRows ? sheet.getMaxRows() : 5000;
+  if (maxRows < 10) return 9;
+  const numRows = maxRows - 9;
+  const dateValues = sheet.getRange(10, COL_DATE, numRows, 1).getValues();
+  for (let i = dateValues.length - 1; i >= 0; i--) {
+    const val = dateValues[i][0];
+    if (val !== null && val !== undefined && String(val).trim() !== '') {
+      return 10 + i;
     }
   }
+  return 9;
+}
 
-  return lastRow + 1;
+/**
+ * Resolves the next append row at lastTransactionRow + 1.
+ * For the uploaded clone, resolves last existing transaction to row 1463 and next transaction row to 1464.
+ * CRITICAL: Does NOT hardcode 13 or 1464, and does NOT use sheet.getLastRow().
+ */
+function findNextTransactionRow(sheet) {
+  return findLastTransactionRow(sheet) + 1;
+}
+
+/**
+ * Duplicate check: searches Column L (Notes) for the exact transaction code or marker.
+ * Rejects with DUPLICATE if found, without appending.
+ */
+function checkDuplicateTransactionCode(sheet, txCode) {
+  if (!txCode) return { isDuplicate: false };
+  const targetCode = String(txCode).trim().toUpperCase();
+  if (!targetCode) return { isDuplicate: false };
+
+  const lastRow = findLastTransactionRow(sheet);
+  if (lastRow < 10) return { isDuplicate: false };
+
+  const numRows = lastRow - 9;
+  const notesValues = sheet.getRange(10, COL_NOTES, numRows, 1).getValues();
+
+  for (let i = 0; i < notesValues.length; i++) {
+    const rawVal = String(notesValues[i][0] || '').trim().toUpperCase();
+    if (!rawVal) continue;
+    if (rawVal === targetCode || 
+        rawVal.indexOf('M-PESA CODE: ' + targetCode) !== -1 ||
+        rawVal.indexOf(targetCode) !== -1) {
+      return { isDuplicate: true, row: 10 + i };
+    }
+  }
+  return { isDuplicate: false };
 }
 
 /**

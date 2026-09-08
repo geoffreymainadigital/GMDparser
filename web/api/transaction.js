@@ -94,7 +94,8 @@ export default async function handler(req, res) {
     }
 
     // Pass through exact status code from Apps Script (e.g. 201, 409, 400)
-    const statusCode = upstreamRes.status !== 200 ? upstreamRes.status : (upstreamData.success ? 201 : (upstreamData.status === 'DUPLICATE_TRANSACTION_CODE' ? 409 : 400));
+    const isDuplicate = upstreamData.status === 'DUPLICATE_TRANSACTION_CODE' || upstreamData.status === 'DUPLICATE';
+    const statusCode = upstreamRes.status !== 200 ? upstreamRes.status : (upstreamData.success ? 201 : (isDuplicate ? 409 : 400));
     return res.status(statusCode).json(upstreamData);
 
   } catch (err) {

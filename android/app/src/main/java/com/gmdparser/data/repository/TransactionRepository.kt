@@ -96,7 +96,7 @@ object TransactionRepository {
                 val confirmed = tx.copy(status = TransactionStatus.SYNCED)
                 _confirmedTransactions.update { listOf(confirmed) + it }
                 Result.success(body)
-            } else if (response.code() == 409) {
+            } else if (response.code() == 409 || body?.status == "DUPLICATE" || body?.status == "DUPLICATE_TRANSACTION_CODE") {
                 // Duplicate transaction code detected by backend
                 removePendingTransaction(tx.transactionCode)
                 val dup = tx.copy(status = TransactionStatus.DUPLICATE)
