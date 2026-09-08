@@ -82,11 +82,25 @@ object TransactionRepository {
         )
 
         return try {
-            val directAppsScriptUrl = BuildConfig.APPS_SCRIPT_URL
-            val response = if (directAppsScriptUrl.isNotBlank()) {
-                NetworkClient.apiService.recordTransactionDirect(directAppsScriptUrl, request, authKey)
-            } else {
-                NetworkClient.apiService.recordTransaction(request, authKey)
+            val response = try {
+                val vercelRes = NetworkClient.apiService.recordTransaction(request, authKey)
+                val directAppsScriptUrl = BuildConfig.APPS_SCRIPT_URL
+                if (!vercelRes.isSuccessful && vercelRes.code() >= 500 && directAppsScriptUrl.isNotBlank()) {
+                    try {
+                        NetworkClient.apiService.recordTransactionDirect(directAppsScriptUrl, request, authKey)
+                    } catch (_: Exception) {
+                        vercelRes
+                    }
+                } else {
+                    vercelRes
+                }
+            } catch (netErr: Exception) {
+                val directAppsScriptUrl = BuildConfig.APPS_SCRIPT_URL
+                if (directAppsScriptUrl.isNotBlank()) {
+                    NetworkClient.apiService.recordTransactionDirect(directAppsScriptUrl, request, authKey)
+                } else {
+                    throw netErr
+                }
             }
             val body = response.body()
 

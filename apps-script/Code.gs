@@ -512,7 +512,7 @@ function extractCategoriesFromSetUpData2(ss) {
 
     if (currentSection === 'Income') {
       const item = e || b;
-      if (item && item.indexOf('Title') === -1 && categoriesByType.Income.indexOf(item) === -1) {
+      if (item && item.indexOf('Title') === -1 && item.indexOf('CellImage') === -1 && item.indexOf('no empty spaces') === -1 && categoriesByType.Income.indexOf(item) === -1) {
         categoriesByType.Income.push(item);
       }
     } else if (currentSection === 'Accounts') {
