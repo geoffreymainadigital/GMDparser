@@ -3,7 +3,7 @@
  * Proxies taxonomy data directly from Google Apps Script / Google Sheets
  */
 
-const PRODUCTION_SPREADSHEET_ID = '1oBP4ltZ5LPcnN8LzesB90-dSwNTMfBMtmMpB48pKiho';
+const PRODUCTION_SPREADSHEET_ID = '11vrj6f_S15fk0B5_HVa88Z2BE8u-f207P16N59zMXG4';
 
 export async function fetchLiveSpreadsheetTaxonomy(spreadsheetId = PRODUCTION_SPREADSHEET_ID) {
   const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&sheet=Set%20up%20data%202&tq=${encodeURIComponent('select B, E limit 200')}`;
