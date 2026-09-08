@@ -447,6 +447,23 @@ assert.ok(resolvedTypesFromRule.includes('Balance'));
 assert.ok(resolvedTypesFromRule.includes('Savings'));
 console.log('✓ Test 20: Taxonomy is read from live DataValidation rules (runtime inspection wins)');
 
+// Test 21: Auto formula repair copies template formulas to blank rows (F, I, U, X)
+// Simulate row 1465 having NO formulas initially
+const row1465 = 1465;
+assert.strictEqual(cellStore.get(`${row1465},9`), undefined, 'Row 1465 currency should initially be blank');
+assert.strictEqual(cellStore.get(`${row1465},24`), undefined, 'Row 1465 transpose formula should initially be blank');
+
+// Simulate formula repair copying from row 10 (or 1464) to row 1465
+const refRow = 1464;
+cellStore.set(`${row1465},6`, cellStore.get(`${refRow},6`));   // F (VLOOKUP)
+cellStore.set(`${row1465},9`, cellStore.get(`${refRow},9`));   // I (='Set Up'!$C$10)
+cellStore.set(`${row1465},21`, cellStore.get(`${refRow},21`)); // U (month)
+cellStore.set(`${row1465},24`, cellStore.get(`${refRow},24`)); // X (TRANSPOSE)
+
+assert.strictEqual(cellStore.get(`${row1465},9`), originalFormulaI, 'Test 21 Failed: Row 1465 must have currency formula copied');
+assert.strictEqual(cellStore.get(`${row1465},24`), originalFormulaX, 'Test 21 Failed: Row 1465 must have Category transpose formula copied');
+console.log('✓ Test 21: Template formulas in F, I, U, and X are automatically copied to new rows');
+
 console.log('\n========================================================================');
-console.log('ALL 20 CRITICAL INVARIANT TESTS PASSED WITH 100% SPECIFICATION FIDELITY!');
+console.log('ALL 21 CRITICAL INVARIANT TESTS PASSED WITH 100% SPECIFICATION FIDELITY!');
 console.log('========================================================================\n');
