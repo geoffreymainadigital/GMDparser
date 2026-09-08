@@ -3,6 +3,7 @@ package com.gmdparser.data.repository
 import com.gmdparser.BuildConfig
 import com.gmdparser.data.model.ApiResponse
 import com.gmdparser.data.model.CreateTransactionRequest
+import com.gmdparser.data.model.DuplicateTransactionException
 import com.gmdparser.data.model.Transaction
 import com.gmdparser.data.model.TransactionPayload
 import com.gmdparser.data.model.TransactionStatus
@@ -103,6 +104,15 @@ object TransactionRepository {
                 }
             }
             val body = response.body()
+            val errBodyStr = if (!response.isSuccessful) response.errorBody()?.string() else null
+            val errJson = try {
+                if (!errBodyStr.isNullOrBlank()) org.json.JSONObject(errBodyStr) else null
+            } catch (_: Exception) { null }
+
+            val statusStr = body?.status ?: errJson?.optString("status") ?: ""
+            val isDuplicate = response.code() == 409 ||
+                statusStr == "DUPLICATE" ||
+                statusStr == "DUPLICATE_TRANSACTION_CODE"
 
             if (response.isSuccessful && body != null && body.success) {
                 // Success: Move from pending to confirmed
@@ -110,22 +120,22 @@ object TransactionRepository {
                 val confirmed = tx.copy(status = TransactionStatus.SYNCED)
                 _confirmedTransactions.update { listOf(confirmed) + it }
                 Result.success(body)
-            } else if (response.code() == 409 || body?.status == "DUPLICATE" || body?.status == "DUPLICATE_TRANSACTION_CODE") {
+            } else if (isDuplicate) {
                 // Duplicate transaction code detected by backend
                 removePendingTransaction(tx.transactionCode)
                 val dup = tx.copy(status = TransactionStatus.DUPLICATE)
                 _confirmedTransactions.update { listOf(dup) + it }
-                Result.failure(Exception("Duplicate transaction code: ${body?.error ?: "Already recorded in sheet"}"))
+                val existingRow = errJson?.optJSONObject("existingRecord")?.optInt("row")
+                    ?: body?.existingRecord?.row
+                    ?: errJson?.optInt("row")
+                val dupMsg = errJson?.optString("error")
+                    ?: body?.error
+                    ?: "Transaction code ${tx.transactionCode} already recorded in sheet"
+                Result.failure(DuplicateTransactionException(if (existingRow != null && existingRow > 0) existingRow else null, tx.transactionCode, dupMsg))
             } else {
-                val errBodyStr = response.errorBody()?.string()
-                val parsedErrMsg = try {
-                    if (!errBodyStr.isNullOrBlank()) {
-                        org.json.JSONObject(errBodyStr).optString("error", errBodyStr)
-                    } else null
-                } catch (_: Exception) {
-                    errBodyStr
-                }
-                val errorMsg = parsedErrMsg ?: body?.error ?: "Server error (${response.code()}): ${response.message()}"
+                val errorMsg = errJson?.optString("error")
+                    ?: body?.error
+                    ?: "Server error (${response.code()}): ${response.message()}"
                 Result.failure(Exception(errorMsg))
             }
         } catch (e: Exception) {

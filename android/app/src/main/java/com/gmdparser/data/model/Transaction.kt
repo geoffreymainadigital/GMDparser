@@ -54,13 +54,25 @@ data class TransactionResponseData(
     @SerializedName("timestamp") val timestamp: String
 )
 
+data class ExistingRecord(
+    @SerializedName("row") val row: Int?,
+    @SerializedName("transactionCode") val transactionCode: String?
+)
+
 data class ApiResponse(
     @SerializedName("success") val success: Boolean,
     @SerializedName("status") val status: String,
     @SerializedName("message") val message: String? = null,
     @SerializedName("error") val error: String? = null,
-    @SerializedName("data") val data: TransactionResponseData? = null
+    @SerializedName("data") val data: TransactionResponseData? = null,
+    @SerializedName("existingRecord") val existingRecord: ExistingRecord? = null
 )
+
+class DuplicateTransactionException(
+    val existingRow: Int?,
+    val transactionCode: String,
+    override val message: String
+) : Exception(message)
 
 data class HealthResponse(
     @SerializedName("status") val status: String,

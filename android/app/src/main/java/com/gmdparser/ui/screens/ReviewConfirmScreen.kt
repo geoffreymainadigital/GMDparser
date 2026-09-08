@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.gmdparser.data.model.DuplicateTransactionException
 import com.gmdparser.data.model.TaxonomyDefaults
 import com.gmdparser.data.model.Transaction
 import com.gmdparser.data.model.TransactionStatus
@@ -28,6 +29,13 @@ import com.gmdparser.data.repository.TaxonomyRepository
 import com.gmdparser.data.repository.TransactionRepository
 import com.gmdparser.ui.theme.*
 import kotlinx.coroutines.launch
+
+enum class FeedbackStyle {
+    NONE,
+    SUCCESS,
+    DUPLICATE,
+    ERROR
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,7 +47,7 @@ fun ReviewConfirmScreen(
 
     var isSubmitting by remember { mutableStateOf(false) }
     var feedbackMessage by remember { mutableStateOf<String?>(null) }
-    var isError by remember { mutableStateOf(false) }
+    var feedbackStyle by remember { mutableStateOf(FeedbackStyle.NONE) }
 
     Column(
         modifier = Modifier
@@ -86,16 +94,20 @@ fun ReviewConfirmScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         if (feedbackMessage != null) {
+            val (containerColor, textColor) = when (feedbackStyle) {
+                FeedbackStyle.SUCCESS -> Pair(MpesaGreen.copy(alpha = 0.18f), MpesaGreen)
+                FeedbackStyle.DUPLICATE -> Pair(AccentAmber.copy(alpha = 0.22f), AccentAmber)
+                FeedbackStyle.ERROR -> Pair(AccentRed.copy(alpha = 0.2f), AccentRed)
+                FeedbackStyle.NONE -> Pair(DarkSurfaceCard, TextPrimary)
+            }
             Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = if (isError) AccentRed.copy(alpha = 0.2f) else MpesaGreen.copy(alpha = 0.2f)
-                ),
+                colors = CardDefaults.cardColors(containerColor = containerColor),
                 shape = RoundedCornerShape(8.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
                     text = feedbackMessage!!,
-                    color = if (isError) AccentRed else MpesaGreen,
+                    color = textColor,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.padding(12.dp),
                     fontSize = 13.sp
@@ -144,51 +156,66 @@ fun ReviewConfirmScreen(
                     scope.launch {
                         isSubmitting = true
                         feedbackMessage = null
+                        feedbackStyle = FeedbackStyle.NONE
                         val result = TransactionRepository.confirmAndSubmitTransaction(editedTx)
-                        if (result.isSuccess && shouldRecordFee && editedTx.cost != null && editedTx.cost > 0.0) {
-                            kotlinx.coroutines.delay(1000)
-                            val feeTx = Transaction(
-                                transactionCode = "${editedTx.transactionCode}-FEE",
-                                amount = editedTx.cost,
-                                type = "Expenses",
-                                category = "Transaction Cost",
-                                description = "Transaction Cost: ${editedTx.description}",
-                                account = "Mpesa",
-                                date = editedTx.date,
-                                time = editedTx.time,
-                                status = TransactionStatus.CONFIRMED
-                            )
-                            val feeResult = TransactionRepository.confirmAndSubmitTransaction(feeTx)
-                            isSubmitting = false
-                            val mainRow = result.getOrNull()?.data?.row
-                            if (feeResult.isSuccess) {
-                                val feeRow = feeResult.getOrNull()?.data?.row
-                                feedbackMessage = "✓ Transaction recorded (row ${mainRow ?: ""}) + Fee recorded (row ${feeRow ?: ""})"
-                                isError = false
-                            } else {
-                                val feeError = feeResult.exceptionOrNull()?.message ?: "Failed to record fee"
-                                feedbackMessage = "✓ Transaction recorded (row ${mainRow ?: ""}), but Fee failed: $feeError"
-                                isError = true
-                            }
-                        } else {
-                            isSubmitting = false
-                            result.fold(
-                                onSuccess = { res ->
-                                    isError = false
-                                    feedbackMessage = "✓ Transaction ${editedTx.transactionCode} recorded in row ${res.data?.row ?: "sheet"}"
-                                },
-                                onFailure = { err ->
-                                    isError = true
-                                    feedbackMessage = err.message ?: "Failed to record transaction"
+                        result.fold(
+                            onSuccess = { res ->
+                                val mainRow = res.data?.row
+                                if (shouldRecordFee && editedTx.cost != null && editedTx.cost > 0.0) {
+                                    kotlinx.coroutines.delay(1000)
+                                    val feeTx = Transaction(
+                                        transactionCode = "${editedTx.transactionCode}-FEE",
+                                        amount = editedTx.cost,
+                                        type = "Expenses",
+                                        category = "Transaction Cost",
+                                        description = "Transaction Cost: ${editedTx.description}",
+                                        account = "Mpesa",
+                                        date = editedTx.date,
+                                        time = editedTx.time,
+                                        status = TransactionStatus.CONFIRMED
+                                    )
+                                    val feeResult = TransactionRepository.confirmAndSubmitTransaction(feeTx)
+                                    isSubmitting = false
+                                    feeResult.fold(
+                                        onSuccess = { feeRes ->
+                                            feedbackStyle = FeedbackStyle.SUCCESS
+                                            feedbackMessage = "✓ Transaction recorded (row ${mainRow ?: "sheet"}) + Fee recorded (row ${feeRes.data?.row ?: "sheet"})"
+                                        },
+                                        onFailure = { feeErr ->
+                                            if (feeErr is DuplicateTransactionException) {
+                                                feedbackStyle = FeedbackStyle.DUPLICATE
+                                                val feeRow = if (feeErr.existingRow != null) " at row ${feeErr.existingRow}" else ""
+                                                feedbackMessage = "✓ Transaction recorded (row ${mainRow ?: "sheet"}), but Fee already recorded$feeRow — skipped duplicate fee"
+                                            } else {
+                                                feedbackStyle = FeedbackStyle.ERROR
+                                                feedbackMessage = "✓ Transaction recorded (row ${mainRow ?: "sheet"}), but Fee failed: ${feeErr.message ?: "Unknown error"}"
+                                            }
+                                        }
+                                    )
+                                } else {
+                                    isSubmitting = false
+                                    feedbackStyle = FeedbackStyle.SUCCESS
+                                    feedbackMessage = "✓ Transaction ${editedTx.transactionCode} recorded in row ${mainRow ?: "sheet"}"
                                 }
-                            )
-                        }
+                            },
+                            onFailure = { err ->
+                                isSubmitting = false
+                                if (err is DuplicateTransactionException) {
+                                    feedbackStyle = FeedbackStyle.DUPLICATE
+                                    val rowInfo = if (err.existingRow != null) " at row ${err.existingRow}" else ""
+                                    feedbackMessage = "⚠ Already recorded in sheet$rowInfo — skipped duplicate (${err.transactionCode})"
+                                } else {
+                                    feedbackStyle = FeedbackStyle.ERROR
+                                    feedbackMessage = "✗ Failed to record transaction: ${err.message ?: "Unknown error"}"
+                                }
+                            }
+                        )
                     }
                 },
                 onDismiss = {
                     TransactionRepository.removePendingTransaction(activeTx.transactionCode)
+                    feedbackStyle = FeedbackStyle.NONE
                     feedbackMessage = "Transaction dismissed without recording."
-                    isError = false
                 }
             )
         }
