@@ -16,8 +16,8 @@ const COL_AMOUNT = 10;          // J (Amount)
 const COL_ACCOUNT = 11;         // K (Account)
 const COL_NOTES = 12;           // L (Notes)
 
-const SCRIPT_VERSION = '2026.09.08.v8_spreadsheet_grounded';
-const SCRIPT_BUILD_ID = 'GMD_GAS_20260908_GROUNDED_01';
+const SCRIPT_VERSION = '2026.09.08.v9_fast_resilient_write';
+const SCRIPT_BUILD_ID = 'GMD_GAS_20260908_PROD_09';
 
 let VALID_TYPES = ['Income', 'Expenses', 'Bills', 'Debt', 'Savings', 'Balance'];
 
@@ -232,49 +232,32 @@ function handleCreateTransaction(tx) {
     formattedDate,
     tx.type
   ]]);
-  SpreadsheetApp.flush();
 
   // 2. Range G:H (Category, Description)
+  // Temporarily bypass strict validation on this target cell during write, then re-apply rule
   const catCell = sheet.getRange(targetRow, COL_CATEGORY);
   const catRule = catCell.getDataValidation();
-  try {
-    sheet.getRange(targetRow, COL_CATEGORY, 1, 2).setValues([[
-      tx.category,
-      tx.description
-    ]]);
-  } catch (gErr) {
-    // If dynamic dependent validation in X:AU has not finished recalculating,
-    // write value safely and restore validation rule on cell
-    if (catRule) catCell.clearDataValidations();
-    sheet.getRange(targetRow, COL_CATEGORY, 1, 2).setValues([[
-      tx.category,
-      tx.description
-    ]]);
-    if (catRule) catCell.setDataValidation(catRule);
-  }
+  if (catRule) catCell.clearDataValidations();
+  sheet.getRange(targetRow, COL_CATEGORY, 1, 2).setValues([[
+    tx.category,
+    tx.description
+  ]]);
+  if (catRule) catCell.setDataValidation(catRule);
 
   // 3. Range J:L (Amount, Account, Notes)
   // CRITICAL: Column I (currency formula 'Set Up'!$C$10) is preserved and NEVER overwritten!
   // Columns A:B, E:F (F has VLOOKUP formula), and P:BR are also preserved.
   const accCell = sheet.getRange(targetRow, COL_ACCOUNT);
   const accRule = accCell.getDataValidation();
-  try {
-    sheet.getRange(targetRow, COL_AMOUNT, 1, 3).setValues([[
-      Number(tx.amount),
-      tx.account,
-      formattedNotes
-    ]]);
-  } catch (kErr) {
-    if (accRule) accCell.clearDataValidations();
-    sheet.getRange(targetRow, COL_AMOUNT, 1, 3).setValues([[
-      Number(tx.amount),
-      tx.account,
-      formattedNotes
-    ]]);
-    if (accRule) accCell.setDataValidation(accRule);
-  }
+  if (accRule) accCell.clearDataValidations();
+  sheet.getRange(targetRow, COL_AMOUNT, 1, 3).setValues([[
+    Number(tx.amount),
+    tx.account,
+    formattedNotes
+  ]]);
+  if (accRule) accCell.setDataValidation(accRule);
 
-  // Flush writes immediately to guarantee persistence
+  // Flush writes once at the very end to guarantee persistence quickly
   SpreadsheetApp.flush();
 
   return createJsonResponse({
