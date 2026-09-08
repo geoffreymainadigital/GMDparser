@@ -2,6 +2,7 @@ package com.gmdparser.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -22,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gmdparser.data.model.TaxonomyDefaults
 import com.gmdparser.data.model.Transaction
+import com.gmdparser.data.model.TransactionStatus
 import com.gmdparser.data.repository.TaxonomyRepository
 import com.gmdparser.data.repository.TransactionRepository
 import com.gmdparser.ui.theme.*
@@ -138,22 +140,42 @@ fun ReviewConfirmScreen(
             TransactionReviewCard(
                 transaction = activeTx,
                 isSubmitting = isSubmitting,
-                onConfirm = { editedTx ->
+                onConfirm = { editedTx, shouldRecordFee ->
                     scope.launch {
                         isSubmitting = true
                         feedbackMessage = null
                         val result = TransactionRepository.confirmAndSubmitTransaction(editedTx)
-                        isSubmitting = false
-                        result.fold(
-                            onSuccess = { res ->
-                                isError = false
-                                feedbackMessage = "✓ Transaction ${editedTx.transactionCode} recorded in row ${res.data?.row ?: "sheet"}"
-                            },
-                            onFailure = { err ->
-                                isError = true
-                                feedbackMessage = err.message ?: "Failed to record transaction"
-                            }
-                        )
+                        if (result.isSuccess && shouldRecordFee && editedTx.cost != null && editedTx.cost > 0.0) {
+                            val feeTx = Transaction(
+                                transactionCode = "${editedTx.transactionCode}-FEE",
+                                amount = editedTx.cost,
+                                type = "Expenses",
+                                category = "Transaction Cost",
+                                description = "Transaction Cost: ${editedTx.description}",
+                                account = "Mpesa",
+                                date = editedTx.date,
+                                time = editedTx.time,
+                                status = TransactionStatus.CONFIRMED
+                            )
+                            val feeResult = TransactionRepository.confirmAndSubmitTransaction(feeTx)
+                            isSubmitting = false
+                            val feeRow = feeResult.getOrNull()?.data?.row
+                            val mainRow = result.getOrNull()?.data?.row
+                            feedbackMessage = "✓ Transaction recorded (row ${mainRow ?: ""}) + Fee recorded (row ${feeRow ?: ""})"
+                            isError = false
+                        } else {
+                            isSubmitting = false
+                            result.fold(
+                                onSuccess = { res ->
+                                    isError = false
+                                    feedbackMessage = "✓ Transaction ${editedTx.transactionCode} recorded in row ${res.data?.row ?: "sheet"}"
+                                },
+                                onFailure = { err ->
+                                    isError = true
+                                    feedbackMessage = err.message ?: "Failed to record transaction"
+                                }
+                            )
+                        }
                     }
                 },
                 onDismiss = {
@@ -171,7 +193,7 @@ fun ReviewConfirmScreen(
 fun TransactionReviewCard(
     transaction: Transaction,
     isSubmitting: Boolean,
-    onConfirm: (Transaction) -> Unit,
+    onConfirm: (Transaction, Boolean) -> Unit,
     onDismiss: () -> Unit
 ) {
     var amountText by remember(transaction) { mutableStateOf(transaction.amount.toString()) }
@@ -180,6 +202,7 @@ fun TransactionReviewCard(
     var descriptionText by remember(transaction) { mutableStateOf(transaction.description) }
     var selectedAccount by remember(transaction) { mutableStateOf(transaction.account) }
     var destinationAccountText by remember(transaction) { mutableStateOf(transaction.destinationAccount ?: "") }
+    var recordFee by remember(transaction) { mutableStateOf(transaction.cost != null && transaction.cost > 0.0) }
 
     val liveTypes by TaxonomyRepository.types.collectAsState()
     val liveCategoriesByType by TaxonomyRepository.categoriesByType.collectAsState()
@@ -444,6 +467,50 @@ fun TransactionReviewCard(
                 Spacer(modifier = Modifier.height(16.dp))
             }
 
+            // Transaction Fee Card / Toggle
+            if (transaction.cost != null && transaction.cost > 0.0) {
+                Surface(
+                    color = if (recordFee) MpesaGreen.copy(alpha = 0.15f) else DarkSurfaceCard,
+                    shape = RoundedCornerShape(10.dp),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        if (recordFee) MpesaGreen.copy(alpha = 0.5f) else DarkSurfaceBorder
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { recordFee = !recordFee }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = recordFee,
+                            onCheckedChange = { recordFee = it },
+                            colors = CheckboxDefaults.colors(
+                                checkedColor = MpesaGreen,
+                                uncheckedColor = TextSecondary
+                            )
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = "Record Transaction Cost: Ksh ${String.format(java.util.Locale.ROOT, "%.2f", transaction.cost)}",
+                                color = TextPrimary,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
+                            Text(
+                                text = "Appends entry under Expenses → Transaction Cost",
+                                color = TextSecondary,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(14.dp))
+            }
+
             // Action Buttons: Explicit Confirmation vs Dismiss
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -472,7 +539,7 @@ fun TransactionReviewCard(
                             account = selectedAccount,
                             destinationAccount = if (selectedType == "Balance" || selectedType == "Transfer") destinationAccountText.trim().ifEmpty { null } else null
                         )
-                        onConfirm(confirmedTx)
+                        onConfirm(confirmedTx, recordFee)
                     },
                     enabled = !isSubmitting,
                     colors = ButtonDefaults.buttonColors(containerColor = MpesaGreen),
