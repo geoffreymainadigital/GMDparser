@@ -154,4 +154,23 @@ assert.strictEqual(r14.category, 'Fare', 'Matatu sacco payment must be Fare');
 assert.strictEqual(r14.account, 'Mpesa');
 console.log('✓ TC-SMS-14 (Matatu Sacco Transport Fare) passed');
 
+// 15. Airtime Purchase
+const airtimeMessage = 'UI8G46M0VD Confirmed. You bought Ksh20.00 of airtime on 8/9/26 at 9:20 AM. New M-PESA balance is Ksh150.00.';
+const r15 = MpesaParser.parse(airtimeMessage);
+assert.strictEqual(r15.isFinancial, true);
+assert.strictEqual(r15.transactionCode, 'UI8G46M0VD');
+assert.strictEqual(r15.amount, 20);
+assert.strictEqual(r15.type, 'Expenses');
+assert.strictEqual(r15.category, 'Bundles');
+console.log('✓ TC-SMS-15 (Airtime Purchase) passed');
+
+// 16. Currency with spacing (Ksh 5.00)
+const spaceMessage = 'UI8G46M3FH Confirmed. Ksh 5.00 sent to DENNIS MOSE 0757662366 on 8/9/26 at 10:00 AM. New M-PESA balance is Ksh2,685.10.';
+const r16 = MpesaParser.parse(spaceMessage);
+assert.strictEqual(r16.isFinancial, true);
+assert.strictEqual(r16.transactionCode, 'UI8G46M3FH');
+assert.strictEqual(r16.amount, 5);
+assert.strictEqual(r16.type, 'Expenses');
+console.log('✓ TC-SMS-16 (Currency with Spacing) passed');
+
 console.log('\nAll Kenyan M-PESA parser unit tests PASSED successfully!');

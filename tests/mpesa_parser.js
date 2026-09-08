@@ -188,20 +188,58 @@ export class MpesaParser {
       };
     }
 
-    // Unmatched pattern despite Confirmed code -> Flag for manual review
+    // 7. Pattern: Airtime or Bundles Purchase
+    const airtimeMatch = trimmed.match(/(?:You\s+(?:have\s+)?bought|bought)\s+(?:Ksh|KES)\.?\s*([\d,]+\.?\d*)\s+of\s+(?:airtime|data(?:\s+bundles?)?|bundles)(?:\s+for\s+(.+?))?\s+on\s+(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\s+at\s+(\d{1,2}:\d{2}\s*(?:AM|PM)?)/i);
+    if (airtimeMatch) {
+      const amount = parseFloat(airtimeMatch[1].replace(/,/g, ''));
+      const recipient = airtimeMatch[2] ? airtimeMatch[2].trim() : 'Airtime';
+      const dateStr = airtimeMatch[3];
+      const timeStr = airtimeMatch[4].trim();
+
+      return {
+        isFinancial: true,
+        confidence: 0.95,
+        transactionCode,
+        amount,
+        balance,
+        cost: cost || 0,
+        date: formatDateIso(dateStr),
+        rawDate: dateStr,
+        time: timeStr,
+        recipient: recipient,
+        description: `Airtime: ${recipient}`,
+        type: 'Expenses',
+        category: 'Bundles',
+        account: 'Mpesa',
+        destinationAccount: null,
+        rawText: trimmed
+      };
+    }
+
+    // Fallback: Extract amount, date, time and recipient from confirmed M-PESA message
+    const fallbackAmountMatch = trimmed.match(/(?:Ksh|KES)\.?\s*([\d,]+\.?\d*)/i);
+    const fallbackAmount = fallbackAmountMatch ? parseFloat(fallbackAmountMatch[1].replace(/,/g, '')) : 0.0;
+    const fallbackDateMatch = trimmed.match(/(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/);
+    const fallbackDate = fallbackDateMatch ? formatDateIso(fallbackDateMatch[1]) : new Date().toISOString().split('T')[0];
+    const fallbackTimeMatch = trimmed.match(/(\d{1,2}:\d{2}\s*(?:AM|PM)?)/i);
+    const fallbackTime = fallbackTimeMatch ? fallbackTimeMatch[1].trim() : '';
+    const payeeMatch = trimmed.match(/(?:sent to|paid to|from|bought)\s+([A-Za-z0-9\s\.\-]+?)(?:\s+on|\s+for account|\s+New M-PESA|\.|,|$)/i);
+    const fallbackDesc = payeeMatch && payeeMatch[1].trim() ? payeeMatch[1].trim() : 'M-PESA Transaction';
+
     return {
       isFinancial: true,
-      confidence: 0.40,
+      confidence: 0.70,
       transactionCode,
-      amount: null,
+      amount: fallbackAmount,
       balance,
-      date: new Date().toISOString().split('T')[0],
+      date: fallbackDate,
+      time: fallbackTime,
       type: 'Expenses',
-      category: 'Uncategorized',
+      category: 'House Supplies',
+      description: fallbackDesc,
       account: 'Mpesa',
       destinationAccount: null,
-      rawText: trimmed,
-      note: 'Ambiguous SMS pattern: manual input required'
+      rawText: trimmed
     };
   }
 

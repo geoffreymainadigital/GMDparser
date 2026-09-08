@@ -225,4 +225,51 @@ class MpesaParserTest {
         assertEquals("Mpesa", payload.account)
         assertEquals("TD47XYZ123", payload.transactionCode)
     }
+
+    // 17. Airtime purchase parsing
+    @Test
+    fun testAirtimePurchaseParsing() {
+        val sms = "UI8G46M0VD Confirmed. You bought Ksh20.00 of airtime on 8/9/26 at 9:20 AM. New M-PESA balance is Ksh150.00."
+        val tx = MpesaParser.parse(sms)
+        assertNotNull(tx)
+        assertEquals("UI8G46M0VD", tx?.transactionCode)
+        assertEquals(20.0, tx?.amount ?: 0.0, 0.001)
+        assertEquals("Expenses", tx?.type)
+        assertEquals("Bundles", tx?.category)
+        assertEquals("Mpesa", tx?.account)
+    }
+
+    // 18. Airtime for other recipient
+    @Test
+    fun testAirtimeForRecipientParsing() {
+        val sms = "UI8G46M0VD Confirmed. You bought Ksh50.00 of airtime for 0712345678 on 8/9/26 at 11:45 AM. New M-PESA balance is Ksh200.00."
+        val tx = MpesaParser.parse(sms)
+        assertNotNull(tx)
+        assertEquals("UI8G46M0VD", tx?.transactionCode)
+        assertEquals(50.0, tx?.amount ?: 0.0, 0.001)
+        assertEquals("Expenses", tx?.type)
+        assertEquals("Bundles", tx?.category)
+    }
+
+    // 19. Space in currency format (e.g. Ksh 2.00)
+    @Test
+    fun testCurrencyWithSpaceParsing() {
+        val sms = "UI8G46M3FH Confirmed. Ksh 5.00 sent to DENNIS MOSE 0757662366 on 8/9/26 at 10:00 AM. New M-PESA balance is Ksh2,685.10."
+        val tx = MpesaParser.parse(sms)
+        assertNotNull(tx)
+        assertEquals("UI8G46M3FH", tx?.transactionCode)
+        assertEquals(5.0, tx?.amount ?: 0.0, 0.001)
+        assertEquals("Expenses", tx?.type)
+    }
+
+    // 20. Fallback extraction ensures amount is never 0.0
+    @Test
+    fun testFallbackExtractionNeverZeroAmount() {
+        val sms = "UI8G46M0VD Confirmed. Ksh2.00 transferred via M-PESA to merchant XYZ on 8/9/26 at 9:20 AM."
+        val tx = MpesaParser.parse(sms)
+        assertNotNull(tx)
+        assertEquals("UI8G46M0VD", tx?.transactionCode)
+        assertEquals(2.0, tx?.amount ?: 0.0, 0.001)
+        assertEquals("Expenses", tx?.type)
+    }
 }

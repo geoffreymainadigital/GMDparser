@@ -232,21 +232,47 @@ function handleCreateTransaction(tx) {
     formattedDate,
     tx.type
   ]]);
+  SpreadsheetApp.flush();
 
   // 2. Range G:H (Category, Description)
-  sheet.getRange(targetRow, COL_CATEGORY, 1, 2).setValues([[
-    tx.category,
-    tx.description
-  ]]);
+  const catCell = sheet.getRange(targetRow, COL_CATEGORY);
+  const catRule = catCell.getDataValidation();
+  try {
+    sheet.getRange(targetRow, COL_CATEGORY, 1, 2).setValues([[
+      tx.category,
+      tx.description
+    ]]);
+  } catch (gErr) {
+    // If dynamic dependent validation in X:AU has not finished recalculating,
+    // write value safely and restore validation rule on cell
+    if (catRule) catCell.clearDataValidations();
+    sheet.getRange(targetRow, COL_CATEGORY, 1, 2).setValues([[
+      tx.category,
+      tx.description
+    ]]);
+    if (catRule) catCell.setDataValidation(catRule);
+  }
 
   // 3. Range J:L (Amount, Account, Notes)
   // CRITICAL: Column I (currency formula 'Set Up'!$C$10) is preserved and NEVER overwritten!
   // Columns A:B, E:F (F has VLOOKUP formula), and P:BR are also preserved.
-  sheet.getRange(targetRow, COL_AMOUNT, 1, 3).setValues([[
-    Number(tx.amount),
-    tx.account,
-    formattedNotes
-  ]]);
+  const accCell = sheet.getRange(targetRow, COL_ACCOUNT);
+  const accRule = accCell.getDataValidation();
+  try {
+    sheet.getRange(targetRow, COL_AMOUNT, 1, 3).setValues([[
+      Number(tx.amount),
+      tx.account,
+      formattedNotes
+    ]]);
+  } catch (kErr) {
+    if (accRule) accCell.clearDataValidations();
+    sheet.getRange(targetRow, COL_AMOUNT, 1, 3).setValues([[
+      Number(tx.amount),
+      tx.account,
+      formattedNotes
+    ]]);
+    if (accRule) accCell.setDataValidation(accRule);
+  }
 
   // Flush writes immediately to guarantee persistence
   SpreadsheetApp.flush();

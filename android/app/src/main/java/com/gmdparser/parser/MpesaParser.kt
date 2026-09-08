@@ -8,31 +8,37 @@ import java.util.Locale
 
 object MpesaParser {
 
-    private val CONFIRMED_CODE_REGEX = Regex("^([A-Z0-9]{8,12})\\s+Confirmed\\.", RegexOption.IGNORE_CASE)
-    private val BALANCE_REGEX = Regex("New M-PESA balance is Ksh([\\d,]+\\.?\\d*)", RegexOption.IGNORE_CASE)
-    private val COST_REGEX = Regex("Transaction cost,?\\s*Ksh([\\d,]+\\.?\\d*)", RegexOption.IGNORE_CASE)
+    private val CONFIRMED_CODE_REGEX = Regex("^([A-Z0-9]{8,12})\\s+Confirmed[\\.\\s]", RegexOption.IGNORE_CASE)
+    private val BALANCE_REGEX = Regex("New M-PESA balance is (?:Ksh|KES)\\.?\\s*([\\d,]+\\.?\\d*)", RegexOption.IGNORE_CASE)
+    private val COST_REGEX = Regex("Transaction cost,?\\s*(?:Ksh|KES)\\.?\\s*([\\d,]+\\.?\\d*)", RegexOption.IGNORE_CASE)
 
     // 1. Sent to (Paybill, Send Money, Bank)
     private val SENT_REGEX = Regex(
-        "Ksh([\\d,]+\\.?\\d*)\\s+sent to\\s+(.+?)\\s+on\\s+(\\d{1,2}/\\d{1,2}/\\d{2,4})\\s+at\\s+(\\d{1,2}:\\d{2}\\s*(?:AM|PM))",
+        "(?:Ksh|KES)\\.?\\s*([\\d,]+\\.?\\d*)\\s+sent to\\s+(.+?)\\s+on\\s+(\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4})\\s+at\\s+(\\d{1,2}:\\d{2}\\s*(?:AM|PM)?)",
         RegexOption.IGNORE_CASE
     )
 
     // 2. Paid to (Buy Goods / Till)
     private val PAID_REGEX = Regex(
-        "Ksh([\\d,]+\\.?\\d*)\\s+paid to\\s+(.+?)(?:\\.|\\s+on)\\s+(?:on\\s+)?(\\d{1,2}/\\d{1,2}/\\d{2,4})\\s+at\\s+(\\d{1,2}:\\d{2}\\s*(?:AM|PM))",
+        "(?:Ksh|KES)\\.?\\s*([\\d,]+\\.?\\d*)\\s+paid to\\s+(.+?)(?:\\.|\\s+on)\\s+(?:on\\s+)?(\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4})\\s+at\\s+(\\d{1,2}:\\d{2}\\s*(?:AM|PM)?)",
         RegexOption.IGNORE_CASE
     )
 
     // 3. Received from
     private val RECEIVED_REGEX = Regex(
-        "You have received Ksh([\\d,]+\\.?\\d*)\\s+from\\s+(.+?)\\s+on\\s+(\\d{1,2}/\\d{1,2}/\\d{2,4})\\s+at\\s+(\\d{1,2}:\\d{2}\\s*(?:AM|PM))",
+        "You have received\\s+(?:Ksh|KES)\\.?\\s*([\\d,]+\\.?\\d*)\\s+from\\s+(.+?)\\s+on\\s+(\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4})\\s+at\\s+(\\d{1,2}:\\d{2}\\s*(?:AM|PM)?)",
         RegexOption.IGNORE_CASE
     )
 
     // 4. Withdrawal from agent
     private val WITHDRAW_REGEX = Regex(
-        "on\\s+(\\d{1,2}/\\d{1,2}/\\d{2,4})\\s+at\\s+(\\d{1,2}:\\d{2}\\s*(?:AM|PM))\\s+Withdraw\\s+Ksh([\\d,]+\\.?\\d*)\\s+from\\s+(.+?)(?:\\s+New|\\.|$)",
+        "on\\s+(\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4})\\s+at\\s+(\\d{1,2}:\\d{2}\\s*(?:AM|PM)?)\\s+Withdraw\\s+(?:Ksh|KES)\\.?\\s*([\\d,]+\\.?\\d*)\\s+from\\s+(.+?)(?:\\s+New|\\.|$)",
+        RegexOption.IGNORE_CASE
+    )
+
+    // 5. Airtime / Bundles purchase
+    private val AIRTIME_REGEX = Regex(
+        "(?:You\\s+(?:have\\s+)?bought|bought)\\s+(?:Ksh|KES)\\.?\\s*([\\d,]+\\.?\\d*)\\s+of\\s+(?:airtime|data(?:\\s+bundles?)?|bundles)(?:\\s+for\\s+(.+?))?\\s+on\\s+(\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4})\\s+at\\s+(\\d{1,2}:\\d{2}\\s*(?:AM|PM)?)",
         RegexOption.IGNORE_CASE
     )
 
@@ -173,20 +179,61 @@ object MpesaParser {
             )
         }
 
-        // Ambiguous pattern with valid code
+        // 5. Airtime or Bundles purchase
+        val airtimeMatch = AIRTIME_REGEX.find(trimmed)
+        if (airtimeMatch != null) {
+            val amount = airtimeMatch.groupValues[1].replace(",", "").toDoubleOrNull() ?: 0.0
+            val recipient = airtimeMatch.groupValues[2].trim().ifEmpty { "Airtime" }
+            val dateStr = airtimeMatch.groupValues[3]
+            val timeStr = airtimeMatch.groupValues[4].trim()
+
+            return Transaction(
+                transactionCode = txCode,
+                amount = amount,
+                type = "Expenses",
+                category = "Bundles",
+                description = "Airtime for $recipient".trim(),
+                account = "Mpesa",
+                date = formatIsoDate(dateStr),
+                time = timeStr,
+                destinationAccount = null,
+                balance = balance,
+                cost = cost ?: 0.0,
+                senderOrRecipient = recipient,
+                rawText = trimmed,
+                status = TransactionStatus.PENDING_REVIEW
+            )
+        }
+
+        // 6. Smart fallback: extract amount, date, time and recipient from confirmed M-PESA SMS
+        val fallbackAmountMatch = Regex("(?:Ksh|KES)\\.?\\s*([\\d,]+\\.?\\d*)", RegexOption.IGNORE_CASE).find(trimmed)
+        val extractedAmount = fallbackAmountMatch?.groupValues?.get(1)?.replace(",", "")?.toDoubleOrNull() ?: 0.0
+
+        val fallbackDateMatch = Regex("(\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4})").find(trimmed)
+        val extractedDate = fallbackDateMatch?.groupValues?.get(1)?.let { formatIsoDate(it) }
+            ?: SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(Date())
+
+        val fallbackTimeMatch = Regex("(\\d{1,2}:\\d{2}\\s*(?:AM|PM)?)", RegexOption.IGNORE_CASE).find(trimmed)
+        val extractedTime = fallbackTimeMatch?.groupValues?.get(1)?.trim() ?: ""
+
+        val payeeMatch = Regex("(?:sent to|paid to|from|bought)\\s+([A-Za-z0-9\\s\\.\\-]+?)(?:\\s+on|\\s+for account|\\s+New M-PESA|\\.|,|$)", RegexOption.IGNORE_CASE).find(trimmed)
+        val extractedDesc = payeeMatch?.groupValues?.get(1)?.trim()?.ifEmpty { "M-PESA Transaction" } ?: "M-PESA Transaction"
+
+        val classification = classifySentTarget(extractedDesc, null)
+
         return Transaction(
             transactionCode = txCode,
-            amount = 0.0,
-            type = "Expenses",
-            category = "House Supplies",
-            description = "Unparsed M-PESA Transaction",
+            amount = extractedAmount,
+            type = classification.type,
+            category = classification.category,
+            description = extractedDesc,
             account = "Mpesa",
-            date = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(Date()),
-            time = "",
+            date = extractedDate,
+            time = extractedTime,
             destinationAccount = null,
             balance = balance,
             cost = cost,
-            senderOrRecipient = "",
+            senderOrRecipient = extractedDesc,
             rawText = trimmed,
             status = TransactionStatus.PENDING_REVIEW
         )

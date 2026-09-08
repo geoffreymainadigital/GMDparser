@@ -66,7 +66,7 @@ export default async function handler(req, res) {
     };
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout for spreadsheet write
+    const timeoutId = setTimeout(() => controller.abort(), 28000); // 28s timeout for spreadsheet write
 
     const upstreamRes = await fetch(appsScriptUrl, {
       method: 'POST',
