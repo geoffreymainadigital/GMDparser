@@ -12,13 +12,12 @@ const COL_DATE = 3;             // C (Date)
 const COL_TYPE = 4;             // D (Transactions - Type)
 const COL_CATEGORY = 7;         // G (Category)
 const COL_DESCRIPTION = 8;      // H (Description)
-const COL_CURRENCY = 9;         // I (Currency formula: ='Set Up'!$C$10 - MUST NOT BE OVERWRITTEN)
 const COL_AMOUNT = 10;          // J (Amount)
 const COL_ACCOUNT = 11;         // K (Account)
 const COL_NOTES = 12;           // L (Notes)
 
-const SCRIPT_VERSION = '2026.09.08.v10_auto_formula_repair';
-const SCRIPT_BUILD_ID = 'GMD_GAS_20260908_PROD_10';
+const SCRIPT_VERSION = '2026.09.08.v9_fast_resilient_write';
+const SCRIPT_BUILD_ID = 'GMD_GAS_20260908_PROD_09';
 
 let VALID_TYPES = ['Income', 'Expenses', 'Bills', 'Debt', 'Savings', 'Balance'];
 
@@ -73,25 +72,6 @@ function doGet(e) {
       }, 200);
     }
 
-    if (action === 'repair') {
-      const targetId = (e && e.parameter && e.parameter.spreadsheetId) || ss.getId();
-      const targetSs = SpreadsheetApp.openById(targetId);
-      const txSheet = targetSs.getSheetByName(SHEET_NAME_TRANSACTIONS);
-      if (!txSheet) {
-        return createJsonResponse({
-          success: false,
-          error: 'Sheet "' + SHEET_NAME_TRANSACTIONS + '" was not found in spreadsheet.'
-        }, 404);
-      }
-      const repairedCount = repairMissingFormulas(txSheet);
-      SpreadsheetApp.flush();
-      return createJsonResponse({
-        success: true,
-        repairedCount: repairedCount,
-        message: 'Successfully repaired formulas and validation across ' + repairedCount + ' rows.',
-        timestamp: new Date().toISOString()
-      }, 200);
-    }
 
     return createJsonResponse({
       success: false,
@@ -225,9 +205,6 @@ function handleCreateTransaction(tx) {
   // Find next transaction row dynamically by inspecting Date column C
   // CRITICAL: NEVER hardcodes row 13/1464 and never uses sheet.getLastRow()
   const targetRow = findNextTransactionRow(sheet);
-
-  // Automatically repair any missing template formulas on targetRow and previous rows (e.g. row 14)
-  repairMissingFormulas(sheet, targetRow);
 
   // Parse and format date
   let formattedDate = tx.date;
@@ -423,133 +400,6 @@ function findLastTransactionRow(sheet) {
  */
 function findNextTransactionRow(sheet) {
   return findLastTransactionRow(sheet) + 1;
-}
-
-/**
- * Finds a known valid reference/template row that contains the required formulas.
- * Checks rows 10 to 25.
- */
-function findTemplateRow(sheet) {
-  for (let r = 10; r <= 25; r++) {
-    const fI = sheet.getRange(r, COL_CURRENCY).getFormula();
-    const fX = sheet.getRange(r, 24).getFormula();
-    if (fI && fX) {
-      return r;
-    }
-  }
-  return 10;
-}
-
-/**
- * Ensures that a transaction row has all necessary formulas and data validations copied
- * from the authoritative template row.
- * Preserves safe transaction boundaries: only writes to formula columns F, I, P:T, U, and X:lastCol.
- */
-function ensureRowFormulasAndValidation(sheet, targetRow, refRow) {
-  if (targetRow <= 9) return false;
-  if (!refRow) refRow = findTemplateRow(sheet);
-  if (targetRow === refRow) return false;
-
-  let repaired = false;
-
-  // 1. Column F (Category lookup helper)
-  const cellF = sheet.getRange(targetRow, 6);
-  if (!cellF.getFormula()) {
-    const sourceF = sheet.getRange(refRow, 6);
-    if (sourceF.getFormula()) {
-      sourceF.copyTo(cellF, SpreadsheetApp.CopyPasteType.PASTE_FORMULA, false);
-      repaired = true;
-    }
-  }
-
-  // 2. Column I (Currency display formula: ='Set Up'!$C$10)
-  const cellI = sheet.getRange(targetRow, COL_CURRENCY);
-  if (!cellI.getFormula()) {
-    const sourceI = sheet.getRange(refRow, COL_CURRENCY);
-    if (sourceI.getFormula()) {
-      sourceI.copyTo(cellI, SpreadsheetApp.CopyPasteType.PASTE_FORMULA, false);
-      repaired = true;
-    }
-  }
-
-  // 3. Column U (Month formula: =IF(C...="","",month(C...)))
-  const cellU = sheet.getRange(targetRow, 21);
-  if (!cellU.getFormula()) {
-    const sourceU = sheet.getRange(refRow, 21);
-    if (sourceU.getFormula()) {
-      sourceU.copyTo(cellU, SpreadsheetApp.CopyPasteType.PASTE_FORMULA, false);
-      repaired = true;
-    }
-  }
-
-  // 4. Columns P:T (Helper / Need checkboxes)
-  const cellP = sheet.getRange(targetRow, 16);
-  if (!cellP.getFormula()) {
-    const sourceP = sheet.getRange(refRow, 16, 1, 5);
-    sourceP.copyTo(sheet.getRange(targetRow, 16, 1, 5), SpreadsheetApp.CopyPasteType.PASTE_FORMULA, false);
-    repaired = true;
-  }
-
-  // 5. Columns X to last column (Dynamic Category Transpose formulas)
-  const cellX = sheet.getRange(targetRow, 24);
-  if (!cellX.getFormula()) {
-    const maxCols = sheet.getMaxColumns ? sheet.getMaxColumns() : 60;
-    const lastCol = Math.min(Math.max(sheet.getLastColumn(), 47), maxCols);
-    const numCols = Math.max(lastCol - 24 + 1, 24);
-    const sourceX = sheet.getRange(refRow, 24, 1, numCols);
-    if (sourceX.getFormula()) {
-      sourceX.copyTo(sheet.getRange(targetRow, 24, 1, numCols), SpreadsheetApp.CopyPasteType.PASTE_FORMULA, false);
-      repaired = true;
-    }
-  }
-
-  // 6. Data Validation on Column G (Category)
-  // Ensure the target cell has the dynamic validation rule pointing to its row's X:AU range
-  const catCell = sheet.getRange(targetRow, COL_CATEGORY);
-  const catRule = catCell.getDataValidation();
-  if (!catRule) {
-    const refCatCell = sheet.getRange(refRow, COL_CATEGORY);
-    const refCatRule = refCatCell.getDataValidation();
-    if (refCatRule) {
-      refCatCell.copyTo(catCell, SpreadsheetApp.CopyPasteType.PASTE_DATA_VALIDATION, false);
-      repaired = true;
-    }
-  }
-
-  // 7. Data Validation on Column K (Account)
-  const accCell = sheet.getRange(targetRow, COL_ACCOUNT);
-  const accRule = accCell.getDataValidation();
-  if (!accRule) {
-    const refAccCell = sheet.getRange(refRow, COL_ACCOUNT);
-    const refAccRule = refAccCell.getDataValidation();
-    if (refAccRule) {
-      refAccCell.copyTo(accCell, SpreadsheetApp.CopyPasteType.PASTE_DATA_VALIDATION, false);
-      repaired = true;
-    }
-  }
-
-  return repaired;
-}
-
-/**
- * Scans transaction rows from row 10 up to maxRow and repairs any rows missing
- * formulas in Column I or Column X.
- */
-function repairMissingFormulas(sheet, maxRow) {
-  const refRow = findTemplateRow(sheet);
-  const lastRow = maxRow || Math.max(findLastTransactionRow(sheet) + 5, 20);
-  let count = 0;
-  for (let r = 10; r <= lastRow; r++) {
-    if (r === refRow) continue;
-    const cellI = sheet.getRange(r, COL_CURRENCY).getFormula();
-    const cellX = sheet.getRange(r, 24).getFormula();
-    if (!cellI || !cellX) {
-      if (ensureRowFormulasAndValidation(sheet, r, refRow)) {
-        count++;
-      }
-    }
-  }
-  return count;
 }
 
 /**
