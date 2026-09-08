@@ -16,8 +16,8 @@ const COL_AMOUNT = 10;          // J (Amount)
 const COL_ACCOUNT = 11;         // K (Account)
 const COL_NOTES = 12;           // L (Notes)
 
-const SCRIPT_VERSION = '2026.09.08.v13_date_last_orphan_prevention';
-const SCRIPT_BUILD_ID = 'GMD_GAS_20260908_PROD_13';
+const SCRIPT_VERSION = '2026.09.08.v14_batch_write';
+const SCRIPT_BUILD_ID = 'GMD_GAS_20260908_PROD_14';
 
 let VALID_TYPES = ['Income', 'Expenses', 'Bills', 'Debt', 'Savings', 'Balance'];
 
@@ -156,6 +156,8 @@ function doPost(e) {
 
     if (action === 'createTransaction') {
       return handleCreateTransaction(payload.transaction);
+    } else if (action === 'batchCreateTransactions') {
+      return handleBatchCreateTransactions(payload.transactions);
     } else if (action === 'validateTransaction') {
       return handleValidateOnly(payload.transaction);
     } else {
@@ -327,6 +329,250 @@ function handleCreateTransaction(tx) {
       notes: formattedNotes,
       timestamp: new Date().toISOString()
     }
+  }, 201);
+}
+
+/**
+ * Batch write handler: accepts an array of transactions, writes all rows field-by-field in
+ * staged batched range operations with a single SpreadsheetApp.flush() per stage.
+ *
+ * Write order (per Date-last orphan prevention contract):
+ *   Stage 1: Type (Column D)  → flush once
+ *   Stage 2: Category + Description (Columns G:H)
+ *   Stage 3: Amount + Account + Notes (Columns J:L)
+ *   Stage 4: Date (Column C) LAST → flush once to commit all rows
+ *
+ * Each transaction is duplicate-checked before allocation. Duplicates are skipped
+ * and reported individually; the rest proceed.
+ * Returns a per-transaction result list even on partial success.
+ */
+function handleBatchCreateTransactions(transactions) {
+  if (!Array.isArray(transactions) || transactions.length === 0) {
+    return createJsonResponse({
+      success: false,
+      status: 'BAD_REQUEST',
+      error: 'transactions must be a non-empty array'
+    }, 400);
+  }
+
+  const MAX_BATCH = 50;
+  if (transactions.length > MAX_BATCH) {
+    return createJsonResponse({
+      success: false,
+      status: 'BAD_REQUEST',
+      error: 'Batch size exceeds maximum of ' + MAX_BATCH + ' transactions per request'
+    }, 400);
+  }
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAME_TRANSACTIONS);
+  if (!sheet) {
+    return createJsonResponse({
+      success: false,
+      status: 'MISSING_TRANSACTIONS_SHEET',
+      error: 'Sheet "' + SHEET_NAME_TRANSACTIONS + '" was not found in spreadsheet.'
+    }, 500);
+  }
+
+  // --- Phase 1: Validate each item and check duplicates ---
+  // Read the full Notes column once up front (avoids N separate reads)
+  const lastExistingRow = findLastTransactionRow(sheet);
+  const existingNotesCount = lastExistingRow >= 10 ? lastExistingRow - 9 : 0;
+  const existingNotesValues = existingNotesCount > 0
+    ? sheet.getRange(10, COL_NOTES, existingNotesCount, 1).getValues()
+    : [];
+
+  // Build a Set of already-known codes for fast O(1) lookups within this batch run
+  const existingCodes = new Set();
+  const codeRowMap = {};  // code -> row number for duplicate reporting
+  for (let i = 0; i < existingNotesValues.length; i++) {
+    const rawVal = String(existingNotesValues[i][0] || '').trim();
+    if (!rawVal) continue;
+    // Extract M-PESA Code from notes using the standard marker
+    const codeMatch = rawVal.match(/M-PESA Code:\s*([A-Z0-9]{8,25})/i);
+    if (codeMatch) {
+      const code = codeMatch[1].toUpperCase();
+      existingCodes.add(code);
+      codeRowMap[code] = 10 + i;
+    }
+  }
+
+  const results = [];
+  // Items that pass validation and are not duplicates → will be written
+  const toWrite = [];
+
+  for (let i = 0; i < transactions.length; i++) {
+    const tx = transactions[i];
+    const validation = validateTransactionPayload(tx);
+    if (!validation.isValid) {
+      results.push({
+        index: i,
+        transactionCode: tx && tx.transactionCode ? tx.transactionCode : '?',
+        status: 'VALIDATION_ERROR',
+        success: false,
+        errors: validation.errors
+      });
+      continue;
+    }
+
+    const txCode = tx.transactionCode.trim().toUpperCase();
+
+    // Check against already-existing codes AND codes added earlier in this batch
+    if (existingCodes.has(txCode)) {
+      results.push({
+        index: i,
+        transactionCode: txCode,
+        status: 'DUPLICATE',
+        success: false,
+        existingRow: codeRowMap[txCode] || null,
+        error: 'Transaction code ' + txCode + ' already exists'
+      });
+      continue;
+    }
+
+    // Reserve this code so later items in the same batch can't claim it
+    existingCodes.add(txCode);
+
+    // Format date
+    let formattedDate = tx.date;
+    try {
+      const d = new Date(tx.date);
+      if (!isNaN(d.getTime())) {
+        formattedDate = Utilities.formatDate(d, 'Africa/Nairobi', 'yyyy-MM-dd');
+      }
+    } catch (_) {}
+
+    // Format notes
+    const formattedNotes = formatNotesWithCode((tx.notes || '').trim(), txCode);
+
+    toWrite.push({
+      originalIndex: i,
+      tx: tx,
+      txCode: txCode,
+      formattedDate: formattedDate,
+      formattedNotes: formattedNotes
+    });
+  }
+
+  if (toWrite.length === 0) {
+    // Nothing to write — return results-only (all duplicates/errors)
+    return createJsonResponse({
+      success: true,
+      status: 'BATCH_COMPLETE',
+      written: 0,
+      total: transactions.length,
+      results: results
+    }, 200);
+  }
+
+  // --- Phase 2: Allocate target rows ---
+  // All rows are allocated sequentially starting from (lastExistingRow + 1).
+  // Because Date (col C) is written LAST, none of these rows are "committed" yet,
+  // so they won't be re-allocated if a partial failure occurs.
+  const firstTargetRow = lastExistingRow + 1;
+  const rowAllocations = toWrite.map(function(item, idx) {
+    return firstTargetRow + idx;
+  });
+
+  // --- Phase 3: Staged batched writes ---
+  // Stage 3a: Write Type (Column D) for ALL rows in a single range write, then flush ONCE.
+  // This triggers Google Sheets to evaluate the Category dropdown array formulas (col X)
+  // for all new rows simultaneously — one full-sheet recalculation instead of N.
+  try {
+    const typeData = toWrite.map(function(item) { return [item.tx.type]; });
+    sheet.getRange(firstTargetRow, COL_TYPE, toWrite.length, 1).setValues(typeData);
+    SpreadsheetApp.flush();  // ONE flush for the whole batch
+
+    // Stage 3b: Write Category + Description (Columns G:H) for all rows at once.
+    try {
+      const catData = toWrite.map(function(item) {
+        return [item.tx.category, item.tx.description];
+      });
+      sheet.getRange(firstTargetRow, COL_CATEGORY, toWrite.length, 2).setValues(catData);
+    } catch (catErr) {
+      // Fallback: clear validations on the whole category column range, then write
+      console.warn('Batch category write failed, attempting with cleared validations: ' + catErr.message);
+      const catRange = sheet.getRange(firstTargetRow, COL_CATEGORY, toWrite.length, 1);
+      catRange.clearDataValidations();
+      const catData = toWrite.map(function(item) {
+        return [item.tx.category, item.tx.description];
+      });
+      sheet.getRange(firstTargetRow, COL_CATEGORY, toWrite.length, 2).setValues(catData);
+    }
+
+    // Stage 3c: Write Amount + Account + Notes (Columns J:L) for all rows at once.
+    // CRITICAL: Column I (currency formula) is NEVER written.
+    try {
+      const amtData = toWrite.map(function(item) {
+        return [Number(item.tx.amount), item.tx.account, item.formattedNotes];
+      });
+      sheet.getRange(firstTargetRow, COL_AMOUNT, toWrite.length, 3).setValues(amtData);
+    } catch (amtErr) {
+      // Fallback: clear account validations, then write
+      console.warn('Batch amount write failed, attempting with cleared validations: ' + amtErr.message);
+      const accRange = sheet.getRange(firstTargetRow, COL_ACCOUNT, toWrite.length, 1);
+      accRange.clearDataValidations();
+      const amtData = toWrite.map(function(item) {
+        return [Number(item.tx.amount), item.tx.account, item.formattedNotes];
+      });
+      sheet.getRange(firstTargetRow, COL_AMOUNT, toWrite.length, 3).setValues(amtData);
+    }
+
+    // Stage 3d: Write Date (Column C) LAST for ALL rows — this commits every row atomically.
+    // Only after this line will findLastTransactionRow() count these rows.
+    const dateData = toWrite.map(function(item) { return [item.formattedDate]; });
+    sheet.getRange(firstTargetRow, COL_DATE, toWrite.length, 1).setValues(dateData);
+
+    // Final flush to persist all rows
+    SpreadsheetApp.flush();
+
+  } catch (writeErr) {
+    // Best-effort cleanup: clear Type column (col D) from all allocated rows
+    // so they remain blank in col C and don't become orphans.
+    try {
+      sheet.getRange(firstTargetRow, COL_TYPE, toWrite.length, 1).clearContent();
+    } catch (_) {}
+    throw writeErr;
+  }
+
+  // --- Phase 4: Build per-transaction success results ---
+  toWrite.forEach(function(item, idx) {
+    const targetRow = rowAllocations[idx];
+    results.push({
+      index: item.originalIndex,
+      transactionCode: item.txCode,
+      status: 'CREATED',
+      success: true,
+      row: targetRow,
+      amount: Number(item.tx.amount),
+      type: item.tx.type,
+      category: item.tx.category,
+      account: item.tx.account,
+      date: item.formattedDate,
+      notes: item.formattedNotes
+    });
+    // Register code in map for response completeness
+    codeRowMap[item.txCode] = targetRow;
+  });
+
+  // Sort results back to original submission order
+  results.sort(function(a, b) { return a.index - b.index; });
+
+  const successCount = results.filter(function(r) { return r.success; }).length;
+  const dupCount = results.filter(function(r) { return r.status === 'DUPLICATE'; }).length;
+  const errorCount = results.filter(function(r) { return !r.success && r.status !== 'DUPLICATE'; }).length;
+
+  return createJsonResponse({
+    success: true,
+    status: 'BATCH_COMPLETE',
+    written: successCount,
+    duplicates: dupCount,
+    errors: errorCount,
+    total: transactions.length,
+    firstRow: successCount > 0 ? firstTargetRow : null,
+    lastRow: successCount > 0 ? rowAllocations[toWrite.length - 1] : null,
+    results: results,
+    timestamp: new Date().toISOString()
   }, 201);
 }
 

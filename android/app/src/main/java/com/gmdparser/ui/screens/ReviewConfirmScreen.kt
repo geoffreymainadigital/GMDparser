@@ -49,6 +49,8 @@ fun ReviewConfirmScreen(
     var feedbackStyle by remember { mutableStateOf(FeedbackStyle.NONE) }
     var expandedTxCode by remember { mutableStateOf<String?>(null) }
     var showScanDialog by remember { mutableStateOf(false) }
+    var batchSubmitting by remember { mutableStateOf(false) }
+    var batchProgress by remember { mutableStateOf("") }
 
     // Batch Review requirement: oldest first
     val orderedPending = remember(pendingList) {
@@ -124,6 +126,56 @@ fun ReviewConfirmScreen(
                     }
                 }
             )
+        }
+    }
+
+    /**
+     * Batch-submit all currently pending transactions using batchCreateTransactions.
+     * A single round-trip replaces N separate round-trips, eliminating the per-transaction
+     * flush() recalculation that caused timeouts during SMS inbox catch-up sessions.
+     */
+    fun submitBatch(txList: List<Transaction>) {
+        if (txList.isEmpty()) return
+        scope.launch {
+            batchSubmitting = true
+            batchProgress = "Sending ${txList.size} transaction(s)…"
+            feedbackMessage = null
+            feedbackStyle = FeedbackStyle.NONE
+
+            val results = try {
+                TransactionRepository.confirmAndSubmitBatch(txList)
+            } catch (e: Exception) {
+                batchSubmitting = false
+                batchProgress = ""
+                feedbackStyle = FeedbackStyle.ERROR
+                feedbackMessage = "✗ Batch failed: ${e.message ?: "Unknown error"}"
+                return@launch
+            }
+
+            batchSubmitting = false
+            batchProgress = ""
+
+            val created = results.count { it.status == "CREATED" }
+            val dups    = results.count { it.status == "DUPLICATE" }
+            val errors  = results.count { it.status == "VALIDATION_ERROR" || it.status == "NETWORK_ERROR" }
+
+            feedbackStyle = when {
+                errors > 0  -> FeedbackStyle.ERROR
+                dups > 0 && created == 0 -> FeedbackStyle.DUPLICATE
+                dups > 0    -> FeedbackStyle.DUPLICATE
+                else        -> FeedbackStyle.SUCCESS
+            }
+            feedbackMessage = buildString {
+                if (created > 0) append("✓ $created recorded")
+                if (dups    > 0) {
+                    if (created > 0) append("  •  ")
+                    append("⚠ $dups duplicate(s) skipped")
+                }
+                if (errors  > 0) {
+                    if (created + dups > 0) append("  •  ")
+                    append("✗ $errors failed")
+                }
+            }
         }
     }
 
@@ -273,6 +325,48 @@ fun ReviewConfirmScreen(
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold
                 )
+                // Confirm All — uses batch endpoint; one round-trip for all pending items.
+                // Only shown when there are ≥ 2 items and nothing is currently being sent.
+                if (orderedPending.size >= 2 && !batchSubmitting && submittingTxCode == null) {
+                    Button(
+                        onClick = { submitBatch(orderedPending) },
+                        colors = ButtonDefaults.buttonColors(containerColor = MpesaGreen),
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Icon(Icons.Default.Done, contentDescription = null, modifier = Modifier.size(15.dp))
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text("Confirm All", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
+            // Batch progress indicator
+            if (batchSubmitting) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MpesaGreen.copy(alpha = 0.12f)),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = MpesaGreen,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = batchProgress,
+                            color = MpesaGreen,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(10.dp))

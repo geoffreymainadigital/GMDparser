@@ -43,6 +43,45 @@ data class CreateTransactionRequest(
     @SerializedName("transaction") val transaction: TransactionPayload
 )
 
+/** Batch write request — sends N transactions in a single round-trip. */
+data class BatchCreateTransactionRequest(
+    @SerializedName("action") val action: String = "batchCreateTransactions",
+    @SerializedName("transactions") val transactions: List<TransactionPayload>
+)
+
+/** Per-transaction result inside a batch response. */
+data class BatchTransactionResult(
+    @SerializedName("index") val index: Int,
+    @SerializedName("transactionCode") val transactionCode: String,
+    @SerializedName("status") val status: String,
+    @SerializedName("success") val success: Boolean,
+    @SerializedName("row") val row: Int? = null,
+    @SerializedName("existingRow") val existingRow: Int? = null,
+    @SerializedName("error") val error: String? = null,
+    @SerializedName("errors") val errors: List<String>? = null,
+    @SerializedName("amount") val amount: Double? = null,
+    @SerializedName("type") val type: String? = null,
+    @SerializedName("category") val category: String? = null,
+    @SerializedName("account") val account: String? = null,
+    @SerializedName("date") val date: String? = null,
+    @SerializedName("notes") val notes: String? = null
+)
+
+/** Top-level response for batchCreateTransactions. */
+data class BatchApiResponse(
+    @SerializedName("success") val success: Boolean,
+    @SerializedName("status") val status: String,
+    @SerializedName("written") val written: Int = 0,
+    @SerializedName("duplicates") val duplicates: Int = 0,
+    @SerializedName("errors") val errors: Int = 0,
+    @SerializedName("total") val total: Int = 0,
+    @SerializedName("firstRow") val firstRow: Int? = null,
+    @SerializedName("lastRow") val lastRow: Int? = null,
+    @SerializedName("results") val results: List<BatchTransactionResult> = emptyList(),
+    @SerializedName("timestamp") val timestamp: String? = null,
+    @SerializedName("error") val error: String? = null
+)
+
 data class TransactionResponseData(
     @SerializedName("row") val row: Int,
     @SerializedName("transactionCode") val transactionCode: String,

@@ -2,6 +2,8 @@ package com.gmdparser.data.network
 
 import com.gmdparser.data.model.ApiResponse
 import com.gmdparser.data.model.AuthCheckResponse
+import com.gmdparser.data.model.BatchApiResponse
+import com.gmdparser.data.model.BatchCreateTransactionRequest
 import com.gmdparser.data.model.CreateTransactionRequest
 import com.gmdparser.data.model.HealthResponse
 import com.gmdparser.data.model.TaxonomyResponse
@@ -38,6 +40,19 @@ interface ApiService {
         @Header("X-GMD-Auth-Key") authKey: String? = null
     ): Response<ApiResponse>
 
+    @POST("/api/transaction")
+    suspend fun recordBatchTransactions(
+        @Body request: BatchCreateTransactionRequest,
+        @Header("X-GMD-Auth-Key") authKey: String? = null
+    ): Response<BatchApiResponse>
+
+    @POST
+    suspend fun recordBatchTransactionsDirect(
+        @Url url: String,
+        @Body request: BatchCreateTransactionRequest,
+        @Header("X-GMD-Auth-Key") authKey: String? = null
+    ): Response<BatchApiResponse>
+
     @POST("/api/log-transaction")
     suspend fun logTransaction(
         @Body request: CreateTransactionRequest,
@@ -50,4 +65,6 @@ interface ApiService {
         @Header("X-GMD-Auth-Key") authKey: String? = null
     ): Response<ApiResponse>
 }
+
+
 
