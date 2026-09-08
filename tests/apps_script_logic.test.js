@@ -75,6 +75,7 @@ function formatNotesWithCode(existingNotes, txCode) {
 
 /**
  * Duplicate check: searches Column L (Notes) for the exact transaction code or marker.
+ * Strictly uses exact M-PESA code marker matching rather than loose substrings.
  * Rejects with DUPLICATE if found, without appending.
  */
 function checkDuplicateTransactionCode(sheet, txCode) {
@@ -87,13 +88,13 @@ function checkDuplicateTransactionCode(sheet, txCode) {
 
   const numRows = lastRow - 9;
   const notesValues = sheet.getRange(10, COL_NOTES, numRows, 1).getValues();
+  const escapedCode = targetCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const markerRegex = new RegExp('(?:^|\\|\\s*|\\s)M-PESA Code:\\s*' + escapedCode + '(?:\\s*\\||\\s|$)', 'i');
 
   for (let i = 0; i < notesValues.length; i++) {
-    const rawVal = String(notesValues[i][0] || '').trim().toUpperCase();
+    const rawVal = String(notesValues[i][0] || '').trim();
     if (!rawVal) continue;
-    if (rawVal === targetCode || 
-        rawVal.indexOf('M-PESA CODE: ' + targetCode) !== -1 ||
-        rawVal.indexOf(targetCode) !== -1) {
+    if (rawVal.toUpperCase() === targetCode || markerRegex.test(rawVal)) {
       return { isDuplicate: true, row: 10 + i };
     }
   }
@@ -407,9 +408,13 @@ const dupFound = checkDuplicateTransactionCode(mockCloneSheet, 'TD88VAL001');
 assert.strictEqual(dupFound.isDuplicate, true, 'Test 18 Failed: Code inside Notes marker must be detected as duplicate');
 assert.strictEqual(dupFound.row, 1464, 'Test 18 Failed: Duplicate row must be 1464');
 
+// Exact marker required: prefix or loose substring must NOT trigger duplicate
+const dupPrefixNotFound = checkDuplicateTransactionCode(mockCloneSheet, 'TD88VAL00');
+assert.strictEqual(dupPrefixNotFound.isDuplicate, false, 'Test 18 Failed: Partial prefix must not report duplicate');
+
 const dupNotFound = checkDuplicateTransactionCode(mockCloneSheet, 'TD99BRANDNEW');
 assert.strictEqual(dupNotFound.isDuplicate, false, 'Test 18 Failed: New code must not report duplicate');
-console.log('✓ Test 18: Duplicate detection searches actual persisted M-PESA code marker in Notes, not imaginary code column');
+console.log('✓ Test 18: Duplicate detection searches actual persisted M-PESA code marker in Notes, not imaginary code column or loose substrings');
 
 // Test 19: No Destination Account is written unless the live sheet proves that field exists
 // Verify written keys in cellStore: none should be an invented destination account column

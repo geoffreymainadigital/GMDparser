@@ -395,6 +395,7 @@ function findNextTransactionRow(sheet) {
 
 /**
  * Duplicate check: searches Column L (Notes) for the exact transaction code or marker.
+ * Strictly uses exact M-PESA code marker matching rather than loose substrings.
  * Rejects with DUPLICATE if found, without appending.
  */
 function checkDuplicateTransactionCode(sheet, txCode) {
@@ -407,13 +408,13 @@ function checkDuplicateTransactionCode(sheet, txCode) {
 
   const numRows = lastRow - 9;
   const notesValues = sheet.getRange(10, COL_NOTES, numRows, 1).getValues();
+  const escapedCode = targetCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const markerRegex = new RegExp('(?:^|\\|\\s*|\\s)M-PESA Code:\\s*' + escapedCode + '(?:\\s*\\||\\s|$)', 'i');
 
   for (let i = 0; i < notesValues.length; i++) {
-    const rawVal = String(notesValues[i][0] || '').trim().toUpperCase();
+    const rawVal = String(notesValues[i][0] || '').trim();
     if (!rawVal) continue;
-    if (rawVal === targetCode || 
-        rawVal.indexOf('M-PESA CODE: ' + targetCode) !== -1 ||
-        rawVal.indexOf(targetCode) !== -1) {
+    if (rawVal.toUpperCase() === targetCode || markerRegex.test(rawVal)) {
       return { isDuplicate: true, row: 10 + i };
     }
   }
