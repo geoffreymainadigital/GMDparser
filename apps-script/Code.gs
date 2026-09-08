@@ -16,8 +16,8 @@ const COL_AMOUNT = 10;          // J (Amount)
 const COL_ACCOUNT = 11;         // K (Account)
 const COL_NOTES = 12;           // L (Notes)
 
-const SCRIPT_VERSION = '2026.09.08.v9_fast_resilient_write';
-const SCRIPT_BUILD_ID = 'GMD_GAS_20260908_PROD_09';
+const SCRIPT_VERSION = '2026.09.08.v11_flush_before_category';
+const SCRIPT_BUILD_ID = 'GMD_GAS_20260908_PROD_11';
 
 let VALID_TYPES = ['Income', 'Expenses', 'Bills', 'Debt', 'Savings', 'Balance'];
 
@@ -233,31 +233,50 @@ function handleCreateTransaction(tx) {
     tx.type
   ]]);
 
+  // CRITICAL: Flush after setting Type so Google Sheets calculates the dynamic categories in X:AU for this Type!
+  SpreadsheetApp.flush();
+
   // 2. Range G:H (Category, Description)
-  // Temporarily bypass strict validation on this target cell during write, then re-apply rule
-  const catCell = sheet.getRange(targetRow, COL_CATEGORY);
-  const catRule = catCell.getDataValidation();
-  if (catRule) catCell.clearDataValidations();
-  sheet.getRange(targetRow, COL_CATEGORY, 1, 2).setValues([[
-    tx.category,
-    tx.description
-  ]]);
-  if (catRule) catCell.setDataValidation(catRule);
+  // With X:AU calculated, tx.category is valid and accepted naturally without validation rejections
+  try {
+    sheet.getRange(targetRow, COL_CATEGORY, 1, 2).setValues([[
+      tx.category,
+      tx.description
+    ]]);
+  } catch (valErr) {
+    // Fallback: If calculation was delayed, write safely
+    const catCell = sheet.getRange(targetRow, COL_CATEGORY);
+    const catRule = catCell.getDataValidation();
+    if (catRule) catCell.clearDataValidations();
+    sheet.getRange(targetRow, COL_CATEGORY, 1, 2).setValues([[
+      tx.category,
+      tx.description
+    ]]);
+    if (catRule) catCell.setDataValidation(catRule);
+  }
 
   // 3. Range J:L (Amount, Account, Notes)
   // CRITICAL: Column I (currency formula 'Set Up'!$C$10) is preserved and NEVER overwritten!
   // Columns A:B, E:F (F has VLOOKUP formula), and P:BR are also preserved.
-  const accCell = sheet.getRange(targetRow, COL_ACCOUNT);
-  const accRule = accCell.getDataValidation();
-  if (accRule) accCell.clearDataValidations();
-  sheet.getRange(targetRow, COL_AMOUNT, 1, 3).setValues([[
-    Number(tx.amount),
-    tx.account,
-    formattedNotes
-  ]]);
-  if (accRule) accCell.setDataValidation(accRule);
+  try {
+    sheet.getRange(targetRow, COL_AMOUNT, 1, 3).setValues([[
+      Number(tx.amount),
+      tx.account,
+      formattedNotes
+    ]]);
+  } catch (accErr) {
+    const accCell = sheet.getRange(targetRow, COL_ACCOUNT);
+    const accRule = accCell.getDataValidation();
+    if (accRule) accCell.clearDataValidations();
+    sheet.getRange(targetRow, COL_AMOUNT, 1, 3).setValues([[
+      Number(tx.amount),
+      tx.account,
+      formattedNotes
+    ]]);
+    if (accRule) accCell.setDataValidation(accRule);
+  }
 
-  // Flush writes once at the very end to guarantee persistence quickly
+  // Final flush to guarantee persistence quickly
   SpreadsheetApp.flush();
 
   return createJsonResponse({
