@@ -568,15 +568,15 @@ function renderLedgerTables() {
 function updateDashboardMetrics() {
   const inflow = state.confirmedRecords
     .filter(r => r.type === 'Income' && r.status === 'SYNCED')
-    .sumOf ? 0 : state.confirmedRecords.filter(r => r.type === 'Income' && r.status === 'SYNCED').reduce((acc, c) => acc + c.amount, 0);
+    .reduce((acc, c) => acc + (Number(c.amount) || 0), 0);
 
   const expenses = state.confirmedRecords
     .filter(r => (r.type === 'Expenses' || r.type === 'Bills') && r.status === 'SYNCED')
-    .reduce((acc, c) => acc + c.amount, 0);
+    .reduce((acc, c) => acc + (Number(c.amount) || 0), 0);
 
   const transfers = state.confirmedRecords
     .filter(r => r.type === 'Transfer' && r.status === 'SYNCED')
-    .reduce((acc, c) => acc + c.amount, 0);
+    .reduce((acc, c) => acc + (Number(c.amount) || 0), 0);
 
   const elInflow = document.getElementById('dash-inflow');
   const elExp = document.getElementById('dash-expenses');
@@ -748,12 +748,18 @@ async function fetchTaxonomyFromApi() {
   }
 }
 
-// Live Transactions Synchronizer (Loads confirmed transactions from Google Sheets via /api/transactions)
+// Live Transactions Synchronizer (Loads confirmed transactions from Google Sheets via /api/transactions or direct Apps Script fallback)
+const FALLBACK_GAS_URL = 'https://script.google.com/macros/s/AKfycbzLo8NZHU3rmGIT6R-une9xrjUqwIdSbUG6to1O_ZwohEbvST1-3MjpNvCaNq2TOF4_Xw/exec';
+
 async function fetchLiveTransactions() {
   try {
-    const res = await fetch('/api/transactions?limit=100');
+    let res = await fetch('/api/transactions?limit=100');
     if (!res.ok) {
-      console.warn('Transactions API responded with status', res.status);
+      console.warn('Vercel /api/transactions returned', res.status, 'trying direct Apps Script fallback...');
+      res = await fetch(`${FALLBACK_GAS_URL}?action=getRecentTransactions&limit=100`);
+    }
+    if (!res.ok) {
+      console.warn('Could not fetch transactions from fallback either, status:', res.status);
       return;
     }
     const json = await res.json();
@@ -764,7 +770,20 @@ async function fetchLiveTransactions() {
       console.log(`✓ Synchronized ${json.data.length} live transactions from Google Sheets`);
     }
   } catch (err) {
-    console.warn('Could not fetch live transactions:', err.message);
+    console.warn('Could not fetch live transactions, attempting fallback:', err.message);
+    try {
+      const fbRes = await fetch(`${FALLBACK_GAS_URL}?action=getRecentTransactions&limit=100`);
+      if (fbRes.ok) {
+        const json = await fbRes.json();
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          state.confirmedRecords = json.data;
+          renderLedgerTables();
+          updateDashboardMetrics();
+        }
+      }
+    } catch (fbErr) {
+      console.warn('Fallback also failed:', fbErr.message);
+    }
   }
 }
 
