@@ -106,6 +106,21 @@ function doGet(e) {
       }, 200);
     }
 
+    if (action === 'getRecentTransactions') {
+      const sheet = ss.getSheetByName(SHEET_NAME_TRANSACTIONS);
+      if (!sheet) {
+        return createJsonResponse({ success: false, error: 'Transactions sheet not found' }, 500);
+      }
+      const limit = parseInt((e && e.parameter && e.parameter.limit) || '50', 10);
+      const transactions = getRecentTransactions(sheet, limit);
+      return createJsonResponse({
+        success: true,
+        count: transactions.length,
+        data: transactions,
+        timestamp: new Date().toISOString()
+      }, 200);
+    }
+
 
     return createJsonResponse({
       success: false,
@@ -735,6 +750,70 @@ function findOrphanedRows(sheet) {
     }
   }
   return orphaned;
+}
+
+/**
+ * Reads the most recent transactions from the Transactions sheet.
+ * Scans up to `limit` non-empty rows starting from the bottom of the ledger.
+ */
+function getRecentTransactions(sheet, limit) {
+  const safeLimit = Math.max(1, Math.min(limit || 50, 200));
+  const lastRow = findLastTransactionRow(sheet);
+  if (lastRow < 10) return [];
+
+  const startRow = Math.max(10, lastRow - safeLimit + 1);
+  const numRows = lastRow - startRow + 1;
+
+  // Read C (Date) through L (Notes) -> 10 columns (cols 3 to 12)
+  const rangeValues = sheet.getRange(startRow, COL_DATE, numRows, 10).getValues();
+  const transactions = [];
+
+  for (let i = rangeValues.length - 1; i >= 0; i--) {
+    const rowNum = startRow + i;
+    const row = rangeValues[i];
+    const dateVal = row[0];
+    const typeVal = String(row[1] || '').trim();
+    const catVal = String(row[4] || '').trim();
+    const descVal = String(row[5] || '').trim();
+    const amtVal = row[7];
+    const acctVal = String(row[8] || '').trim();
+    const notesVal = String(row[9] || '').trim();
+
+    // Skip empty or header rows
+    if (!dateVal && !typeVal && !amtVal) continue;
+    if (String(dateVal).toLowerCase() === 'date' || typeVal.toLowerCase() === 'type') continue;
+
+    let formattedDate = '';
+    if (dateVal instanceof Date) {
+      formattedDate = Utilities.formatDate(dateVal, 'Africa/Nairobi', 'yyyy-MM-dd');
+    } else if (dateVal) {
+      formattedDate = String(dateVal).split('T')[0];
+    }
+
+    // Extract transaction code from Notes if present
+    let txCode = '';
+    const codeMatch = notesVal.match(/M-PESA Code:\s*([A-Z0-9_\-]+)/i) || notesVal.match(/\b([A-Z0-9]{8,15}(?:-FEE)?)\b/i);
+    if (codeMatch) {
+      txCode = codeMatch[1].trim();
+    } else {
+      txCode = 'ROW-' + rowNum;
+    }
+
+    transactions.push({
+      row: rowNum,
+      date: formattedDate,
+      transactionCode: txCode,
+      type: typeVal || 'Expenses',
+      category: catVal || '',
+      description: descVal || '',
+      amount: typeof amtVal === 'number' ? amtVal : parseFloat(String(amtVal || '0').replace(/,/g, '')) || 0,
+      account: acctVal || 'Mpesa',
+      notes: notesVal,
+      status: 'SYNCED'
+    });
+  }
+
+  return transactions;
 }
 
 /**

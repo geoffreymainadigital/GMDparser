@@ -748,6 +748,26 @@ async function fetchTaxonomyFromApi() {
   }
 }
 
+// Live Transactions Synchronizer (Loads confirmed transactions from Google Sheets via /api/transactions)
+async function fetchLiveTransactions() {
+  try {
+    const res = await fetch('/api/transactions?limit=100');
+    if (!res.ok) {
+      console.warn('Transactions API responded with status', res.status);
+      return;
+    }
+    const json = await res.json();
+    if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+      state.confirmedRecords = json.data;
+      renderLedgerTables();
+      updateDashboardMetrics();
+      console.log(`✓ Synchronized ${json.data.length} live transactions from Google Sheets`);
+    }
+  } catch (err) {
+    console.warn('Could not fetch live transactions:', err.message);
+  }
+}
+
 // Main Initialization
 document.addEventListener('DOMContentLoaded', () => {
   initNavigation();
@@ -755,6 +775,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderLedgerTables();
   checkNetworkStatus();
   fetchTaxonomyFromApi();
+  fetchLiveTransactions();
 
   // Quick SMS Parse button
   const parseBtn = document.getElementById('btn-parse-sms');
