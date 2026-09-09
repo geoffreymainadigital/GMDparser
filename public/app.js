@@ -238,17 +238,47 @@ function parseMpesaMessage(smsBody) {
     const dateStr = receivedMatch[3];
     const timeStr = receivedMatch[4];
 
+    const sLower = sender.toLowerCase();
+    const isSavingsWithdrawal = sLower.includes('sanlam') ||
+      sLower.includes('britam') ||
+      sLower.includes('etica') ||
+      sLower.includes('ziidi') ||
+      sLower.includes('cic') ||
+      sLower.includes('arvocap') ||
+      sLower.includes('faida') ||
+      sLower.includes('aib') ||
+      sLower.includes('mmf');
+
+    let finalType = 'Income';
+    let finalCat = 'Salary';
+    let finalAmt = amount;
+    let finalDesc = `Received from ${sender}`;
+
+    if (isSavingsWithdrawal) {
+      finalType = 'Savings';
+      finalAmt = -Math.abs(amount);
+      finalDesc = `Withdrawal from ${sender}`;
+      if (sLower.includes('sanlam')) finalCat = 'Sanlam MMF';
+      else if (sLower.includes('britam')) finalCat = 'Britam EQ and MMF';
+      else if (sLower.includes('etica')) finalCat = 'Etica MMF';
+      else if (sLower.includes('ziidi')) finalCat = 'Ziidi MMF';
+      else if (sLower.includes('faida')) finalCat = 'Faida Stocks';
+      else if (sLower.includes('aib')) finalCat = 'AIB Stocks';
+      else if (sLower.includes('arvocap')) finalCat = 'Arvocap';
+      else finalCat = 'Sanlam MMF';
+    }
+
     return {
       transactionCode,
-      amount,
+      amount: finalAmt,
       balance,
       cost: 0,
       date: formatIsoDate(dateStr),
       time: timeStr,
       sender,
-      description: `Received from ${sender}`,
-      type: 'Income',
-      category: 'Salary',
+      description: finalDesc,
+      type: finalType,
+      category: finalCat,
       account: 'Mpesa',
       destinationAccount: null,
       rawText: trimmed

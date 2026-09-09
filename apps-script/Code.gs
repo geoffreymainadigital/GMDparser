@@ -642,8 +642,10 @@ function validateTransactionPayload(tx) {
   }
 
   const amount = Number(tx.amount);
-  if (isNaN(amount) || amount <= 0) {
-    errors.push('Amount must be a positive non-zero number');
+  if (isNaN(amount) || amount === 0) {
+    errors.push('Amount must be a non-zero number');
+  } else if (amount < 0 && tx.type !== 'Savings') {
+    errors.push('Negative amounts are only valid for Savings transactions (withdrawals)');
   }
 
   if (!tx.date || typeof tx.date !== 'string') {

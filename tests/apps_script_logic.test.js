@@ -116,8 +116,10 @@ function validateTransactionPayload(tx) {
   }
 
   const amount = Number(tx.amount);
-  if (isNaN(amount) || amount <= 0) {
-    errors.push('Amount must be a positive non-zero number');
+  if (isNaN(amount) || amount === 0) {
+    errors.push('Amount must be a non-zero number');
+  } else if (amount < 0 && tx.type !== 'Savings') {
+    errors.push('Negative amounts are only valid for Savings transactions (withdrawals)');
   }
 
   if (!tx.date || typeof tx.date !== 'string') {
@@ -620,7 +622,47 @@ assert.strictEqual(accountsFunctionMatch[0].includes('setValues('), false, 'getA
 assert.strictEqual(accountsFunctionMatch[0].includes('appendRow('), false, 'getAccountsData must NOT call appendRow');
 console.log('✓ Test 26: getMonthlyDashboardData and getAccountsData are strictly read-only (0 write calls)');
 
+// --- Test 27: Negative amounts are accepted ONLY for Savings (withdrawals) ---
+const validSavingsWithdrawal = {
+  transactionCode: 'TD99WTH123',
+  amount: -1000,
+  type: 'Savings',
+  category: 'Sanlam MMF',
+  description: 'Sanlam MMF withdrawal to Mpesa',
+  account: 'Mpesa',
+  date: '2026-09-09'
+};
+const valSavingsResult = validateTransactionPayload(validSavingsWithdrawal);
+assert.strictEqual(valSavingsResult.isValid, true, 'Negative amount MUST be valid for Savings withdrawals');
+
+const invalidExpenseNegative = {
+  transactionCode: 'TD99NEG123',
+  amount: -500,
+  type: 'Expenses',
+  category: 'Mama Mboga',
+  description: 'Invalid negative expense',
+  account: 'Mpesa',
+  date: '2026-09-09'
+};
+const valExpResult = validateTransactionPayload(invalidExpenseNegative);
+assert.strictEqual(valExpResult.isValid, false, 'Negative amount must be REJECTED for Expenses');
+assert.ok(valExpResult.errors.some(e => e.includes('Negative amounts are only valid for Savings')), 'Must have specific error message for invalid negative type');
+
+const zeroAmountTx = {
+  transactionCode: 'TD99ZER123',
+  amount: 0,
+  type: 'Savings',
+  category: 'Sanlam MMF',
+  description: 'Zero amount transaction',
+  account: 'Mpesa',
+  date: '2026-09-09'
+};
+const valZeroResult = validateTransactionPayload(zeroAmountTx);
+assert.strictEqual(valZeroResult.isValid, false, 'Zero amount must be REJECTED');
+console.log('✓ Test 27: Negative amounts are allowed for Savings withdrawals and rejected for other types/zero');
+
 console.log('\n========================================================================');
-console.log('ALL 26 CRITICAL INVARIANT TESTS PASSED WITH 100% SPECIFICATION FIDELITY!');
+console.log('ALL 27 CRITICAL INVARIANT TESTS PASSED WITH 100% SPECIFICATION FIDELITY!');
 console.log('========================================================================\n');
+
 

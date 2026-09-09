@@ -171,8 +171,10 @@ object TransactionRepository {
         tx: Transaction,
         authKey: String? = null
     ): Result<ApiResponse> {
-        if (tx.amount <= 0.0)
-            return Result.failure(IllegalArgumentException("Amount must be greater than zero."))
+        if (tx.amount == 0.0)
+            return Result.failure(IllegalArgumentException("Amount must be a non-zero number."))
+        if (tx.amount < 0.0 && tx.type != "Savings")
+            return Result.failure(IllegalArgumentException("Negative amounts are only valid for Savings transactions (withdrawals)."))
         if (tx.transactionCode.isBlank())
             return Result.failure(IllegalArgumentException("Transaction code cannot be blank."))
         if (tx.type == "Transfer" && tx.destinationAccount.isNullOrBlank())

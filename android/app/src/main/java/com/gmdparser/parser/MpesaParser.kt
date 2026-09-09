@@ -135,12 +135,40 @@ object MpesaParser {
                 sender = phoneMatch.groupValues[1].trim()
             }
 
+            val sLower = sender.lowercase(Locale.ROOT)
+            val isSavingsWithdrawal = sLower.contains("sanlam") ||
+                sLower.contains("britam") ||
+                sLower.contains("etica") ||
+                sLower.contains("ziidi") ||
+                sLower.contains("cic") ||
+                sLower.contains("arvocap") ||
+                sLower.contains("faida") ||
+                sLower.contains("aib") ||
+                sLower.contains("mmf")
+
+            val (finalType, finalCat, finalAmt, finalDesc) = if (isSavingsWithdrawal) {
+                val cat = when {
+                    sLower.contains("sanlam") -> "Sanlam MMF"
+                    sLower.contains("britam") -> "Britam EQ and MMF"
+                    sLower.contains("etica") -> "Etica MMF"
+                    sLower.contains("ziidi") -> "Ziidi MMF"
+                    sLower.contains("faida") -> "Faida Stocks"
+                    sLower.contains("aib") -> "AIB Stocks"
+                    sLower.contains("arvocap") -> "Arvocap"
+                    else -> "Sanlam MMF"
+                }
+                // Savings withdrawal is recorded as a negative amount
+                listOf("Savings", cat, -Math.abs(amount), "Withdrawal from $sender")
+            } else {
+                listOf("Income", "Salary", amount, "Received from $sender")
+            }
+
             return Transaction(
                 transactionCode = txCode,
-                amount = amount,
-                type = "Income",
-                category = "Salary",
-                description = "Received from $sender",
+                amount = finalAmt as Double,
+                type = finalType as String,
+                category = finalCat as String,
+                description = finalDesc as String,
                 account = "Mpesa",
                 date = formatIsoDate(dateStr),
                 time = timeStr,
