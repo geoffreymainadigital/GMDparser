@@ -787,6 +787,137 @@ async function fetchLiveTransactions() {
   }
 }
 
+// Live Monthly Dashboard & Account Balances Synchronizer
+let currentCatSection = 'Income';
+
+async function fetchMonthlyDashboard() {
+  try {
+    let res = await fetch('/api/dashboard');
+    if (!res.ok) {
+      console.warn('Vercel /api/dashboard returned', res.status, 'trying direct Apps Script fallback...');
+      res = await fetch(`${FALLBACK_GAS_URL}?action=dashboard`);
+    }
+    if (!res.ok) {
+      console.warn('Could not fetch dashboard from fallback either, status:', res.status);
+      return;
+    }
+    const json = await res.json();
+    if (json.success) {
+      state.monthlyData = json.month;
+      state.accountsData = json.accounts;
+      renderMonthlyDashboard();
+      renderAccountsBalanceTable();
+      console.log('✓ Synchronized live monthly budget and account balances from Google Sheets:', json);
+    }
+  } catch (err) {
+    console.warn('Could not fetch live dashboard:', err.message);
+    try {
+      const fbRes = await fetch(`${FALLBACK_GAS_URL}?action=dashboard`);
+      if (fbRes.ok) {
+        const json = await fbRes.json();
+        if (json.success) {
+          state.monthlyData = json.month;
+          state.accountsData = json.accounts;
+          renderMonthlyDashboard();
+          renderAccountsBalanceTable();
+        }
+      }
+    } catch (fbErr) {
+      console.warn('Dashboard fallback error:', fbErr.message);
+    }
+  }
+}
+
+function renderMonthlyDashboard() {
+  if (!state.monthlyData) return;
+  const m = state.monthlyData;
+
+  const badge = document.getElementById('monthly-sheet-badge');
+  const title = document.getElementById('monthly-budget-title');
+  if (badge) badge.textContent = `SHEET: ${m.month}`;
+  if (title) title.textContent = `Monthly Budget & Tracking (${m.month})`;
+
+  const tiles = m.summaryTiles || {};
+  function setTile(prefix, t) {
+    const valEl = document.getElementById(`tile-${prefix}-val`);
+    const subEl = document.getElementById(`tile-${prefix}-sub`);
+    if (valEl && t) {
+      valEl.textContent = `Ksh ${Number(t.actual || 0).toLocaleString('en-KE', { minimumFractionDigits: 2 })}`;
+    }
+    if (subEl && t) {
+      if (t.goal !== undefined) {
+        subEl.textContent = `Goal: Ksh ${Number(t.goal || 0).toLocaleString('en-KE', { minimumFractionDigits: 2 })} • ${t.statusText || ''}`;
+      } else {
+        subEl.textContent = t.statusText || 'Remaining balance';
+      }
+    }
+  }
+
+  setTile('income', tiles.totalIncome);
+  setTile('bills', tiles.totalBills);
+  setTile('debt', tiles.totalDebtPayoff);
+  setTile('expenses', tiles.totalExpenses);
+  setTile('savings', tiles.totalSavings);
+
+  const unallocEl = document.getElementById('tile-unallocated-val');
+  if (unallocEl && tiles.unallocatedIncome) {
+    unallocEl.textContent = `Ksh ${Number(tiles.unallocatedIncome.actual || 0).toLocaleString('en-KE', { minimumFractionDigits: 2 })}`;
+  }
+
+  renderCategoryTable(currentCatSection);
+}
+
+function renderCategoryTable(section) {
+  currentCatSection = section || 'Income';
+  const tbody = document.getElementById('month-categories-tbody');
+  if (!tbody) return;
+
+  // Update chip active states
+  document.querySelectorAll('#cat-tabs button').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-cat-section') === currentCatSection);
+  });
+
+  const tables = (state.monthlyData && state.monthlyData.tables) || {};
+  const items = tables[currentCatSection] || [];
+
+  if (items.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted">No ${currentCatSection} categories found in monthly sheet.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = items.map(item => {
+    const diffColor = item.diff < 0 ? 'text-amber' : (item.diff > 0 ? 'text-green' : '');
+    return `
+      <tr>
+        <td><strong>${item.category}</strong></td>
+        <td>Ksh ${Number(item.goal).toLocaleString('en-KE', { minimumFractionDigits: 2 })}</td>
+        <td>Ksh ${Number(item.actual).toLocaleString('en-KE', { minimumFractionDigits: 2 })}</td>
+        <td class="${diffColor}">Ksh ${Number(item.diff).toLocaleString('en-KE', { minimumFractionDigits: 2 })}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function renderAccountsBalanceTable() {
+  const tbody = document.getElementById('accounts-balance-tbody');
+  if (!tbody || !Array.isArray(state.accountsData)) return;
+
+  if (state.accountsData.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted">No account balances found.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = state.accountsData.map(a => `
+    <tr>
+      <td><strong>${a.accountName}</strong></td>
+      <td>Ksh ${Number(a.startBalance).toLocaleString('en-KE', { minimumFractionDigits: 2 })}</td>
+      <td><strong>Ksh ${Number(a.currentBalance).toLocaleString('en-KE', { minimumFractionDigits: 2 })}</strong></td>
+      <td class="text-green">+Ksh ${Number(a.deposits).toLocaleString('en-KE', { minimumFractionDigits: 2 })}</td>
+      <td class="text-amber">Ksh ${Number(a.withdrawals).toLocaleString('en-KE', { minimumFractionDigits: 2 })}</td>
+    </tr>
+  `).join('');
+}
+
 // Main Initialization
 document.addEventListener('DOMContentLoaded', () => {
   initNavigation();
@@ -795,6 +926,15 @@ document.addEventListener('DOMContentLoaded', () => {
   checkNetworkStatus();
   fetchTaxonomyFromApi();
   fetchLiveTransactions();
+  fetchMonthlyDashboard();
+
+  // Category Tabs click handlers
+  document.querySelectorAll('#cat-tabs button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const sec = btn.getAttribute('data-cat-section');
+      renderCategoryTable(sec);
+    });
+  });
 
   // Quick SMS Parse button
   const parseBtn = document.getElementById('btn-parse-sms');

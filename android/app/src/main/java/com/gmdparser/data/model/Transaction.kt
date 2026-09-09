@@ -141,3 +141,49 @@ data class AuthCheckResponse(
     @SerializedName("error") val error: String? = null
 )
 
+data class SummaryTile(
+    @SerializedName("actual") val actual: Double = 0.0,
+    @SerializedName("goal") val goal: Double? = null,
+    @SerializedName("diff") val diff: Double? = null,
+    @SerializedName("statusText") val statusText: String? = null
+)
+
+data class SummaryTiles(
+    @SerializedName("totalIncome") val totalIncome: SummaryTile? = null,
+    @SerializedName("totalBills") val totalBills: SummaryTile? = null,
+    @SerializedName("totalDebtPayoff") val totalDebtPayoff: SummaryTile? = null,
+    @SerializedName("totalExpenses") val totalExpenses: SummaryTile? = null,
+    @SerializedName("totalSavings") val totalSavings: SummaryTile? = null,
+    @SerializedName("unallocatedIncome") val unallocatedIncome: SummaryTile? = null
+)
+
+data class CategoryItem(
+    @SerializedName("category") val category: String,
+    @SerializedName("goal") val goal: Double = 0.0,
+    @SerializedName("actual") val actual: Double = 0.0,
+    @SerializedName("diff") val diff: Double = 0.0
+)
+
+data class MonthlyDashboardData(
+    @SerializedName("month") val month: String,
+    @SerializedName("summaryTiles") val summaryTiles: SummaryTiles,
+    @SerializedName("tables") val tables: Map<String, List<CategoryItem>>
+)
+
+data class AccountBalanceItem(
+    @SerializedName("accountName") val accountName: String,
+    @SerializedName("startBalance") val startBalance: Double = 0.0,
+    @SerializedName("currentBalance") val currentBalance: Double = 0.0,
+    @SerializedName("deposits") val deposits: Double = 0.0,
+    @SerializedName("withdrawals") val withdrawals: Double = 0.0
+)
+
+data class DashboardResponse(
+    @SerializedName("success") val success: Boolean,
+    @SerializedName("month") val month: MonthlyDashboardData? = null,
+    @SerializedName("accounts") val accounts: List<AccountBalanceItem>? = null,
+    @SerializedName("timestamp") val timestamp: String? = null,
+    @SerializedName("error") val error: String? = null
+)
+
+

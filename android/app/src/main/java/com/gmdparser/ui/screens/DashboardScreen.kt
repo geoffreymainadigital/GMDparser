@@ -31,6 +31,11 @@ fun DashboardScreen(
 ) {
     val pendingList by TransactionRepository.pendingTransactions.collectAsState()
     val confirmedList by TransactionRepository.confirmedTransactions.collectAsState()
+    val dashboardResponse by TransactionRepository.dashboardData.collectAsState()
+
+    LaunchedEffect(Unit) {
+        TransactionRepository.fetchDashboard()
+    }
 
     var testSmsText by remember { mutableStateOf("") }
     var parseFeedback by remember { mutableStateOf<String?>(null) }
@@ -94,6 +99,63 @@ fun DashboardScreen(
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+
+        // Monthly Budget Sheet Live Card (if loaded)
+        val monthData = dashboardResponse?.month
+        if (monthData != null) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, DarkSurfaceBorder, RoundedCornerShape(16.dp))
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Monthly Budget (${monthData.month})",
+                            color = TextPrimary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp
+                        )
+                        Surface(
+                            color = AccentCyan.copy(alpha = 0.2f),
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Text(
+                                text = "LIVE",
+                                color = AccentCyan,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    val tiles = monthData.summaryTiles
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        BudgetSummaryTile("Income", tiles.totalIncome?.actual ?: 0.0, tiles.totalIncome?.goal, MpesaGreen, Modifier.weight(1f))
+                        BudgetSummaryTile("Bills", tiles.totalBills?.actual ?: 0.0, tiles.totalBills?.goal, AccentAmber, Modifier.weight(1f))
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        BudgetSummaryTile("Debt", tiles.totalDebtPayoff?.actual ?: 0.0, tiles.totalDebtPayoff?.goal, AccentBlue, Modifier.weight(1f))
+                        BudgetSummaryTile("Expenses", tiles.totalExpenses?.actual ?: 0.0, tiles.totalExpenses?.goal, AccentRed, Modifier.weight(1f))
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        BudgetSummaryTile("Savings", tiles.totalSavings?.actual ?: 0.0, tiles.totalSavings?.goal, AccentCyan, Modifier.weight(1f))
+                        BudgetSummaryTile("Unallocated", tiles.unallocatedIncome?.actual ?: 0.0, null, TextSecondary, Modifier.weight(1f))
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
 
         // Pending Reviews Call-To-Action Banner (if any pending)
         if (pendingList.isNotEmpty()) {
@@ -274,6 +336,40 @@ fun MetricQuickCard(
             Spacer(modifier = Modifier.height(8.dp))
             Text(title, color = TextMuted, fontSize = 11.sp)
             Text(value, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+fun BudgetSummaryTile(
+    label: String,
+    actual: Double,
+    goal: Double?,
+    color: androidx.compose.ui.graphics.Color,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        color = DarkBackground,
+        shape = RoundedCornerShape(10.dp),
+        modifier = modifier
+    ) {
+        Column(modifier = Modifier.padding(10.dp)) {
+            Text(text = label, color = TextMuted, fontSize = 11.sp)
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = "Ksh ${String.format("%,.0f", actual)}",
+                color = color,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold
+            )
+            if (goal != null) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "Goal: Ksh ${String.format("%,.0f", goal)}",
+                    color = TextSecondary,
+                    fontSize = 10.sp
+                )
+            }
         }
     }
 }

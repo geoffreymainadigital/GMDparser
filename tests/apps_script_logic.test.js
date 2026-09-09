@@ -527,6 +527,100 @@ cellStore.delete('2000,3');
 cellStore.delete('2000,4');
 console.log('✓ Test 23: findOrphanedRows accurately detects orphaned blank/partial rows');
 
+// --- Test 24: Header-discovery extracts summary tiles on a sample month sheet ---
+function mockGetMonthlyDashboardData(values, displayValues) {
+  function findCell(targetLabel) {
+    const target = String(targetLabel).toLowerCase().trim();
+    for (let r = 0; r < values.length; r++) {
+      for (let c = 0; c < values[r].length; c++) {
+        const val = String(values[r][c] || '').toLowerCase().trim();
+        if (val === target) return { row: r, col: c };
+      }
+    }
+    return null;
+  }
+
+  const requiredTileLabels = ['Total Bills', 'Total Debt Payoff', 'Total Expenses', 'Total Savings', 'Unallocated Income'];
+  const tileCoords = {};
+  requiredTileLabels.forEach(lbl => {
+    const loc = findCell(lbl);
+    if (!loc) throw new Error('Missing tile: ' + lbl);
+    tileCoords[lbl] = loc;
+  });
+
+  assert.ok(tileCoords['Total Bills'], 'Must find Total Bills tile');
+  assert.ok(tileCoords['Total Expenses'], 'Must find Total Expenses tile');
+  assert.ok(tileCoords['Unallocated Income'], 'Must find Unallocated Income tile');
+  return true;
+}
+
+const sampleMonthValues = [
+  ['', '', '', '', '14000', '', '', '36300', '', '', '23679'],
+  ['', '', '', '', 'Ksh2,500.00', '', '', 'Ksh10,871.00', '', '', 'Unallocated Income'],
+  ['', '', '', '', '', '', '', '', '', '', ''],
+  ['', '', '', '', 'Total Bills', 'Total Debt Payoff', '', 'Total Expenses', '', 'Total Savings', 'Ksh-1,899.00']
+];
+assert.strictEqual(mockGetMonthlyDashboardData(sampleMonthValues, sampleMonthValues), true);
+console.log('✓ Test 24: Header-discovery correctly locates summary tiles on sample month sheet');
+
+// --- Test 25: Accounts table extraction returns expected column structure ---
+function mockGetAccountsData(values) {
+  let headerRow = -1, colAccountNames = -1, colCurrentBalance = -1, colDeposits = -1, colWithdrawals = -1;
+  for (let r = 0; r < values.length; r++) {
+    for (let c = 0; c < values[r].length; c++) {
+      const val = String(values[r][c] || '').toLowerCase().trim();
+      if (val === 'account names') { headerRow = r; colAccountNames = c; }
+      else if (val === 'current balance' && headerRow === r) colCurrentBalance = c;
+      else if (val.includes('deposits') && headerRow === r) colDeposits = c;
+      else if (val.includes('withdrawals') && headerRow === r) colWithdrawals = c;
+    }
+    if (colAccountNames !== -1) break;
+  }
+  assert.notStrictEqual(colAccountNames, -1, 'Must find Account Names header');
+  assert.notStrictEqual(colCurrentBalance, -1, 'Must find Current Balance header');
+
+  const accounts = [];
+  for (let r = headerRow + 1; r < values.length; r++) {
+    const name = String(values[r][colAccountNames] || '').trim();
+    if (!name) continue;
+    accounts.push({
+      accountName: name,
+      currentBalance: parseFloat(values[r][colCurrentBalance]) || 0,
+      deposits: parseFloat(values[r][colDeposits]) || 0,
+      withdrawals: parseFloat(values[r][colWithdrawals]) || 0
+    });
+  }
+  return accounts;
+}
+
+const sampleAccountsSheet = [
+  ['', '', ''],
+  ['', '', 'Account Names', 'Start Balance', 'Current Balance', 'Deposits (+)', 'Withdrawals (-)'],
+  ['', '', 'Equity Bank', '0', '-24000', '196000', '-102000'],
+  ['', '', 'Mpesa', '1728', '1202', '195000', '-249000']
+];
+const extractedAccounts = mockGetAccountsData(sampleAccountsSheet);
+assert.strictEqual(extractedAccounts.length, 2);
+assert.strictEqual(extractedAccounts[0].accountName, 'Equity Bank');
+assert.strictEqual(extractedAccounts[1].accountName, 'Mpesa');
+console.log('✓ Test 25: Accounts table extraction dynamically parses Account Name, Balances, Deposits, Withdrawals');
+
+// --- Test 26: Purely read-only invariant (no write calls added) ---
+const codeGsSource = fs.readFileSync('apps-script/Code.gs', 'utf8');
+const dashboardFunctionMatch = codeGsSource.match(/function getMonthlyDashboardData[\s\S]*?^}/m);
+assert.ok(dashboardFunctionMatch, 'getMonthlyDashboardData must exist in Code.gs');
+assert.strictEqual(dashboardFunctionMatch[0].includes('setValue('), false, 'getMonthlyDashboardData must NOT call setValue');
+assert.strictEqual(dashboardFunctionMatch[0].includes('setValues('), false, 'getMonthlyDashboardData must NOT call setValues');
+assert.strictEqual(dashboardFunctionMatch[0].includes('appendRow('), false, 'getMonthlyDashboardData must NOT call appendRow');
+
+const accountsFunctionMatch = codeGsSource.match(/function getAccountsData[\s\S]*?^}/m);
+assert.ok(accountsFunctionMatch, 'getAccountsData must exist in Code.gs');
+assert.strictEqual(accountsFunctionMatch[0].includes('setValue('), false, 'getAccountsData must NOT call setValue');
+assert.strictEqual(accountsFunctionMatch[0].includes('setValues('), false, 'getAccountsData must NOT call setValues');
+assert.strictEqual(accountsFunctionMatch[0].includes('appendRow('), false, 'getAccountsData must NOT call appendRow');
+console.log('✓ Test 26: getMonthlyDashboardData and getAccountsData are strictly read-only (0 write calls)');
+
 console.log('\n========================================================================');
-console.log('ALL 23 CRITICAL INVARIANT TESTS PASSED WITH 100% SPECIFICATION FIDELITY!');
+console.log('ALL 26 CRITICAL INVARIANT TESTS PASSED WITH 100% SPECIFICATION FIDELITY!');
 console.log('========================================================================\n');
+

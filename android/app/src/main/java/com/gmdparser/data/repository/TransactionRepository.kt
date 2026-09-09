@@ -44,6 +44,24 @@ object TransactionRepository {
     private val _confirmedTransactions = MutableStateFlow<List<Transaction>>(emptyList())
     val confirmedTransactions: StateFlow<List<Transaction>> = _confirmedTransactions.asStateFlow()
 
+    private val _dashboardData = MutableStateFlow<com.gmdparser.data.model.DashboardResponse?>(null)
+    val dashboardData: StateFlow<com.gmdparser.data.model.DashboardResponse?> = _dashboardData.asStateFlow()
+
+    suspend fun fetchDashboard(): Result<com.gmdparser.data.model.DashboardResponse> {
+        return try {
+            val response = ApiClient.apiService.getDashboard()
+            if (response.isSuccessful && response.body() != null) {
+                val data = response.body()!!
+                _dashboardData.value = data
+                Result.success(data)
+            } else {
+                Result.failure(Exception("Dashboard fetch failed: ${response.code()} ${response.message()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     fun init(context: Context) {
         if (prefs != null) return
         val sp = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)

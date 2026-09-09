@@ -133,6 +133,25 @@ async function runTests() {
   assert.strictEqual(res8.body.isAutoSync, false);
   console.log('✓ POST /api/auto-sync-sms correctly rejected unconfirmed write with 403');
 
+  // 9. Dashboard proxy handler test (unconfigured Apps Script URL returns real 503 error)
+  const dashboardHandler = (await import('../web/api/dashboard.js')).default;
+  const req9 = createMockReq({ method: 'GET' });
+  const res9 = createMockRes();
+  delete process.env.APPS_SCRIPT_URL;
+  await dashboardHandler(req9, res9);
+  assert.strictEqual(res9.statusCode, 503);
+  assert.strictEqual(res9.body.success, false);
+  assert.strictEqual(res9.body.error, 'APPS_SCRIPT_URL not configured');
+  console.log('✓ GET /api/dashboard returns 503 error when APPS_SCRIPT_URL is not set (fail-closed, no fake data)');
+
+  // 10. Dashboard proxy method not allowed test
+  const req10 = createMockReq({ method: 'POST' });
+  const res10 = createMockRes();
+  await dashboardHandler(req10, res10);
+  assert.strictEqual(res10.statusCode, 405);
+  assert.strictEqual(res10.body.success, false);
+  console.log('✓ POST /api/dashboard returns 405 Method Not Allowed');
+
   console.log('\nAll Vercel API proxy unit tests PASSED successfully.');
 }
 
@@ -140,3 +159,4 @@ runTests().catch(err => {
   console.error('Test execution failed:', err);
   process.exit(1);
 });
+

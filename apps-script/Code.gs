@@ -121,6 +121,19 @@ function doGet(e) {
       }, 200);
     }
 
+    if (action === 'dashboard') {
+      const targetSs = (e && e.parameter && e.parameter.spreadsheetId) ?
+        SpreadsheetApp.openById(e.parameter.spreadsheetId) : ss;
+      const monthData = getMonthlyDashboardData(targetSs);
+      const accountsData = getAccountsData(targetSs);
+      return createJsonResponse({
+        success: true,
+        month: monthData,
+        accounts: accountsData,
+        timestamp: new Date().toISOString()
+      }, 200);
+    }
+
 
     return createJsonResponse({
       success: false,
@@ -1199,6 +1212,318 @@ function testTaxonomyAgainstSpreadsheet(spreadsheetId) {
   return taxonomy;
 }
 
+
+/**
+ * Programmatically discovers and parses the current month sheet (Read-Only)
+ */
+function getMonthlyDashboardData(ss) {
+  const monthNames = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+  const now = new Date();
+  const monthIndex = parseInt(Utilities.formatDate(now, 'Africa/Nairobi', 'M'), 10) - 1;
+  const currentMonthCode = monthNames[monthIndex];
+
+  const sheetNames = ss.getSheets().map(function (s) { return s.getName(); });
+  let targetSheetName = currentMonthCode;
+  if (sheetNames.indexOf(targetSheetName) === -1) {
+    const found = sheetNames.find(function (n) { return monthNames.indexOf(n.toUpperCase().trim()) !== -1; });
+    if (!found) {
+      throw new Error('Could not dynamically find any monthly budget sheet (searched: ' + monthNames.join(', ') + ')');
+    }
+    targetSheetName = found;
+  }
+
+  const sheet = ss.getSheetByName(targetSheetName);
+  if (!sheet) {
+    throw new Error('Sheet "' + targetSheetName + '" not found in spreadsheet.');
+  }
+
+  const maxRows = Math.min(sheet.getMaxRows ? sheet.getMaxRows() : 160, 200);
+  const maxCols = Math.min(sheet.getMaxColumns ? sheet.getMaxColumns() : 90, 100);
+  const dataRange = sheet.getRange(1, 1, maxRows, maxCols);
+  const values = dataRange.getValues();
+  const displayValues = dataRange.getDisplayValues();
+
+  // Helper to search label in values
+  function findCell(targetLabel) {
+    const target = String(targetLabel).toLowerCase().trim();
+    for (let r = 0; r < values.length; r++) {
+      for (let c = 0; c < values[r].length; c++) {
+        const val = String(values[r][c] || '').toLowerCase().trim();
+        if (val === target) {
+          return { row: r, col: c };
+        }
+      }
+    }
+    return null;
+  }
+
+  // 1. Locate summary tiles (Strict header search)
+  const requiredTileLabels = [
+    'Total Bills',
+    'Total Debt Payoff',
+    'Total Expenses',
+    'Total Savings',
+    'Unallocated Income'
+  ];
+
+  const tileCoords = {};
+  requiredTileLabels.forEach(function (lbl) {
+    const loc = findCell(lbl);
+    if (!loc) {
+      throw new Error('Required dashboard summary tile label "' + lbl + '" was not found in sheet "' + targetSheetName + '".');
+    }
+    tileCoords[lbl] = loc;
+  });
+
+  function parseAmount(val) {
+    if (typeof val === 'number') return val;
+    if (!val) return 0;
+    const clean = String(val).replace(/[^0-9.\-]/g, '');
+    return parseFloat(clean) || 0;
+  }
+
+  function getTileData(loc, isUnderLabel) {
+    let actual = 0;
+    let goal = 0;
+    let diff = 0;
+    let percent = 0;
+    let status = '';
+
+    if (loc) {
+      const r = loc.row;
+      const c = loc.col;
+      // Actual amount is 2 rows above the label for bills/debt/expenses/savings
+      const actualRow = isUnderLabel ? (r + 1) : Math.max(0, r - 2);
+      actual = parseAmount(values[actualRow] && values[actualRow][c]);
+
+      // Row r - 3 has goal/budget (Row 1 in 1-based index)
+      if (!isUnderLabel && r >= 3) {
+        goal = parseAmount(values[r - 3] && values[r - 3][c]);
+      }
+
+      // Status indicator row (e.g. Row 6 in 1-based index = r + 2)
+      if (r + 2 < values.length) {
+        status = String(displayValues[r + 2][c] || '').trim();
+        if (!status && c > 0) {
+          status = String(displayValues[r + 2][c + 1] || displayValues[r + 2][c - 1] || '').trim();
+        }
+      }
+    }
+    return { actual: actual, goal: goal, diff: actual - goal, statusText: status };
+  }
+
+  const billsTile = getTileData(tileCoords['Total Bills'], false);
+  const debtTile = getTileData(tileCoords['Total Debt Payoff'], false);
+  const expensesTile = getTileData(tileCoords['Total Expenses'], false);
+  const savingsTile = getTileData(tileCoords['Total Savings'], false);
+
+  // Unallocated income tile
+  const unallocatedLoc = tileCoords['Unallocated Income'];
+  const unallocatedActual = parseAmount(values[unallocatedLoc.row + 2] && values[unallocatedLoc.row + 2][unallocatedLoc.col]);
+
+  // 2. Discover Category Tables by searching for "Category" headers
+  const categoryHeaders = [];
+  for (let r = 0; r < values.length; r++) {
+    for (let c = 0; c < Math.min(10, values[r].length); c++) {
+      const val = String(values[r][c] || '').trim();
+      if (val === 'Category') {
+        categoryHeaders.push({ row: r, col: c });
+      }
+    }
+  }
+
+  if (categoryHeaders.length === 0) {
+    throw new Error('No "Category" header found in sheet "' + targetSheetName + '".');
+  }
+
+  // Map category headers to sections based on preceding section title in col B (index 1)
+  const tables = {
+    Income: [],
+    Bills: [],
+    Debt: [],
+    Expenses: [],
+    Savings: []
+  };
+
+  const sectionNames = ['Income', 'Bills', 'Debt', 'Expenses', 'Savings'];
+
+  categoryHeaders.forEach(function (h, idx) {
+    const r = h.row;
+    const headerRowValues = values[r];
+    
+    // Find Goal/Budget, Actual, Diff columns in this header row
+    let goalCol = -1;
+    let actualCol = -1;
+    let diffCol = -1;
+
+    for (let c = h.col + 1; c < Math.min(h.col + 35, headerRowValues.length); c++) {
+      const cellText = String(headerRowValues[c] || '').toLowerCase().trim();
+      if (cellText === 'goal' || cellText === 'budget') {
+        goalCol = c;
+      } else if (cellText === 'actual') {
+        actualCol = c;
+      } else if (cellText === 'diff' || cellText === 'diff.') {
+        diffCol = c;
+      }
+    }
+
+    if (actualCol === -1) {
+      return; // Not a standard category table
+    }
+
+    // Determine section name by looking backwards for section title
+    let detectedSection = sectionNames[idx] || 'Expenses';
+    for (let checkR = r - 1; checkR >= Math.max(0, r - 5); checkR--) {
+      const checkText = String(values[checkR][1] || values[checkR][0] || '').toUpperCase();
+      if (checkText.indexOf('INCOME') !== -1) { detectedSection = 'Income'; break; }
+      if (checkText.indexOf('BILL') !== -1) { detectedSection = 'Bills'; break; }
+      if (checkText.indexOf('DEBT') !== -1) { detectedSection = 'Debt'; break; }
+      if (checkText.indexOf('EXPENSE') !== -1) { detectedSection = 'Expenses'; break; }
+      if (checkText.indexOf('SAVING') !== -1) { detectedSection = 'Savings'; break; }
+    }
+
+    const items = [];
+    // Category values are located in col index 3 (Column D) right under Category (Column C, index 2)
+    const catValCol = h.col + 1;
+    for (let dataR = r + 1; dataR < values.length; dataR++) {
+      const rawCat = String(values[dataR][catValCol] || values[dataR][h.col] || '').trim();
+      if (!rawCat) break;
+      if (rawCat.indexOf('THIS SPREADSHEET') !== -1 || rawCat.indexOf('Total') !== -1) break;
+
+      // In the sheet, currency symbols ("Ksh") are at goalCol, actualCol, diffCol, and values are at +1
+      const gVal = goalCol !== -1 ? parseAmount(values[dataR][goalCol + 1] !== undefined && values[dataR][goalCol + 1] !== '' ? values[dataR][goalCol + 1] : values[dataR][goalCol]) : 0;
+      const aVal = actualCol !== -1 ? parseAmount(values[dataR][actualCol + 1] !== undefined && values[dataR][actualCol + 1] !== '' ? values[dataR][actualCol + 1] : values[dataR][actualCol]) : 0;
+      const dVal = diffCol !== -1 ? parseAmount(values[dataR][diffCol + 1] !== undefined && values[dataR][diffCol + 1] !== '' ? values[dataR][diffCol + 1] : values[dataR][diffCol]) : (aVal - gVal);
+
+      items.push({
+        category: rawCat,
+        goal: gVal,
+        actual: aVal,
+        diff: dVal
+      });
+    }
+
+    tables[detectedSection] = items;
+  });
+
+  // Calculate Total Income summary directly from Income table items
+  let totalIncomeGoal = 0;
+  let totalIncomeActual = 0;
+  tables.Income.forEach(function (item) {
+    totalIncomeGoal += item.goal;
+    totalIncomeActual += item.actual;
+  });
+
+  const incomeTile = {
+    actual: totalIncomeActual,
+    goal: totalIncomeGoal,
+    diff: totalIncomeActual - totalIncomeGoal,
+    statusText: Math.round((totalIncomeActual / (totalIncomeGoal || 1)) * 100) + '% of goal'
+  };
+
+  return {
+    month: targetSheetName,
+    summaryTiles: {
+      totalIncome: incomeTile,
+      totalBills: billsTile,
+      totalDebtPayoff: debtTile,
+      totalExpenses: expensesTile,
+      totalSavings: savingsTile,
+      unallocatedIncome: { actual: unallocatedActual }
+    },
+    tables: tables
+  };
+}
+
+/**
+ * Programmatically discovers and parses the Accounts tab (Read-Only)
+ */
+function getAccountsData(ss) {
+  const sheet = ss.getSheetByName('Accounts');
+  if (!sheet) {
+    throw new Error('Sheet "Accounts" not found in spreadsheet.');
+  }
+
+  const maxRows = Math.min(sheet.getMaxRows ? sheet.getMaxRows() : 50, 60);
+  const maxCols = Math.min(sheet.getMaxColumns ? sheet.getMaxColumns() : 50, 60);
+  const dataRange = sheet.getRange(1, 1, maxRows, maxCols);
+  const values = dataRange.getValues();
+
+  // Search for the table header row
+  let headerRow = -1;
+  let colAccountNames = -1;
+  let colStartBalance = -1;
+  let colCurrentBalance = -1;
+  let colDeposits = -1;
+  let colWithdrawals = -1;
+
+  for (let r = 0; r < values.length; r++) {
+    for (let c = 0; c < values[r].length; c++) {
+      const val = String(values[r][c] || '').toLowerCase().trim();
+      if (val === 'account names') {
+        headerRow = r;
+        colAccountNames = c;
+      } else if (val === 'start balance') {
+        colStartBalance = c;
+      } else if (val === 'current balance' && headerRow === r) {
+        colCurrentBalance = c;
+      } else if (val.indexOf('deposits') !== -1 && headerRow === r) {
+        colDeposits = c;
+      } else if (val.indexOf('withdrawals') !== -1 && headerRow === r) {
+        colWithdrawals = c;
+      }
+    }
+    if (colAccountNames !== -1) {
+      // Complete column discovery in this header row
+      for (let c = 0; c < values[headerRow].length; c++) {
+        const val = String(values[headerRow][c] || '').toLowerCase().trim();
+        if (val === 'start balance') colStartBalance = c;
+        if (val === 'current balance') colCurrentBalance = c;
+        if (val.indexOf('deposits') !== -1) colDeposits = c;
+        if (val.indexOf('withdrawals') !== -1) colWithdrawals = c;
+      }
+      break;
+    }
+  }
+
+  if (colAccountNames === -1) {
+    throw new Error('Required header "Account Names" not found in Accounts tab.');
+  }
+  if (colCurrentBalance === -1) {
+    throw new Error('Required header "Current Balance" not found in Accounts tab.');
+  }
+
+  function parseAmount(val) {
+    if (typeof val === 'number') return val;
+    if (!val) return 0;
+    const clean = String(val).replace(/[^0-9.\-]/g, '');
+    return parseFloat(clean) || 0;
+  }
+
+  const accounts = [];
+  // Standard Accounts list in this sheet
+  for (let r = headerRow + 1; r < values.length; r++) {
+    const acctName = String(values[r][colAccountNames] || '').trim();
+    if (!acctName) continue;
+    if (acctName.indexOf('Total') !== -1 || acctName.indexOf('THIS SPREADSHEET') !== -1) break;
+
+    // Numerical values are located in the column or column + 1 (if currency column is separate)
+    const startVal = colStartBalance !== -1 ? parseAmount(values[r][colStartBalance + 1] !== undefined && values[r][colStartBalance + 1] !== '' ? values[r][colStartBalance + 1] : values[r][colStartBalance]) : 0;
+    const currVal = colCurrentBalance !== -1 ? parseAmount(values[r][colCurrentBalance + 1] !== undefined && values[r][colCurrentBalance + 1] !== '' ? values[r][colCurrentBalance + 1] : values[r][colCurrentBalance]) : 0;
+    const depVal = colDeposits !== -1 ? parseAmount(values[r][colDeposits + 1] !== undefined && values[r][colDeposits + 1] !== '' ? values[r][colDeposits + 1] : values[r][colDeposits]) : 0;
+    const withVal = colWithdrawals !== -1 ? parseAmount(values[r][colWithdrawals + 1] !== undefined && values[r][colWithdrawals + 1] !== '' ? values[r][colWithdrawals + 1] : values[r][colWithdrawals]) : 0;
+
+    accounts.push({
+      accountName: acctName,
+      startBalance: startVal,
+      currentBalance: currVal,
+      deposits: depVal,
+      withdrawals: withVal
+    });
+  }
+
+  return accounts;
+}
 
 /**
  * Creates standardized JSON HTTP Response with CORS headers

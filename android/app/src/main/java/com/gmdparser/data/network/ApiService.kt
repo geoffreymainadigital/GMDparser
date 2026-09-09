@@ -27,6 +27,9 @@ interface ApiService {
     @GET("/api/taxonomy")
     suspend fun getTaxonomy(): Response<TaxonomyResponse>
 
+    @GET("/api/dashboard")
+    suspend fun getDashboard(): Response<com.gmdparser.data.model.DashboardResponse>
+
     @POST("/api/transaction")
     suspend fun recordTransaction(
         @Body request: CreateTransactionRequest,

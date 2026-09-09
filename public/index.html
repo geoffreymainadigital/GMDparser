@@ -133,6 +133,80 @@
             </div>
           </div>
 
+          <!-- Monthly Budget Live Summary (SEP) -->
+          <div class="card monthly-budget-card" id="card-monthly-budget">
+            <div class="card-header">
+              <div>
+                <h3 id="monthly-budget-title">Monthly Budget & Category Tracking</h3>
+                <p class="card-desc" id="monthly-budget-subtitle">Goal vs Actual summary synced from active month tab.</p>
+              </div>
+              <span class="tag tag-cyan" id="monthly-sheet-badge">SYNCING...</span>
+            </div>
+
+            <!-- Summary Tiles Grid -->
+            <div class="metrics-grid" id="monthly-tiles-grid">
+              <div class="metric-card">
+                <span class="metric-label">Total Income</span>
+                <div class="metric-val text-green" id="tile-income-val">Ksh 0.00</div>
+                <span class="metric-sub" id="tile-income-sub">Goal: Ksh 0.00</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Total Bills</span>
+                <div class="metric-val text-amber" id="tile-bills-val">Ksh 0.00</div>
+                <span class="metric-sub" id="tile-bills-sub">Budget: Ksh 0.00</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Total Debt Payoff</span>
+                <div class="metric-val text-blue" id="tile-debt-val">Ksh 0.00</div>
+                <span class="metric-sub" id="tile-debt-sub">Goal: Ksh 0.00</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Total Expenses</span>
+                <div class="metric-val text-red" id="tile-expenses-val">Ksh 0.00</div>
+                <span class="metric-sub" id="tile-expenses-sub">Budget: Ksh 0.00</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Total Savings</span>
+                <div class="metric-val text-cyan" id="tile-savings-val">Ksh 0.00</div>
+                <span class="metric-sub" id="tile-savings-sub">Goal: Ksh 0.00</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Unallocated Income</span>
+                <div class="metric-val" id="tile-unallocated-val">Ksh 0.00</div>
+                <span class="metric-sub">Remaining balance</span>
+              </div>
+            </div>
+
+            <!-- Category Breakdown Section -->
+            <div class="category-breakdown-wrapper" style="margin-top: 24px;">
+              <div style="display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap;" id="cat-tabs">
+                <button class="chip-btn active" data-cat-section="Income">Income</button>
+                <button class="chip-btn" data-cat-section="Bills">Bills</button>
+                <button class="chip-btn" data-cat-section="Debt">Debt</button>
+                <button class="chip-btn" data-cat-section="Expenses">Expenses</button>
+                <button class="chip-btn" data-cat-section="Savings">Savings</button>
+              </div>
+
+              <div class="table-container">
+                <table class="data-table" id="month-categories-table">
+                  <thead>
+                    <tr>
+                      <th>Category</th>
+                      <th>Goal / Budget</th>
+                      <th>Actual</th>
+                      <th>Diff (Remaining)</th>
+                    </tr>
+                  </thead>
+                  <tbody id="month-categories-tbody">
+                    <tr>
+                      <td colspan="4" class="text-center text-muted">Loading live monthly sheet data...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
           <!-- Recent Confirmed Transactions -->
           <div class="card">
             <div class="card-header">
@@ -238,6 +312,25 @@
 
             <div class="accounts-grid" id="accounts-grid">
               <!-- Rendered via JS -->
+            </div>
+
+            <div class="table-container" style="margin-top: 20px;">
+              <table class="data-table" id="accounts-balance-table">
+                <thead>
+                  <tr>
+                    <th>Account Name</th>
+                    <th>Start Balance</th>
+                    <th>Current Balance</th>
+                    <th>Deposits (+)</th>
+                    <th>Withdrawals (-)</th>
+                  </tr>
+                </thead>
+                <tbody id="accounts-balance-tbody">
+                  <tr>
+                    <td colspan="5" class="text-center text-muted">Loading live account balances...</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
 
