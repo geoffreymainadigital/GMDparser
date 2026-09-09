@@ -587,19 +587,28 @@ function updateDashboardMetrics() {
   if (elTrans) elTrans.textContent = `Ksh ${transfers.toLocaleString('en-KE', { minimumFractionDigits: 2 })}`;
 }
 
-// Accounts Initializer
+// Accounts Initializer & Synchronizer
 function renderAccountsAndBudgets() {
   const accountsGrid = document.getElementById('accounts-grid');
   if (accountsGrid) {
-    accountsGrid.innerHTML = state.accounts.map(a => `
-      <div class="account-item-card">
-        <div>
-          <div class="acc-title">${a.name}</div>
-          <div class="acc-type">${a.type}</div>
+    accountsGrid.innerHTML = state.accounts.map(a => {
+      let balance = a.balance || 0;
+      if (Array.isArray(state.accountsData)) {
+        const liveAcc = state.accountsData.find(la => la.accountName.toLowerCase() === a.name.toLowerCase());
+        if (liveAcc && liveAcc.currentBalance !== undefined) {
+          balance = liveAcc.currentBalance;
+        }
+      }
+      return `
+        <div class="account-item-card">
+          <div>
+            <div class="acc-title">${a.name}</div>
+            <div class="acc-type">${a.type}</div>
+          </div>
+          <div class="acc-bal">Ksh ${Number(balance).toLocaleString('en-KE', { minimumFractionDigits: 2 })}</div>
         </div>
-        <div class="acc-bal">Ksh ${a.balance.toLocaleString('en-KE', { minimumFractionDigits: 2 })}</div>
-      </div>
-    `).join('');
+      `;
+    }).join('');
   }
 }
 
@@ -806,6 +815,7 @@ async function fetchMonthlyDashboard() {
       state.monthlyData = json.month;
       state.accountsData = json.accounts;
       renderMonthlyDashboard();
+      renderAccountsAndBudgets();
       renderAccountsBalanceTable();
       console.log('✓ Synchronized live monthly budget and account balances from Google Sheets:', json);
     }
@@ -819,6 +829,7 @@ async function fetchMonthlyDashboard() {
           state.monthlyData = json.month;
           state.accountsData = json.accounts;
           renderMonthlyDashboard();
+          renderAccountsAndBudgets();
           renderAccountsBalanceTable();
         }
       }
