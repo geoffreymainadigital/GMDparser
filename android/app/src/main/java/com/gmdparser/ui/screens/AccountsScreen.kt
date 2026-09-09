@@ -9,12 +9,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -23,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gmdparser.data.repository.TransactionRepository
 import com.gmdparser.ui.theme.*
+import kotlinx.coroutines.launch
 
 data class AccountItem(
     val name: String,
@@ -34,6 +37,7 @@ data class AccountItem(
 @Composable
 fun AccountsScreen() {
     val dashboardResponse by TransactionRepository.dashboardData.collectAsState()
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         TransactionRepository.fetchDashboard()
@@ -42,10 +46,10 @@ fun AccountsScreen() {
     val liveAccounts = dashboardResponse?.accounts
 
     val staticAccounts = listOf(
-        AccountItem("Mpesa", "Mobile Money", Icons.Default.PhoneAndroid, isDefault = true),
         AccountItem("Equity Bank", "Bank Account", Icons.Default.AccountBalance),
         AccountItem("I&M Bank", "Bank Account", Icons.Default.AccountBalance),
         AccountItem("Cash", "Physical Cash", Icons.Default.AccountBalance),
+        AccountItem("Mpesa", "Mobile Money", Icons.Default.PhoneAndroid, isDefault = true),
         AccountItem("Till Number", "Merchant Account", Icons.Default.PhoneAndroid),
         AccountItem("Tower Sacco", "SACCO Account", Icons.Default.Savings),
         AccountItem("Airtime", "Telecom", Icons.Default.PhoneAndroid)
@@ -57,19 +61,32 @@ fun AccountsScreen() {
             .background(DarkBackground)
             .padding(16.dp)
     ) {
-        Text(
-            text = "Financial Accounts",
-            color = TextPrimary,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold
-        )
-        Text(
-            text = "Funding and destination accounts configured in production spreadsheet",
-            color = TextSecondary,
-            fontSize = 12.sp
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "Financial Accounts",
+                    color = TextPrimary,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Live balances from Accounts tab in Google Sheets",
+                    color = TextSecondary,
+                    fontSize = 12.sp
+                )
+            }
+            IconButton(onClick = {
+                scope.launch { TransactionRepository.fetchDashboard() }
+            }) {
+                Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = AccentCyan)
+            }
+        }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
         LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             items(staticAccounts) { acc ->
@@ -135,42 +152,82 @@ fun AccountsScreen() {
                             }
                         }
 
-                        if (liveAcct != null) {
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Divider(color = DarkSurfaceBorder, thickness = 1.dp)
-                            Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Divider(color = DarkSurfaceBorder, thickness = 1.dp)
+                        Spacer(modifier = Modifier.height(10.dp))
 
+                        val curBal = liveAcct?.currentBalance ?: 0.0
+                        val dep = liveAcct?.deposits ?: 0.0
+                        val wth = liveAcct?.withdrawals ?: 0.0
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column {
+                                Text("Current Balance", color = TextMuted, fontSize = 11.sp)
+                                Text(
+                                    text = "Ksh ${String.format("%,.2f", curBal)}",
+                                    color = if (curBal >= 0) TextPrimary else AccentRed,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 15.sp
+                                )
+                            }
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text("Deposits (+)", color = TextMuted, fontSize = 11.sp)
+                                Text(
+                                    text = "+Ksh ${String.format("%,.2f", dep)}",
+                                    color = MpesaGreen,
+                                    fontWeight = FontWeight.Medium,
+                                    fontSize = 12.sp
+                                )
+                            }
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text("Withdrawals (-)", color = TextMuted, fontSize = 11.sp)
+                                Text(
+                                    text = "Ksh ${String.format("%,.2f", wth)}",
+                                    color = AccentAmber,
+                                    fontWeight = FontWeight.Medium,
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // TOTAL Row
+            val totalAcct = liveAccounts?.firstOrNull { it.accountName.equals("TOTAL", ignoreCase = true) }
+            if (totalAcct != null) {
+                item {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, AccentCyan.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("TOTAL NET ACCOUNTS", color = AccentCyan, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Text(
+                                    text = "Ksh ${String.format("%,.2f", totalAcct.currentBalance)}",
+                                    color = if (totalAcct.currentBalance >= 0) MpesaGreen else AccentRed,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 15.sp
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Column {
-                                    Text("Current Balance", color = TextMuted, fontSize = 11.sp)
-                                    Text(
-                                        text = "Ksh ${String.format("%,.2f", liveAcct.currentBalance)}",
-                                        color = if (liveAcct.currentBalance >= 0) TextPrimary else AccentRed,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 15.sp
-                                    )
-                                }
-                                Column(horizontalAlignment = Alignment.End) {
-                                    Text("Deposits (+)", color = TextMuted, fontSize = 11.sp)
-                                    Text(
-                                        text = "+Ksh ${String.format("%,.2f", liveAcct.deposits)}",
-                                        color = MpesaGreen,
-                                        fontWeight = FontWeight.Medium,
-                                        fontSize = 12.sp
-                                    )
-                                }
-                                Column(horizontalAlignment = Alignment.End) {
-                                    Text("Withdrawals (-)", color = TextMuted, fontSize = 11.sp)
-                                    Text(
-                                        text = "Ksh ${String.format("%,.2f", liveAcct.withdrawals)}",
-                                        color = AccentAmber,
-                                        fontWeight = FontWeight.Medium,
-                                        fontSize = 12.sp
-                                    )
-                                }
+                                Text("Deposits: +Ksh ${String.format("%,.2f", totalAcct.deposits)}", color = MpesaGreen, fontSize = 11.sp)
+                                Text("Withdrawals: Ksh ${String.format("%,.2f", totalAcct.withdrawals)}", color = AccentAmber, fontSize = 11.sp)
                             }
                         }
                     }

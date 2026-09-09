@@ -47,18 +47,48 @@ object TransactionRepository {
     private val _dashboardData = MutableStateFlow<com.gmdparser.data.model.DashboardResponse?>(null)
     val dashboardData: StateFlow<com.gmdparser.data.model.DashboardResponse?> = _dashboardData.asStateFlow()
 
+    private const val FALLBACK_GAS_URL = "https://script.google.com/macros/s/AKfycbzLo8NZHU3rmGIT6R-une9xrjUqwIdSbUG6to1O_ZwohEbvST1-3MjpNvCaNq2TOF4_Xw/exec"
+
     suspend fun fetchDashboard(): Result<com.gmdparser.data.model.DashboardResponse> {
         return try {
             val response = ApiClient.apiService.getDashboard()
-            if (response.isSuccessful && response.body() != null) {
+            if (response.isSuccessful && response.body() != null && response.body()!!.success) {
                 val data = response.body()!!
                 _dashboardData.value = data
                 Result.success(data)
             } else {
-                Result.failure(Exception("Dashboard fetch failed: ${response.code()} ${response.message()}"))
+                fetchDashboardDirect()
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            fetchDashboardDirect()
+        }
+    }
+
+    private suspend fun fetchDashboardDirect(): Result<com.gmdparser.data.model.DashboardResponse> {
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val client = okhttp3.OkHttpClient.Builder()
+                    .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(20, java.util.concurrent.TimeUnit.SECONDS)
+                    .followRedirects(true)
+                    .build()
+                val request = okhttp3.Request.Builder()
+                    .url("$FALLBACK_GAS_URL?action=dashboard")
+                    .get()
+                    .build()
+                val res = client.newCall(request).execute()
+                val bodyStr = res.body?.string()
+                if (res.isSuccessful && !bodyStr.isNullOrBlank()) {
+                    val data = gson.fromJson(bodyStr, com.gmdparser.data.model.DashboardResponse::class.java)
+                    if (data != null && data.success) {
+                        _dashboardData.value = data
+                        return@withContext Result.success(data)
+                    }
+                }
+                Result.failure(Exception("Direct Apps Script fetch failed: ${res.code}"))
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
         }
     }
 
