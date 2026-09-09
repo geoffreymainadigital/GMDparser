@@ -44,8 +44,9 @@ object ApiClient {
 
         OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(90, TimeUnit.SECONDS)   // flush() + formula recalc can take 60-80s on large sheets
             .writeTimeout(30, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(false)      // Prevent silent re-sends that cause ghost duplicates
             .addInterceptor(logging)
             .build()
     }

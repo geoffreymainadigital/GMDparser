@@ -20,7 +20,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.gmdparser.data.model.DuplicateTransactionException
 import com.gmdparser.data.model.Transaction
 import com.gmdparser.data.model.TransactionStatus
 import com.gmdparser.data.repository.TaxonomyRepository
@@ -77,6 +76,12 @@ fun ReviewConfirmScreen(
             result.fold(
                 onSuccess = { res ->
                     val mainRow = res.data?.row
+                    val isDupOk = res.status == "DUPLICATE_OK"
+                    val mainLabel = if (isDupOk) {
+                        "✓ ${tx.transactionCode} already in sheet (row ${mainRow ?: "?"})"
+                    } else {
+                        "✓ ${tx.transactionCode} recorded (row ${mainRow ?: "sheet"})"
+                    }
                     if (shouldRecordFee && tx.cost != null && tx.cost > 0.0) {
                         kotlinx.coroutines.delay(1000)
                         val feeTx = Transaction(
@@ -94,36 +99,30 @@ fun ReviewConfirmScreen(
                         submittingTxCode = null
                         feeResult.fold(
                             onSuccess = { feeRes ->
+                                val feeRow = feeRes.data?.row
+                                val feeDupOk = feeRes.status == "DUPLICATE_OK"
                                 feedbackStyle = FeedbackStyle.SUCCESS
-                                feedbackMessage = "✓ ${tx.transactionCode} recorded (row ${mainRow ?: "sheet"}) + Fee recorded (row ${feeRes.data?.row ?: "sheet"})"
+                                feedbackMessage = if (feeDupOk) {
+                                    "$mainLabel + Fee already in sheet (row ${feeRow ?: "?"})"
+                                } else {
+                                    "$mainLabel + Fee recorded (row ${feeRow ?: "sheet"})"
+                                }
                             },
                             onFailure = { feeErr ->
-                                if (feeErr is DuplicateTransactionException) {
-                                    feedbackStyle = FeedbackStyle.DUPLICATE
-                                    val feeRow = if (feeErr.existingRow != null) " at row ${feeErr.existingRow}" else ""
-                                    feedbackMessage = "✓ ${tx.transactionCode} recorded (row ${mainRow ?: "sheet"}), but Fee already recorded$feeRow — skipped duplicate fee"
-                                } else {
-                                    feedbackStyle = FeedbackStyle.ERROR
-                                    feedbackMessage = "✓ ${tx.transactionCode} recorded (row ${mainRow ?: "sheet"}), but Fee failed: ${feeErr.message ?: "Unknown error"}"
-                                }
+                                feedbackStyle = FeedbackStyle.ERROR
+                                feedbackMessage = "$mainLabel, but Fee failed: ${feeErr.message ?: "Unknown error"}"
                             }
                         )
                     } else {
                         submittingTxCode = null
                         feedbackStyle = FeedbackStyle.SUCCESS
-                        feedbackMessage = "✓ Transaction ${tx.transactionCode} recorded in row ${mainRow ?: "sheet"}"
+                        feedbackMessage = mainLabel
                     }
                 },
                 onFailure = { err ->
                     submittingTxCode = null
-                    if (err is DuplicateTransactionException) {
-                        feedbackStyle = FeedbackStyle.DUPLICATE
-                        val rowInfo = if (err.existingRow != null) " at row ${err.existingRow}" else ""
-                        feedbackMessage = "⚠ Already recorded in sheet$rowInfo — skipped duplicate (${err.transactionCode})"
-                    } else {
-                        feedbackStyle = FeedbackStyle.ERROR
-                        feedbackMessage = "✗ Failed to record transaction: ${err.message ?: "Unknown error"}"
-                    }
+                    feedbackStyle = FeedbackStyle.ERROR
+                    feedbackMessage = "✗ Failed to record transaction: ${err.message ?: "Unknown error"}"
                 }
             )
         }

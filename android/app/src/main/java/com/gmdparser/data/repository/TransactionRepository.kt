@@ -6,7 +6,6 @@ import com.gmdparser.data.model.BatchApiResponse
 import com.gmdparser.data.model.BatchCreateTransactionRequest
 import com.gmdparser.data.model.BatchTransactionResult
 import com.gmdparser.data.model.CreateTransactionRequest
-import com.gmdparser.data.model.DuplicateTransactionException
 import com.gmdparser.data.model.Transaction
 import com.gmdparser.data.model.TransactionPayload
 import com.gmdparser.data.model.TransactionStatus
@@ -165,17 +164,32 @@ object TransactionRepository {
                 persistConfirmed(_confirmedTransactions.value)
                 Result.success(body)
             } else if (isDuplicate) {
+                // DUPLICATE means the transaction IS in the sheet — either from a previous
+                // session or from our own request that succeeded but whose response was lost
+                // (timeout / retry). Either way, the data is recorded. Treat as success so
+                // the caller can proceed with follow-up writes (e.g. fee recording).
                 removePendingTransaction(tx.transactionCode)
-                val dup = tx.copy(status = TransactionStatus.DUPLICATE)
-                _confirmedTransactions.update { listOf(dup) + it }
+                val confirmed = tx.copy(status = TransactionStatus.SYNCED)
+                _confirmedTransactions.update { listOf(confirmed) + it }
                 persistConfirmed(_confirmedTransactions.value)
                 val existingRow = errJson?.optJSONObject("existingRecord")?.optInt("row")
                     ?: body?.existingRecord?.row ?: errJson?.optInt("row")
-                val dupMsg = errJson?.optString("error") ?: body?.error
-                    ?: "Transaction code ${tx.transactionCode} already recorded in sheet"
-                Result.failure(DuplicateTransactionException(
-                    if (existingRow != null && existingRow > 0) existingRow else null,
-                    tx.transactionCode, dupMsg
+                // Build a synthetic success response carrying the existing row
+                val syntheticData = com.gmdparser.data.model.TransactionResponseData(
+                    row = existingRow ?: 0,
+                    transactionCode = tx.transactionCode,
+                    amount = tx.amount,
+                    type = tx.type,
+                    category = tx.category,
+                    account = tx.account,
+                    date = tx.date,
+                    timestamp = java.time.Instant.now().toString()
+                )
+                Result.success(ApiResponse(
+                    success = true,
+                    status = "DUPLICATE_OK",
+                    message = "Transaction already recorded (row ${existingRow ?: "?"})",
+                    data = syntheticData
                 ))
             } else {
                 val errorMsg = errJson?.optString("error") ?: body?.error
