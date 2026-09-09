@@ -16,10 +16,30 @@ const COL_AMOUNT = 10;          // J (Amount)
 const COL_ACCOUNT = 11;         // K (Account)
 const COL_NOTES = 12;           // L (Notes)
 
-const SCRIPT_VERSION = '2026.09.08.v14_batch_write';
-const SCRIPT_BUILD_ID = 'GMD_GAS_20260908_PROD_14';
+const SCRIPT_VERSION = '2026.09.09.v15_no_flush';
+const SCRIPT_BUILD_ID = 'GMD_GAS_20260909_PROD_15';
 
 let VALID_TYPES = ['Income', 'Expenses', 'Bills', 'Debt', 'Savings', 'Balance'];
+
+// Module-level taxonomy cache — populated lazily on first write so each deployment
+// pays the 'Set up data 2' read cost only once per Apps Script instance.
+let _taxonomyCache = null;
+
+/**
+ * Returns the list of valid category strings for the given transaction type.
+ * Sourced from 'Set up data 2' (same as extractCategoriesFromSetUpData2).
+ * Result is cached for the lifetime of the script instance to avoid redundant sheet reads.
+ */
+function getCategoriesForType(type) {
+  if (!_taxonomyCache) {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    _taxonomyCache = extractCategoriesFromSetUpData2(ss);
+  }
+  if (!_taxonomyCache || !_taxonomyCache.categoriesByType) {
+    return [];  // fallback: caller will write value without a strict rule
+  }
+  return _taxonomyCache.categoriesByType[type] || [];
+}
 
 
 /**
@@ -242,72 +262,50 @@ function handleCreateTransaction(tx) {
   }
   const formattedNotes = formatNotesWithCode(baseNotes, tx.transactionCode);
 
-  // Write strictly to safe raw transaction write boundaries:
-  // WRITE SEQUENCE (Orphaned Row Prevention):
+  // WRITE SEQUENCE (Orphaned Row Prevention + No-Flush Path):
   // Date (Column C) is written LAST because findLastTransactionRow scans Column C.
-  // If an error or timeout happens during Type, Category, or Amount/Account, Column C remains
-  // completely blank. The next transaction write will naturally reuse this row without orphaning it.
+  // If an error or timeout occurs before Date is written, Column C stays blank and the next
+  // transaction write reuses this row naturally — no orphaned rows.
+  //
+  // Category validation rule is built directly from taxonomy (getCategoriesForType), applied to
+  // the target cell BEFORE writing the value. This eliminates the need for SpreadsheetApp.flush()
+  // to trigger the sheet's array formula in column X — no full-sheet recalculation required.
   try {
-    // 1. Range D (Type) alone
+    // 1. Write Type (Column D)
     sheet.getRange(targetRow, COL_TYPE).setValue(tx.type);
 
-    // CRITICAL: Flush after setting Type so Google Sheets calculates the dynamic categories in X:AU for this Type!
-    SpreadsheetApp.flush();
-
-    // 2. Range G:H (Category, Description)
-    // With X:AU calculated, tx.category is valid and accepted naturally without validation rejections
-    try {
-      sheet.getRange(targetRow, COL_CATEGORY, 1, 2).setValues([[
-        tx.category,
-        tx.description
-      ]]);
-    } catch (valErr) {
-      // Fallback: If calculation was delayed, write safely and preserve dropdown with warning mode
-      const catCell = sheet.getRange(targetRow, COL_CATEGORY);
-      const catRule = catCell.getDataValidation();
-      if (catRule) catCell.clearDataValidations();
-      sheet.getRange(targetRow, COL_CATEGORY, 1, 2).setValues([[
-        tx.category,
-        tx.description
-      ]]);
-      if (catRule) {
-        try {
-          catCell.setDataValidation(catRule.copy().setAllowInvalid(true).build());
-        } catch (_) {
-          // Safe fallback if rule build fails
-        }
-      }
+    // 2. Apply category data-validation rule directly — no flush() needed.
+    //    getCategoriesForType() reads from 'Set up data 2', the same authoritative source
+    //    the sheet's own array formula reads. Result is cached for the instance lifetime.
+    const validCategories = getCategoriesForType(tx.type);
+    if (validCategories && validCategories.length > 0) {
+      const catRule = SpreadsheetApp.newDataValidation()
+        .requireValueInList(validCategories, true)
+        .setAllowInvalid(false)
+        .build();
+      sheet.getRange(targetRow, COL_CATEGORY).setDataValidation(catRule);
     }
 
-    // 3. Range J:L (Amount, Account, Notes)
+    // 3. Write Category + Description (Columns G:H)
+    sheet.getRange(targetRow, COL_CATEGORY, 1, 2).setValues([[
+      tx.category,
+      tx.description
+    ]]);
+
+    // 4. Write Amount + Account + Notes (Columns J:L)
     // CRITICAL: Column I (currency formula 'Set Up'!$C$10) is preserved and NEVER overwritten!
     // Columns A:B, E:F (F has VLOOKUP formula), and P:BR are also preserved.
-    try {
-      sheet.getRange(targetRow, COL_AMOUNT, 1, 3).setValues([[
-        Number(tx.amount),
-        tx.account,
-        formattedNotes
-      ]]);
-    } catch (accErr) {
-      const accCell = sheet.getRange(targetRow, COL_ACCOUNT);
-      const accRule = accCell.getDataValidation();
-      if (accRule) accCell.clearDataValidations();
-      sheet.getRange(targetRow, COL_AMOUNT, 1, 3).setValues([[
-        Number(tx.amount),
-        tx.account,
-        formattedNotes
-      ]]);
-      if (accRule) accCell.setDataValidation(accRule);
-    }
+    sheet.getRange(targetRow, COL_AMOUNT, 1, 3).setValues([[
+      Number(tx.amount),
+      tx.account,
+      formattedNotes
+    ]]);
 
-    // 4. Write Date to Column C LAST - this commits the row for findLastTransactionRow
+    // 5. Write Date to Column C LAST — commits the row for findLastTransactionRow.
     sheet.getRange(targetRow, COL_DATE).setValue(formattedDate);
 
-    // Final flush to guarantee persistence quickly
-    SpreadsheetApp.flush();
-
   } catch (writeErr) {
-    // If write failed before Date was written, clean up Type from Column D so row stays blank
+    // If write failed before Date was written, clean up Type from Column D so row stays blank.
     try {
       sheet.getRange(targetRow, COL_TYPE).clearContent();
     } catch (_) {}
@@ -474,57 +472,48 @@ function handleBatchCreateTransactions(transactions) {
     return firstTargetRow + idx;
   });
 
-  // --- Phase 3: Staged batched writes ---
-  // Stage 3a: Write Type (Column D) for ALL rows in a single range write, then flush ONCE.
-  // This triggers Google Sheets to evaluate the Category dropdown array formulas (col X)
-  // for all new rows simultaneously — one full-sheet recalculation instead of N.
+  // --- Phase 3: Staged batched writes (No-Flush Path) ---
+  // Category validation rules are built directly from taxonomy (getCategoriesForType) and applied
+  // via setDataValidations() as a single API call. No flush() needed — no array-formula
+  // recalculation. All stages are single range writes for the whole batch.
   try {
+    // Stage 3a: Write Type (Column D) — single range write, no flush.
     const typeData = toWrite.map(function(item) { return [item.tx.type]; });
     sheet.getRange(firstTargetRow, COL_TYPE, toWrite.length, 1).setValues(typeData);
-    SpreadsheetApp.flush();  // ONE flush for the whole batch
 
-    // Stage 3b: Write Category + Description (Columns G:H) for all rows at once.
-    try {
-      const catData = toWrite.map(function(item) {
-        return [item.tx.category, item.tx.description];
-      });
-      sheet.getRange(firstTargetRow, COL_CATEGORY, toWrite.length, 2).setValues(catData);
-    } catch (catErr) {
-      // Fallback: clear validations on the whole category column range, then write
-      console.warn('Batch category write failed, attempting with cleared validations: ' + catErr.message);
-      const catRange = sheet.getRange(firstTargetRow, COL_CATEGORY, toWrite.length, 1);
-      catRange.clearDataValidations();
-      const catData = toWrite.map(function(item) {
-        return [item.tx.category, item.tx.description];
-      });
-      sheet.getRange(firstTargetRow, COL_CATEGORY, toWrite.length, 2).setValues(catData);
+    // Stage 3b: Apply category data-validation rules for all rows in one call.
+    //   Each row gets its own rule matching its Type — built from the taxonomy cache.
+    //   setDataValidations accepts a 2-D array of DataValidation objects.
+    const catRules2D = toWrite.map(function(item) {
+      const cats = getCategoriesForType(item.tx.type);
+      if (!cats || cats.length === 0) return [null];  // no rule if taxonomy empty
+      return [SpreadsheetApp.newDataValidation()
+        .requireValueInList(cats, true)
+        .setAllowInvalid(false)
+        .build()];
+    });
+    // Filter: only apply if at least one row has a non-null rule
+    if (catRules2D.some(function(r) { return r[0] !== null; })) {
+      sheet.getRange(firstTargetRow, COL_CATEGORY, toWrite.length, 1).setDataValidations(catRules2D);
     }
 
-    // Stage 3c: Write Amount + Account + Notes (Columns J:L) for all rows at once.
+    // Stage 3c: Write Category + Description (Columns G:H) — single range write.
+    const catData = toWrite.map(function(item) {
+      return [item.tx.category, item.tx.description];
+    });
+    sheet.getRange(firstTargetRow, COL_CATEGORY, toWrite.length, 2).setValues(catData);
+
+    // Stage 3d: Write Amount + Account + Notes (Columns J:L) — single range write.
     // CRITICAL: Column I (currency formula) is NEVER written.
-    try {
-      const amtData = toWrite.map(function(item) {
-        return [Number(item.tx.amount), item.tx.account, item.formattedNotes];
-      });
-      sheet.getRange(firstTargetRow, COL_AMOUNT, toWrite.length, 3).setValues(amtData);
-    } catch (amtErr) {
-      // Fallback: clear account validations, then write
-      console.warn('Batch amount write failed, attempting with cleared validations: ' + amtErr.message);
-      const accRange = sheet.getRange(firstTargetRow, COL_ACCOUNT, toWrite.length, 1);
-      accRange.clearDataValidations();
-      const amtData = toWrite.map(function(item) {
-        return [Number(item.tx.amount), item.tx.account, item.formattedNotes];
-      });
-      sheet.getRange(firstTargetRow, COL_AMOUNT, toWrite.length, 3).setValues(amtData);
-    }
+    const amtData = toWrite.map(function(item) {
+      return [Number(item.tx.amount), item.tx.account, item.formattedNotes];
+    });
+    sheet.getRange(firstTargetRow, COL_AMOUNT, toWrite.length, 3).setValues(amtData);
 
-    // Stage 3d: Write Date (Column C) LAST for ALL rows — this commits every row atomically.
+    // Stage 3e: Write Date (Column C) LAST for ALL rows — commits every row atomically.
     // Only after this line will findLastTransactionRow() count these rows.
     const dateData = toWrite.map(function(item) { return [item.formattedDate]; });
     sheet.getRange(firstTargetRow, COL_DATE, toWrite.length, 1).setValues(dateData);
-
-    // Final flush to persist all rows
-    SpreadsheetApp.flush();
 
   } catch (writeErr) {
     // Best-effort cleanup: clear Type column (col D) from all allocated rows
