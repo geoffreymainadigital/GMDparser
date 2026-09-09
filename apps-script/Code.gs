@@ -1257,24 +1257,6 @@ function getMonthlyDashboardData(ss) {
     return null;
   }
 
-  // 1. Locate summary tiles (Strict header search)
-  const requiredTileLabels = [
-    'Total Bills',
-    'Total Debt Payoff',
-    'Total Expenses',
-    'Total Savings',
-    'Unallocated Income'
-  ];
-
-  const tileCoords = {};
-  requiredTileLabels.forEach(function (lbl) {
-    const loc = findCell(lbl);
-    if (!loc) {
-      throw new Error('Required dashboard summary tile label "' + lbl + '" was not found in sheet "' + targetSheetName + '".');
-    }
-    tileCoords[lbl] = loc;
-  });
-
   function parseAmount(val) {
     if (typeof val === 'number') return val;
     if (!val) return 0;
@@ -1282,46 +1264,7 @@ function getMonthlyDashboardData(ss) {
     return parseFloat(clean) || 0;
   }
 
-  function getTileData(loc, isUnderLabel) {
-    let actual = 0;
-    let goal = 0;
-    let diff = 0;
-    let percent = 0;
-    let status = '';
-
-    if (loc) {
-      const r = loc.row;
-      const c = loc.col;
-      // Actual amount is 2 rows above the label for bills/debt/expenses/savings
-      const actualRow = isUnderLabel ? (r + 1) : Math.max(0, r - 2);
-      actual = parseAmount(values[actualRow] && values[actualRow][c]);
-
-      // Row r - 3 has goal/budget (Row 1 in 1-based index)
-      if (!isUnderLabel && r >= 3) {
-        goal = parseAmount(values[r - 3] && values[r - 3][c]);
-      }
-
-      // Status indicator row (e.g. Row 6 in 1-based index = r + 2)
-      if (r + 2 < values.length) {
-        status = String(displayValues[r + 2][c] || '').trim();
-        if (!status && c > 0) {
-          status = String(displayValues[r + 2][c + 1] || displayValues[r + 2][c - 1] || '').trim();
-        }
-      }
-    }
-    return { actual: actual, goal: goal, diff: actual - goal, statusText: status };
-  }
-
-  const billsTile = getTileData(tileCoords['Total Bills'], false);
-  const debtTile = getTileData(tileCoords['Total Debt Payoff'], false);
-  const expensesTile = getTileData(tileCoords['Total Expenses'], false);
-  const savingsTile = getTileData(tileCoords['Total Savings'], false);
-
-  // Unallocated income tile
-  const unallocatedLoc = tileCoords['Unallocated Income'];
-  const unallocatedActual = parseAmount(values[unallocatedLoc.row + 2] && values[unallocatedLoc.row + 2][unallocatedLoc.col]);
-
-  // 2. Discover Category Tables by searching for "Category" headers
+  // 1. Discover Category Tables by searching for "Category" headers
   const categoryHeaders = [];
   for (let r = 0; r < values.length; r++) {
     for (let c = 0; c < Math.min(10, values[r].length); c++) {
@@ -1406,20 +1349,38 @@ function getMonthlyDashboardData(ss) {
     tables[detectedSection] = items;
   });
 
-  // Calculate Total Income summary directly from Income table items
-  let totalIncomeGoal = 0;
-  let totalIncomeActual = 0;
-  tables.Income.forEach(function (item) {
-    totalIncomeGoal += item.goal;
-    totalIncomeActual += item.actual;
-  });
+  // Helper to aggregate summary totals directly from parsed table categories
+  function aggregateSection(items, sectionType) {
+    let g = 0;
+    let a = 0;
+    (items || []).forEach(function (it) {
+      g += (Number(it.goal) || 0);
+      a += (Number(it.actual) || 0);
+    });
+    const d = a - g;
+    const pct = g > 0 ? Math.round((a / g) * 100) : 0;
+    let st = '';
+    if (sectionType === 'Income') {
+      st = pct + '% of goal';
+    } else if (sectionType === 'Bills' || sectionType === 'Expenses') {
+      const underOver = d <= 0 ? 'under budget' : 'over budget';
+      st = pct + '% • Ksh ' + Math.abs(d).toLocaleString('en-US') + ' ' + underOver;
+    } else {
+      const underOver = d <= 0 ? 'under goal' : 'over goal';
+      st = pct + '% • Ksh ' + Math.abs(d).toLocaleString('en-US') + ' ' + underOver;
+    }
+    return { actual: a, goal: g, diff: d, statusText: st };
+  }
 
-  const incomeTile = {
-    actual: totalIncomeActual,
-    goal: totalIncomeGoal,
-    diff: totalIncomeActual - totalIncomeGoal,
-    statusText: Math.round((totalIncomeActual / (totalIncomeGoal || 1)) * 100) + '% of goal'
-  };
+  const incomeTile = aggregateSection(tables.Income, 'Income');
+  const billsTile = aggregateSection(tables.Bills, 'Bills');
+  const debtTile = aggregateSection(tables.Debt, 'Debt');
+  const expensesTile = aggregateSection(tables.Expenses, 'Expenses');
+  const savingsTile = aggregateSection(tables.Savings, 'Savings');
+
+  // Unallocated Income = Total Income Actual - (Bills + Debt + Expenses + Savings Actuals)
+  const totalAllocatedActual = billsTile.actual + debtTile.actual + expensesTile.actual + savingsTile.actual;
+  const unallocatedActual = incomeTile.actual - totalAllocatedActual;
 
   return {
     month: targetSheetName,
@@ -1429,7 +1390,7 @@ function getMonthlyDashboardData(ss) {
       totalDebtPayoff: debtTile,
       totalExpenses: expensesTile,
       totalSavings: savingsTile,
-      unallocatedIncome: { actual: unallocatedActual }
+      unallocatedIncome: { actual: unallocatedActual, statusText: 'Remaining balance' }
     },
     tables: tables
   };
