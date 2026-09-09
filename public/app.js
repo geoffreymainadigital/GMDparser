@@ -258,9 +258,6 @@ function parseMpesaMessage(smsBody) {
   return null;
 }
 
-  return null;
-}
-
 function formatIsoDate(rawDate) {
   if (!rawDate) return new Date().toISOString().split('T')[0];
   const parts = rawDate.split('/');
@@ -279,7 +276,10 @@ function initNavigation() {
     item.addEventListener('click', (e) => {
       e.preventDefault();
       const tabId = item.getAttribute('data-tab');
-      switchTab(tabId);
+      if (tabId) {
+        window.location.hash = tabId;
+        switchTab(tabId);
+      }
     });
   });
 
@@ -288,9 +288,25 @@ function initNavigation() {
     btn.addEventListener('click', (e) => {
       e.preventDefault();
       const tabId = btn.getAttribute('data-tab');
-      switchTab(tabId);
+      if (tabId) {
+        window.location.hash = tabId;
+        switchTab(tabId);
+      }
     });
   });
+
+  // Handle hash on direct URL load and hash changes
+  window.addEventListener('hashchange', () => {
+    const hash = window.location.hash.replace('#', '').trim();
+    if (hash) {
+      switchTab(hash);
+    }
+  });
+
+  const initialHash = window.location.hash.replace('#', '').trim();
+  if (initialHash) {
+    switchTab(initialHash);
+  }
 
   // Mobile menu toggle
   const mobileToggle = document.getElementById('mobile-menu-toggle');
