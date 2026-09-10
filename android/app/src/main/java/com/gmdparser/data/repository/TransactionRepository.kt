@@ -74,8 +74,8 @@ object TransactionRepository {
         return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 val client = okhttp3.OkHttpClient.Builder()
-                    .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-                    .readTimeout(20, java.util.concurrent.TimeUnit.SECONDS)
+                    .connectTimeout(25, java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(35, java.util.concurrent.TimeUnit.SECONDS)
                     .followRedirects(true)
                     .build()
                 val request = okhttp3.Request.Builder()
