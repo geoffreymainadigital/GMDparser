@@ -1655,8 +1655,6 @@ function getAnnualDashboardData(ss) {
   };
 }
 
-let _accountsDataCache = null;
-
 /**
  * Programmatically discovers and parses the Accounts tab (Read-Only)
  */
