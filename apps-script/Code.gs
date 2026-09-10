@@ -1432,10 +1432,14 @@ function getMonthlyDashboardData(ss) {
 function getAnnualDashboardData(ss) {
   const sheetNames = ss.getSheets().map(function (s) { return s.getName(); });
 
-  // Discover the Annual Dashboard tab by name (case-insensitive contains "annual")
-  const annualTabName = sheetNames.find(function (n) {
-    return n.toLowerCase().indexOf('annual') !== -1;
-  });
+  // Discover the Annual tab by prioritizing exact 'Annual Dashboard', then 'Annual Budget', then any containing 'annual'
+  let annualTabName = sheetNames.find(function (n) { return n.toLowerCase() === 'annual dashboard'; });
+  if (!annualTabName) {
+    annualTabName = sheetNames.find(function (n) { return n.toLowerCase() === 'annual budget'; });
+  }
+  if (!annualTabName) {
+    annualTabName = sheetNames.find(function (n) { return n.toLowerCase().indexOf('annual') !== -1; });
+  }
   if (!annualTabName) {
     throw new Error('ANNUAL_TAB_NOT_FOUND. Available sheets: [' + sheetNames.join(', ') + '].');
   }
@@ -1452,13 +1456,13 @@ function getAnnualDashboardData(ss) {
   const dataRange = sheet.getRange(1, 1, maxRows, maxCols);
   const values = dataRange.getValues();
 
-  // Helper: find cell by label (exact, case-insensitive)
+  // Helper: find cell by label (contains, case-insensitive)
   function findCell(targetLabel) {
-    const target = String(targetLabel).toLowerCase().trim();
+    const target = String(targetLabel).toLowerCase().replace(/\s+/g, '');
     for (var r = 0; r < values.length; r++) {
       for (var c = 0; c < values[r].length; c++) {
-        const val = String(values[r][c] || '').toLowerCase().trim();
-        if (val === target) {
+        const val = String(values[r][c] || '').toLowerCase().replace(/\s+/g, '');
+        if (val.indexOf(target) !== -1) {
           return { row: r, col: c };
         }
       }
@@ -1474,15 +1478,14 @@ function getAnnualDashboardData(ss) {
   }
 
   // Discover the six summary tiles by their label text.
-  // For each label, the value is typically in the same column a few rows above.
-  // We search for the header label then look in the cell(s) around it for a numeric value.
+  // For each label, the numeric value is in nearby cells (above, below, or offset by 1-2 columns/rows)
   const TILE_LABELS = [
-    { key: 'totalIncome',    label: 'Total Income' },
-    { key: 'totalBills',     label: 'Total Bills' },
-    { key: 'totalDebtPayoff',label: 'Total Debt Payoff' },
-    { key: 'totalExpenses',  label: 'Total Expenses' },
-    { key: 'totalSavings',   label: 'Total Savings' },
-    { key: 'unallocatedIncome', label: 'Unallocated Income' }
+    { key: 'totalIncome',       label: 'Total Income' },
+    { key: 'totalBills',        label: 'Total Bills' },
+    { key: 'totalDebtPayoff',   label: 'Total Debt' },
+    { key: 'totalExpenses',     label: 'Total Expenses' },
+    { key: 'totalSavings',      label: 'Total Savings' },
+    { key: 'unallocatedIncome', label: 'Unallocated' }
   ];
 
   var summaryTiles = {};
@@ -1492,15 +1495,19 @@ function getAnnualDashboardData(ss) {
       summaryTiles[tile.key] = { actual: 0, goal: 0, diff: 0, statusText: 'NOT FOUND: ' + tile.label };
       return;
     }
-    // Search rows near the header (within ±5 rows, same column) for a numeric value
+    // Search a 7x7 bounding box around the header for the largest numeric value
     var bestVal = 0;
-    for (var dr = -5; dr <= 5; dr++) {
-      var checkRow = pos.row + dr;
-      if (checkRow < 0 || checkRow >= values.length) continue;
-      var candidate = values[checkRow][pos.col];
-      if (typeof candidate === 'number' && candidate !== 0) {
-        bestVal = candidate;
-        break;
+    for (var dr = -4; dr <= 4; dr++) {
+      for (var dc = -3; dc <= 3; dc++) {
+        var checkRow = pos.row + dr;
+        var checkCol = pos.col + dc;
+        if (checkRow < 0 || checkRow >= values.length) continue;
+        if (checkCol < 0 || checkCol >= values[checkRow].length) continue;
+        var candidate = values[checkRow][checkCol];
+        var num = parseAmount(candidate);
+        if (num !== 0 && Math.abs(num) > Math.abs(bestVal)) {
+          bestVal = num;
+        }
       }
     }
     summaryTiles[tile.key] = { actual: bestVal, statusText: tile.label + ' (Annual)' };
