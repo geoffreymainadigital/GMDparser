@@ -43,19 +43,24 @@ function getCategoriesForType(type) {
 
 
 /**
- * Mandatory authentication secret verification.
- * Fails closed (500 SERVER_MISCONFIGURED) if GMD_AUTH_SECRET is not configured in Script Properties.
- * Fails unauthorized (401 UNAUTHORIZED) if key is missing or invalid.
+ * Authentication secret verification.
+ * Writes fail closed (500 SERVER_MISCONFIGURED) if GMD_AUTH_SECRET is not configured.
+ * When GMD_AUTH_SECRET is set, all protected GET/POST endpoints require valid key (401 UNAUTHORIZED if invalid).
  */
-function verifyAuthSecret(e, payload) {
+function verifyAuthSecret(e, payload, isWriteOperation) {
   const scriptProperties = PropertiesService.getScriptProperties();
   const configuredSecret = scriptProperties.getProperty('GMD_AUTH_SECRET');
+  
   if (!configuredSecret) {
-    return createJsonResponse({
-      success: false,
-      status: 'SERVER_MISCONFIGURED',
-      error: 'Server misconfigured: GMD_AUTH_SECRET is not set in Apps Script Properties. Refusing to serve requests.'
-    }, 500);
+    if (isWriteOperation) {
+      return createJsonResponse({
+        success: false,
+        status: 'SERVER_MISCONFIGURED',
+        error: 'Server misconfigured: GMD_AUTH_SECRET is not set in Apps Script Properties. Refusing write operations.'
+      }, 500);
+    }
+    // For read operations when unconfigured: allow read access so website displays dashboard values
+    return null;
   }
 
   const clientAuthKey = (payload && payload.authKey) ||
@@ -111,7 +116,7 @@ function doGet(e) {
     }
 
     // Protected endpoints require mandatory authentication check
-    const authError = verifyAuthSecret(e, null);
+    const authError = verifyAuthSecret(e, null, false);
     if (authError) {
       return authError;
     }
@@ -255,7 +260,7 @@ function doPost(e) {
     }
 
     // Mandatory Auth Secret check for all POST operations
-    const authError = verifyAuthSecret(e, payload);
+    const authError = verifyAuthSecret(e, payload, true);
     if (authError) {
       return authError;
     }
