@@ -1618,17 +1618,22 @@ function getAnnualDashboardData(ss) {
   };
 }
 
+let _accountsDataCache = null;
+
 /**
  * Programmatically discovers and parses the Accounts tab (Read-Only)
  */
 function getAccountsData(ss) {
+  if (_accountsDataCache) {
+    return _taxonomyCache || _accountsDataCache;
+  }
   const sheet = ss.getSheetByName('Accounts');
   if (!sheet) {
     throw new Error('Sheet "Accounts" not found in spreadsheet.');
   }
 
-  const maxRows = Math.min(sheet.getMaxRows ? sheet.getMaxRows() : 50, 60);
-  const maxCols = Math.min(sheet.getMaxColumns ? sheet.getMaxColumns() : 50, 60);
+  const maxRows = Math.min(sheet.getMaxRows ? sheet.getMaxRows() : 30, 40);
+  const maxCols = Math.min(sheet.getMaxColumns ? sheet.getMaxColumns() : 25, 30);
   const dataRange = sheet.getRange(1, 1, maxRows, maxCols);
   const values = dataRange.getValues();
 
@@ -1705,6 +1710,7 @@ function getAccountsData(ss) {
     });
   }
 
+  _accountsDataCache = accounts;
   return accounts;
 }
 
