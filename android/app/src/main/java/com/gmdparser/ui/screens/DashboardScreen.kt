@@ -100,34 +100,20 @@ fun DashboardScreen(
 
         // Monthly/Annual Budget Sheet Live Card (SWR: instant toggle with background revalidation)
         var selectedPeriod by remember { mutableStateOf("monthly") }
-        var isLoadingPeriod by remember { mutableStateOf(false) }
+        var isSyncingPeriod by remember { mutableStateOf(false) }
 
-        // SWR Memory Cache for Android client session
-        var cachedMonthlyData by remember { mutableStateOf<com.gmdparser.data.model.MonthlyDashboardData?>(null) }
-        var cachedAnnualData by remember { mutableStateOf<com.gmdparser.data.model.MonthlyDashboardData?>(null) }
-
-        LaunchedEffect(dashboardResponse) {
-            if (dashboardResponse?.period == "monthly" && dashboardResponse?.month != null) {
-                cachedMonthlyData = dashboardResponse?.month
-            } else if (dashboardResponse?.period == "annual" && dashboardResponse?.annual != null) {
-                cachedAnnualData = dashboardResponse?.annual
-            }
-        }
+        val monthlyData by TransactionRepository.monthlyDashboard.collectAsState()
+        val annualData by TransactionRepository.annualDashboard.collectAsState()
 
         LaunchedEffect(selectedPeriod) {
-            isLoadingPeriod = true
+            isSyncingPeriod = true
             TransactionRepository.fetchDashboard(selectedPeriod)
-            isLoadingPeriod = false
+            isSyncingPeriod = false
         }
 
-        // Active data: prioritize newly fetched data matching selectedPeriod, else fallback to cached period data
-        val activeData = if (dashboardResponse?.period == selectedPeriod) {
-            if (selectedPeriod == "annual") dashboardResponse?.annual else dashboardResponse?.month
-        } else {
-            if (selectedPeriod == "annual") cachedAnnualData else cachedMonthlyData
-        }
-
-        val showLoading = activeData == null || (isLoadingPeriod && activeData == null)
+        // Active data: instantly display the selected period's dedicated cached data!
+        val activeData = if (selectedPeriod == "annual") annualData else monthlyData
+        val showLoading = activeData == null
 
         Card(
             colors = CardDefaults.cardColors(containerColor = DarkSurface),
@@ -159,12 +145,12 @@ fun DashboardScreen(
                         modifier = Modifier.weight(1f)
                     )
                     Surface(
-                        color = if (showLoading) AccentAmber.copy(alpha = 0.2f) else AccentCyan.copy(alpha = 0.2f),
+                        color = if (isSyncingPeriod && showLoading) AccentAmber.copy(alpha = 0.2f) else AccentCyan.copy(alpha = 0.2f),
                         shape = RoundedCornerShape(4.dp)
                     ) {
                         Text(
-                            text = if (showLoading) "SYNCING" else "LIVE",
-                            color = if (showLoading) AccentAmber else AccentCyan,
+                            text = if (isSyncingPeriod) "SYNCING" else "LIVE",
+                            color = if (isSyncingPeriod) AccentAmber else AccentCyan,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)

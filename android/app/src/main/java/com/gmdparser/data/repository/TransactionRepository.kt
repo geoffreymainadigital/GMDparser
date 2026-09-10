@@ -32,6 +32,8 @@ object TransactionRepository {
     private const val PREFS_NAME = "gmdparser_tx_repo"
     private const val KEY_PENDING = "pending_transactions"
     private const val KEY_CONFIRMED = "confirmed_transactions"
+    private const val KEY_MONTHLY_DASHBOARD = "cached_monthly_dashboard"
+    private const val KEY_ANNUAL_DASHBOARD = "cached_annual_dashboard"
     /** Max transactions per batchCreateTransactions call — must match Apps Script MAX_BATCH. */
     private const val BATCH_MAX_SIZE = 50
 
@@ -47,10 +49,29 @@ object TransactionRepository {
     private val _dashboardData = MutableStateFlow<com.gmdparser.data.model.DashboardResponse?>(null)
     val dashboardData: StateFlow<com.gmdparser.data.model.DashboardResponse?> = _dashboardData.asStateFlow()
 
+    private val _monthlyDashboard = MutableStateFlow<com.gmdparser.data.model.MonthlyDashboardData?>(null)
+    val monthlyDashboard: StateFlow<com.gmdparser.data.model.MonthlyDashboardData?> = _monthlyDashboard.asStateFlow()
+
+    private val _annualDashboard = MutableStateFlow<com.gmdparser.data.model.MonthlyDashboardData?>(null)
+    val annualDashboard: StateFlow<com.gmdparser.data.model.MonthlyDashboardData?> = _annualDashboard.asStateFlow()
+
     @Volatile
     private var dashboardFetchRequestId: Long = 0
 
     private const val FALLBACK_GAS_URL = "https://script.google.com/macros/s/AKfycbzLo8NZHU3rmGIT6R-une9xrjUqwIdSbUG6to1O_ZwohEbvST1-3MjpNvCaNq2TOF4_Xw/exec"
+
+    private fun handleDashboardSuccess(data: com.gmdparser.data.model.DashboardResponse, reqId: Long) {
+        if (reqId == dashboardFetchRequestId) {
+            _dashboardData.value = data
+            if (data.period == "annual" && data.annual != null) {
+                _annualDashboard.value = data.annual
+                prefs?.edit()?.putString(KEY_ANNUAL_DASHBOARD, gson.toJson(data.annual))?.apply()
+            } else if (data.month != null) {
+                _monthlyDashboard.value = data.month
+                prefs?.edit()?.putString(KEY_MONTHLY_DASHBOARD, gson.toJson(data.month))?.apply()
+            }
+        }
+    }
 
     suspend fun fetchDashboard(period: String = "monthly"): Result<com.gmdparser.data.model.DashboardResponse> {
         val currentReqId = synchronized(this) { ++dashboardFetchRequestId }
@@ -58,9 +79,7 @@ object TransactionRepository {
             val response = ApiClient.apiService.getDashboard(period)
             if (response.isSuccessful && response.body() != null && response.body()!!.success) {
                 val data = response.body()!!
-                if (currentReqId == dashboardFetchRequestId) {
-                    _dashboardData.value = data
-                }
+                handleDashboardSuccess(data, currentReqId)
                 Result.success(data)
             } else {
                 fetchDashboardDirect(period, currentReqId)
@@ -87,9 +106,7 @@ object TransactionRepository {
                 if (res.isSuccessful && !bodyStr.isNullOrBlank()) {
                     val data = gson.fromJson(bodyStr, com.gmdparser.data.model.DashboardResponse::class.java)
                     if (data != null && data.success) {
-                        if (reqId == dashboardFetchRequestId) {
-                            _dashboardData.value = data
-                        }
+                        handleDashboardSuccess(data, reqId)
                         return@withContext Result.success(data)
                     }
                 }
@@ -120,6 +137,22 @@ object TransactionRepository {
                 val type = object : TypeToken<List<Transaction>>() {}.type
                 val loaded: List<Transaction> = gson.fromJson(confirmedJson, type)
                 _confirmedTransactions.value = loaded
+            } catch (e: Exception) { e.printStackTrace() }
+        }
+
+        val monthlyJson = sp.getString(KEY_MONTHLY_DASHBOARD, null)
+        if (!monthlyJson.isNullOrBlank()) {
+            try {
+                val loaded = gson.fromJson(monthlyJson, com.gmdparser.data.model.MonthlyDashboardData::class.java)
+                _monthlyDashboard.value = loaded
+            } catch (e: Exception) { e.printStackTrace() }
+        }
+
+        val annualJson = sp.getString(KEY_ANNUAL_DASHBOARD, null)
+        if (!annualJson.isNullOrBlank()) {
+            try {
+                val loaded = gson.fromJson(annualJson, com.gmdparser.data.model.MonthlyDashboardData::class.java)
+                _annualDashboard.value = loaded
             } catch (e: Exception) { e.printStackTrace() }
         }
     }
