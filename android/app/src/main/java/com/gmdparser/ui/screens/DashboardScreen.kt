@@ -32,11 +32,8 @@ fun DashboardScreen(
 ) {
     val pendingList by TransactionRepository.pendingTransactions.collectAsState()
     val confirmedList by TransactionRepository.confirmedTransactions.collectAsState()
-    val dashboardResponse by TransactionRepository.dashboardData.collectAsState()
 
-    LaunchedEffect(Unit) {
-        TransactionRepository.fetchDashboard()
-    }
+    // Data is prefetched at startup in MainAppHost; no fetch needed here.
 
     Column(
         modifier = Modifier
@@ -98,20 +95,13 @@ fun DashboardScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Monthly/Annual Budget Sheet Live Card (SWR: instant toggle with background revalidation)
+        // Monthly/Annual Budget Sheet — data is prefetched at startup for instant toggle.
         var selectedPeriod by remember { mutableStateOf("monthly") }
-        var isSyncingPeriod by remember { mutableStateOf(false) }
 
         val monthlyData by TransactionRepository.monthlyDashboard.collectAsState()
         val annualData by TransactionRepository.annualDashboard.collectAsState()
 
-        LaunchedEffect(selectedPeriod) {
-            isSyncingPeriod = true
-            TransactionRepository.fetchDashboard(selectedPeriod)
-            isSyncingPeriod = false
-        }
-
-        // Active data: instantly display the selected period's dedicated cached data!
+        // Active data: instantly switches between the two independently cached flows.
         val activeData = if (selectedPeriod == "annual") annualData else monthlyData
         val showLoading = activeData == null
 
@@ -145,12 +135,12 @@ fun DashboardScreen(
                         modifier = Modifier.weight(1f)
                     )
                     Surface(
-                        color = if (isSyncingPeriod && showLoading) AccentAmber.copy(alpha = 0.2f) else AccentCyan.copy(alpha = 0.2f),
+                        color = if (showLoading) AccentAmber.copy(alpha = 0.2f) else AccentCyan.copy(alpha = 0.2f),
                         shape = RoundedCornerShape(4.dp)
                     ) {
                         Text(
-                            text = if (isSyncingPeriod) "SYNCING" else "LIVE",
-                            color = if (isSyncingPeriod) AccentAmber else AccentCyan,
+                            text = if (showLoading) "LOADING" else "LIVE",
+                            color = if (showLoading) AccentAmber else AccentCyan,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -202,7 +192,6 @@ fun DashboardScreen(
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.height(12.dp))
                     Spacer(modifier = Modifier.height(12.dp))
 
                     val tiles = activeData?.summaryTiles

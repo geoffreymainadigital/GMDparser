@@ -26,6 +26,9 @@ import com.gmdparser.ui.theme.DarkBackground
 import com.gmdparser.ui.theme.DarkSurface
 import com.gmdparser.ui.theme.GMDParserTheme
 import com.gmdparser.ui.theme.MpesaGreen
+import com.gmdparser.ui.theme.ThemeManager
+import com.gmdparser.util.AppPreferences
+import kotlinx.coroutines.launch
 
 enum class Screen(val title: String, val icon: ImageVector) {
     DASHBOARD("Dashboard", Icons.Default.Dashboard),
@@ -49,6 +52,12 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Initialise shared preferences before anything else
+        AppPreferences.init(this)
+        TransactionRepository.init(this)
+        ThemeManager.init()
+
         checkAndRequestPermissions()
 
         val initialScreen = if (intent?.hasExtra("OPEN_REVIEW_CODE") == true) {
@@ -59,7 +68,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             GMDParserTheme {
-                MainAppHost(initialScreen = initialScreen)
+                AppEntryPoint(initialScreen = initialScreen)
             }
         }
     }
@@ -83,14 +92,41 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+/**
+ * Top-level entry point: shows PIN screen if enabled, then the main app.
+ */
+@Composable
+fun AppEntryPoint(initialScreen: Screen = Screen.DASHBOARD) {
+    var unlocked by remember { mutableStateOf(!AppPreferences.isPinEnabled) }
+
+    if (!unlocked) {
+        PinLockScreen(
+            mode = PinScreenMode.UNLOCK,
+            onUnlocked = { unlocked = true }
+        )
+    } else {
+        MainAppHost(initialScreen = initialScreen)
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainAppHost(initialScreen: Screen = Screen.DASHBOARD) {
     var currentScreen by remember { mutableStateOf(initialScreen) }
     val pendingCount by TransactionRepository.pendingTransactions.collectAsState()
+    val scope = rememberCoroutineScope()
 
+    // Initialise taxonomy once
     LaunchedEffect(Unit) {
         TaxonomyRepository.refreshTaxonomy()
+    }
+
+    // Prefetch BOTH dashboard periods in parallel so the toggle is instant.
+    // Each coroutine writes to its own dedicated StateFlow in the repository,
+    // so they never overwrite each other's data.
+    LaunchedEffect(Unit) {
+        scope.launch { TransactionRepository.fetchDashboard("monthly") }
+        scope.launch { TransactionRepository.fetchDashboard("annual") }
     }
 
     Scaffold(
@@ -158,14 +194,14 @@ fun MainAppHost(initialScreen: Screen = Screen.DASHBOARD) {
                     onNavigateToAccounts = { currentScreen = Screen.ACCOUNTS },
                     onNavigateToCategories = { currentScreen = Screen.CATEGORIES }
                 )
-                Screen.REVIEW -> ReviewConfirmScreen()
-                Screen.HISTORY -> HistoryScreen()
-                Screen.ACCOUNTS -> AccountsScreen()
+                Screen.REVIEW    -> ReviewConfirmScreen()
+                Screen.HISTORY   -> HistoryScreen()
+                Screen.ACCOUNTS  -> AccountsScreen()
                 Screen.CATEGORIES -> CategoriesScreen()
-                Screen.SAVINGS -> SavingsScreen()
-                Screen.DEBTS -> DebtsScreen()
-                Screen.GOALS -> GoalsScreen()
-                Screen.SETTINGS -> SettingsScreen()
+                Screen.SAVINGS   -> SavingsScreen()
+                Screen.DEBTS     -> DebtsScreen()
+                Screen.GOALS     -> GoalsScreen()
+                Screen.SETTINGS  -> SettingsScreen()
             }
         }
     }

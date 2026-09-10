@@ -7,9 +7,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.NetworkCheck
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,6 +25,8 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.ui.platform.LocalContext
 import com.gmdparser.ui.components.SmsScanDialog
+import com.gmdparser.util.AppPreferences
+import com.gmdparser.util.AppTheme
 import com.gmdparser.util.ReminderCadence
 import com.gmdparser.util.ReviewReminderManager
 
@@ -41,10 +41,45 @@ fun SettingsScreen() {
     var currentCadence by remember { mutableStateOf(ReviewReminderManager.getCadence(context)) }
     var showScanDialog by remember { mutableStateOf(false) }
 
+    // PIN state
+    var pinEnabled by remember { mutableStateOf(AppPreferences.isPinEnabled) }
+    var pinScreenMode by remember { mutableStateOf<PinScreenMode?>(null) }
+    var pendingSetPin by remember { mutableStateOf<String?>(null) }
+
+    // Theme state
+    val currentTheme by ThemeManager.currentTheme.collectAsState()
+
+    // Full-screen PIN flow overlay
+    when (pinScreenMode) {
+        PinScreenMode.SET -> {
+            PinLockScreen(
+                mode = PinScreenMode.SET,
+                onPinSet = { pin ->
+                    pendingSetPin = pin
+                    pinScreenMode = PinScreenMode.CONFIRM
+                },
+                onCancel = { pinScreenMode = null }
+            )
+            return
+        }
+        PinScreenMode.CONFIRM -> {
+            PinLockScreen(
+                mode = PinScreenMode.CONFIRM,
+                pendingPin = pendingSetPin,
+                onUnlocked = {
+                    pinEnabled = true
+                    pinScreenMode = null
+                    pendingSetPin = null
+                },
+                onCancel = { pinScreenMode = null; pendingSetPin = null }
+            )
+            return
+        }
+        else -> { /* show main settings */ }
+    }
+
     if (showScanDialog) {
-        SmsScanDialog(
-            onDismiss = { showScanDialog = false }
-        )
+        SmsScanDialog(onDismiss = { showScanDialog = false })
     }
 
     Column(
@@ -55,11 +90,161 @@ fun SettingsScreen() {
             .verticalScroll(rememberScrollState())
     ) {
         Text("System Settings", color = TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-        Text("Review cadence, SMS catch-up, and gateway configuration", color = TextSecondary, fontSize = 12.sp)
+        Text("Security, appearance, reminders, and gateway configuration", color = TextSecondary, fontSize = 12.sp)
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Review Cadence & Reminders Card
+        // ── PIN Lock ────────────────────────────────────────────────────
+        Card(
+            colors = CardDefaults.cardColors(containerColor = DarkSurface),
+            shape = RoundedCornerShape(14.dp),
+            modifier = Modifier.fillMaxWidth().border(1.dp, DarkSurfaceBorder, RoundedCornerShape(14.dp))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Lock, contentDescription = null, tint = AccentPurple, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("PIN Lock", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "Require a 6-digit PIN each time the app is opened.",
+                    color = TextSecondary,
+                    fontSize = 11.sp
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (pinEnabled) {
+                        OutlinedButton(
+                            onClick = {
+                                AppPreferences.clearPin()
+                                pinEnabled = false
+                            },
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentRed),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, AccentRed.copy(alpha = 0.6f)),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.LockOpen, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Disable PIN", fontWeight = FontWeight.SemiBold)
+                        }
+                        OutlinedButton(
+                            onClick = { pinScreenMode = PinScreenMode.SET },
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentAmber),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, AccentAmber.copy(alpha = 0.6f)),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Change PIN", fontWeight = FontWeight.SemiBold)
+                        }
+                    } else {
+                        Button(
+                            onClick = { pinScreenMode = PinScreenMode.SET },
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentPurple),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Set PIN", color = TextPrimary, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = if (pinEnabled) "✓ PIN lock is active" else "PIN lock is disabled",
+                    color = if (pinEnabled) MpesaGreen else TextMuted,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // ── Theme Selector ───────────────────────────────────────────────
+        Card(
+            colors = CardDefaults.cardColors(containerColor = DarkSurface),
+            shape = RoundedCornerShape(14.dp),
+            modifier = Modifier.fillMaxWidth().border(1.dp, DarkSurfaceBorder, RoundedCornerShape(14.dp))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Palette, contentDescription = null, tint = AccentCyan, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("App Theme", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text("Choose a colour scheme for the app interface.", color = TextSecondary, fontSize = 11.sp)
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AppTheme.values().forEach { theme ->
+                        val isSelected = currentTheme == theme
+                        val accentColor = when (theme) {
+                            AppTheme.DARK     -> AccentBlue
+                            AppTheme.MIDNIGHT -> AccentPurple
+                            AppTheme.FOREST   -> MpesaGreen
+                            AppTheme.LIGHT    -> AccentAmber
+                        }
+                        val themeIcon = when (theme) {
+                            AppTheme.DARK     -> Icons.Default.DarkMode
+                            AppTheme.MIDNIGHT -> Icons.Default.NightlightRound
+                            AppTheme.FOREST   -> Icons.Default.Eco
+                            AppTheme.LIGHT    -> Icons.Default.LightMode
+                        }
+                        Surface(
+                            color = if (isSelected) accentColor.copy(alpha = 0.12f) else DarkSurfaceCard,
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .border(
+                                    1.dp,
+                                    if (isSelected) accentColor.copy(alpha = 0.6f) else DarkSurfaceBorder,
+                                    RoundedCornerShape(10.dp)
+                                )
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = isSelected,
+                                    onClick = { ThemeManager.setTheme(theme) },
+                                    colors = RadioButtonDefaults.colors(
+                                        selectedColor = accentColor,
+                                        unselectedColor = TextMuted
+                                    )
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(themeIcon, contentDescription = null, tint = accentColor, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = theme.label,
+                                    color = if (isSelected) TextPrimary else TextSecondary,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    fontSize = 13.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // ── Review Cadence & Reminders ───────────────────────────────────
         Card(
             colors = CardDefaults.cardColors(containerColor = DarkSurface),
             shape = RoundedCornerShape(14.dp),
@@ -112,9 +297,9 @@ fun SettingsScreen() {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = when (currentCadence) {
-                        ReminderCadence.OFF -> "Reminders are disabled. You can review pending items anytime."
-                        ReminderCadence.DAILY -> "Daily reminders scheduled for 8:00 PM when queue is non-empty."
-                        ReminderCadence.WEEKLY -> "Weekly reminders scheduled every 7 days when queue is non-empty."
+                        ReminderCadence.OFF     -> "Reminders are disabled. You can review pending items anytime."
+                        ReminderCadence.DAILY   -> "Daily reminders scheduled for 8:00 PM when queue is non-empty."
+                        ReminderCadence.WEEKLY  -> "Weekly reminders scheduled every 7 days when queue is non-empty."
                         ReminderCadence.MONTHLY -> "Monthly reminders scheduled every 30 days when queue is non-empty."
                     },
                     color = if (currentCadence == ReminderCadence.OFF) TextMuted else AccentCyan,
@@ -125,7 +310,7 @@ fun SettingsScreen() {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Advanced Inbox History Scan Card (Custom Ranges)
+        // ── Advanced Inbox History Scan ───────────────────────────────────
         Card(
             colors = CardDefaults.cardColors(containerColor = DarkSurface),
             shape = RoundedCornerShape(14.dp),
@@ -162,7 +347,7 @@ fun SettingsScreen() {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Vercel API Gateway Endpoint
+        // ── Vercel API Gateway Endpoint ──────────────────────────────────
         Card(
             colors = CardDefaults.cardColors(containerColor = DarkSurface),
             shape = RoundedCornerShape(14.dp),
@@ -241,7 +426,7 @@ fun SettingsScreen() {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // App Metadata
+        // ── App Metadata ──────────────────────────────────────────────────
         Card(
             colors = CardDefaults.cardColors(containerColor = DarkSurface),
             shape = RoundedCornerShape(14.dp),
