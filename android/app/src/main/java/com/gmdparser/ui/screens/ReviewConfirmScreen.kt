@@ -741,29 +741,7 @@ fun BatchTransactionItemCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Action Buttons Row: 1-Tap Quick Confirm vs Edit/Expand
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                OutlinedButton(
-                    onClick = onToggleExpand,
-                    enabled = !isSubmitting,
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, DarkSurfaceBorder),
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Icon(
-                        if (isExpanded) Icons.Default.ExpandLess else Icons.Default.Edit,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(if (isExpanded) "Collapse" else "Edit", fontSize = 12.sp)
-                }
-
-                // Part C restriction logic
+                // Part C restriction logic: warning displayed cleanly above the action buttons
                 val isUncategorized = (if (isExpanded) selectedCategory else transaction.category).isBlank()
 
                 if (isUncategorized && !isExpanded) {
@@ -778,37 +756,59 @@ fun BatchTransactionItemCard(
                     )
                 }
 
-                Button(
-                    onClick = {
-                        if (isExpanded) {
-                            val parsedAmt = amountText.toDoubleOrNull() ?: transaction.amount
-                            val editedTx = transaction.copy(
-                                amount = parsedAmt,
-                                type = selectedType,
-                                category = selectedCategory,
-                                description = descriptionText,
-                                account = selectedAccount,
-                                destinationAccount = if (selectedType == "Balance" || selectedType == "Transfer") destinationAccountText.trim().ifEmpty { null } else null
-                            )
-                            onCustomConfirm(editedTx, recordFee)
-                        } else {
-                            onQuickConfirm()
-                        }
-                    },
-                    enabled = !isSubmitting && !isUncategorized,
-                    colors = ButtonDefaults.buttonColors(containerColor = MpesaGreen),
-                    modifier = Modifier.weight(2f),
-                    shape = RoundedCornerShape(10.dp)
+                // Action Buttons Row: 1-Tap Quick Confirm vs Edit/Expand
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    if (isSubmitting) {
-                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                    } else {
-                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(if (isExpanded) "Save Edited" else "1-Tap Confirm", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    OutlinedButton(
+                        onClick = onToggleExpand,
+                        enabled = !isSubmitting,
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, DarkSurfaceBorder),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(
+                            if (isExpanded) Icons.Default.ExpandLess else Icons.Default.Edit,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(if (isExpanded) "Collapse" else "Edit", fontSize = 12.sp)
+                    }
+
+                    Button(
+                        onClick = {
+                            if (isExpanded) {
+                                val parsedAmt = amountText.toDoubleOrNull() ?: transaction.amount
+                                val editedTx = transaction.copy(
+                                    amount = parsedAmt,
+                                    type = selectedType,
+                                    category = selectedCategory,
+                                    description = descriptionText,
+                                    account = selectedAccount,
+                                    destinationAccount = if (selectedType == "Balance" || selectedType == "Transfer") destinationAccountText.trim().ifEmpty { null } else null
+                                )
+                                onCustomConfirm(editedTx, recordFee)
+                            } else {
+                                onQuickConfirm()
+                            }
+                        },
+                        enabled = !isSubmitting && !isUncategorized,
+                        colors = ButtonDefaults.buttonColors(containerColor = MpesaGreen),
+                        modifier = Modifier.weight(2f),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        if (isSubmitting) {
+                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(if (isExpanded) "Save Edited" else "1-Tap Confirm", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
                     }
                 }
-            }
         }
     }
 }

@@ -105,7 +105,11 @@ fun DashboardScreen(
             TransactionRepository.fetchDashboard(selectedPeriod)
         }
 
-        val monthData = dashboardResponse?.month ?: dashboardResponse?.annual
+        val monthData = if (selectedPeriod == "annual") {
+            dashboardResponse?.annual ?: dashboardResponse?.month
+        } else {
+            dashboardResponse?.month ?: dashboardResponse?.annual
+        }
         if (monthData != null) {
             Card(
                 colors = CardDefaults.cardColors(containerColor = DarkSurface),

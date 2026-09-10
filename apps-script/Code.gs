@@ -16,8 +16,8 @@ const COL_AMOUNT = 10;          // J (Amount)
 const COL_ACCOUNT = 11;         // K (Account)
 const COL_NOTES = 12;           // L (Notes)
 
-const SCRIPT_VERSION = '2026.09.09.v15_no_flush';
-const SCRIPT_BUILD_ID = 'GMD_GAS_20260909_PROD_15';
+const SCRIPT_VERSION = '2026.09.10.v16_annual_dashboard';
+const SCRIPT_BUILD_ID = 'GMD_GAS_20260910_PROD_16';
 
 let VALID_TYPES = ['Income', 'Expenses', 'Bills', 'Debt', 'Savings', 'Balance'];
 
