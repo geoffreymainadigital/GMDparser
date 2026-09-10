@@ -16,8 +16,8 @@ const COL_AMOUNT = 10;          // J (Amount)
 const COL_ACCOUNT = 11;         // K (Account)
 const COL_NOTES = 12;           // L (Notes)
 
-const SCRIPT_VERSION = '2026.09.10.v16_annual_dashboard';
-const SCRIPT_BUILD_ID = 'GMD_GAS_20260910_PROD_16';
+const SCRIPT_VERSION = '2026.09.10.v17_auth_gate_fix';
+const SCRIPT_BUILD_ID = 'GMD_GAS_20260910_PROD_17';
 
 let VALID_TYPES = ['Income', 'Expenses', 'Bills', 'Debt', 'Savings', 'Balance'];
 
@@ -115,40 +115,6 @@ function doGet(e) {
       }, 200);
     }
 
-    // Protected endpoints require mandatory authentication check
-    const authError = verifyAuthSecret(e, null, false);
-    if (authError) {
-      return authError;
-    }
-
-    if (action === 'diagnoseTaxonomy') {
-      const targetId = (e && e.parameter && e.parameter.spreadsheetId) || ss.getId();
-      const targetSs = SpreadsheetApp.openById(targetId);
-      const sheetNames = targetSs.getSheets().map(function (s) { return s.getName(); });
-      const taxonomy = getTaxonomyData(targetSs);
-      return createJsonResponse({
-        success: true,
-        spreadsheetId: targetId,
-        sheets: sheetNames,
-        taxonomy: taxonomy,
-        timestamp: new Date().toISOString()
-      }, 200);
-    }
-
-    if (action === 'findOrphanedRows') {
-      const sheet = ss.getSheetByName(SHEET_NAME_TRANSACTIONS);
-      if (!sheet) {
-        return createJsonResponse({ success: false, error: 'Transactions sheet not found' }, 500);
-      }
-      const orphans = findOrphanedRows(sheet);
-      return createJsonResponse({
-        success: true,
-        count: orphans.length,
-        orphanedRows: orphans,
-        timestamp: new Date().toISOString()
-      }, 200);
-    }
-
     if (action === 'getRecentTransactions') {
       const sheet = ss.getSheetByName(SHEET_NAME_TRANSACTIONS);
       if (!sheet) {
@@ -206,6 +172,40 @@ function doGet(e) {
           timestamp: new Date().toISOString()
         }, 200);
       }
+    }
+
+    // Protected endpoints require mandatory authentication check (admin/diagnostic only)
+    const authError = verifyAuthSecret(e, null, false);
+    if (authError) {
+      return authError;
+    }
+
+    if (action === 'diagnoseTaxonomy') {
+      const targetId = (e && e.parameter && e.parameter.spreadsheetId) || ss.getId();
+      const targetSs = SpreadsheetApp.openById(targetId);
+      const sheetNames = targetSs.getSheets().map(function (s) { return s.getName(); });
+      const taxonomy = getTaxonomyData(targetSs);
+      return createJsonResponse({
+        success: true,
+        spreadsheetId: targetId,
+        sheets: sheetNames,
+        taxonomy: taxonomy,
+        timestamp: new Date().toISOString()
+      }, 200);
+    }
+
+    if (action === 'findOrphanedRows') {
+      const sheet = ss.getSheetByName(SHEET_NAME_TRANSACTIONS);
+      if (!sheet) {
+        return createJsonResponse({ success: false, error: 'Transactions sheet not found' }, 500);
+      }
+      const orphans = findOrphanedRows(sheet);
+      return createJsonResponse({
+        success: true,
+        count: orphans.length,
+        orphanedRows: orphans,
+        timestamp: new Date().toISOString()
+      }, 200);
     }
 
 
