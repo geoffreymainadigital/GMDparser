@@ -16,14 +16,15 @@ const COL_AMOUNT = 10;          // J (Amount)
 const COL_ACCOUNT = 11;         // K (Account)
 const COL_NOTES = 12;           // L (Notes)
 
-const SCRIPT_VERSION = '2026.09.10.v17_auth_gate_fix';
-const SCRIPT_BUILD_ID = 'GMD_GAS_20260910_PROD_17';
+const SCRIPT_VERSION = '2026.09.10.v18_monthly_perf';
+const SCRIPT_BUILD_ID = 'GMD_GAS_20260910_PROD_18';
 
 let VALID_TYPES = ['Income', 'Expenses', 'Bills', 'Debt', 'Savings', 'Balance'];
 
 // Module-level taxonomy cache — populated lazily on first write so each deployment
 // pays the 'Set up data 2' read cost only once per Apps Script instance.
 let _taxonomyCache = null;
+let _accountsDataCache = null;
 
 /**
  * Returns the list of valid category strings for the given transaction type.
@@ -1312,8 +1313,10 @@ function getMonthlyDashboardData(ss) {
     throw new Error('Sheet "' + targetSheetName + '" not found in spreadsheet.');
   }
 
-  const maxRows = Math.min(sheet.getMaxRows ? sheet.getMaxRows() : 160, 200);
-  const maxCols = Math.min(sheet.getMaxColumns ? sheet.getMaxColumns() : 60, 80);
+  // Read a bounded range — monthly budget sheets rarely exceed 120 rows x 60 cols.
+  // Keeping this tight avoids forcing Apps Script to evaluate trailing formula cells.
+  const maxRows = Math.min(sheet.getMaxRows ? sheet.getMaxRows() : 120, 120);
+  const maxCols = Math.min(sheet.getMaxColumns ? sheet.getMaxColumns() : 60, 60);
   const dataRange = sheet.getRange(1, 1, maxRows, maxCols);
   const values = dataRange.getValues();
 
@@ -1659,7 +1662,7 @@ let _accountsDataCache = null;
  */
 function getAccountsData(ss) {
   if (_accountsDataCache) {
-    return _taxonomyCache || _accountsDataCache;
+    return _accountsDataCache;
   }
   const sheet = ss.getSheetByName('Accounts');
   if (!sheet) {
