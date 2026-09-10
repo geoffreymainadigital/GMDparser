@@ -47,11 +47,11 @@ fun SmsScanDialog(
         onDismissRequest = { if (!isScanning) onDismiss() },
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Search, contentDescription = null, tint = MpesaGreen)
+                Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = if (resultStats == null) "Scan SMS Inbox" else "Scan Completed",
-                    color = TextPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -67,16 +67,16 @@ fun SmsScanDialog(
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            CircularProgressIndicator(color = MpesaGreen)
+                            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
                                 "Scanning SMS messages...",
-                                color = TextPrimary,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 fontSize = 14.sp
                             )
                             Text(
                                 "Deduplicating against your records",
-                                color = TextSecondary,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 12.sp
                             )
                         }
@@ -84,33 +84,33 @@ fun SmsScanDialog(
                 } else if (resultStats != null) {
                     val stats = resultStats!!
                     Card(
-                        colors = CardDefaults.cardColors(containerColor = DarkSurfaceCard),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                         shape = RoundedCornerShape(10.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .border(1.dp, MpesaGreen.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
+                            .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
                     ) {
                         Column(modifier = Modifier.padding(14.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MpesaGreen, modifier = Modifier.size(20.dp))
+                                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Scan Summary", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Text("Scan Summary", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                             }
                             Spacer(modifier = Modifier.height(8.dp))
-                            Text("• SMS scanned: ${stats.totalSmsScanned}", color = TextSecondary, fontSize = 13.sp)
-                            Text("• M-PESA messages identified: ${stats.mpesaFound}", color = TextSecondary, fontSize = 13.sp)
-                            Text("• Newly added to review queue: ${stats.newlyQueued}", color = MpesaGreen, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                            Text("• Already recorded/skipped: ${stats.alreadyTracked}", color = TextMuted, fontSize = 12.sp)
+                            Text("• SMS scanned: ${stats.totalSmsScanned}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                            Text("• M-PESA messages identified: ${stats.mpesaFound}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                            Text("• Newly added to review queue: ${stats.newlyQueued}", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                            Text("• Already recorded/skipped: ${stats.alreadyTracked}", color = MaterialTheme.colorScheme.outline, fontSize = 12.sp)
                         }
                     }
                 } else {
                     Text(
                         text = "Scan your device SMS inbox for M-PESA messages to catch up on unrecorded transactions. Messages already pending or confirmed will not be duplicated.",
-                        color = TextSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 13.sp
                     )
                     Spacer(modifier = Modifier.height(14.dp))
-                    Text("Select Time Range:", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                    Text("Select Time Range:", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                     Spacer(modifier = Modifier.height(8.dp))
 
                     options.forEachIndexed { index, (label, _) ->
@@ -125,14 +125,14 @@ fun SmsScanDialog(
                                 selected = selectedIndex == index,
                                 onClick = { selectedIndex = index },
                                 colors = RadioButtonDefaults.colors(
-                                    selectedColor = MpesaGreen,
-                                    unselectedColor = TextMuted
+                                    selectedColor = MaterialTheme.colorScheme.primary,
+                                    unselectedColor = MaterialTheme.colorScheme.outline
                                 )
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = label,
-                                color = if (selectedIndex == index) TextPrimary else TextSecondary,
+                                color = if (selectedIndex == index) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 13.sp,
                                 fontWeight = if (selectedIndex == index) FontWeight.SemiBold else FontWeight.Normal
                             )
@@ -145,9 +145,9 @@ fun SmsScanDialog(
             if (resultStats != null) {
                 Button(
                     onClick = onDismiss,
-                    colors = ButtonDefaults.buttonColors(containerColor = MpesaGreen)
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
-                    Text("Done", color = Color.White)
+                    Text("Done", color = MaterialTheme.colorScheme.onPrimary)
                 }
             } else if (!isScanning) {
                 Button(
@@ -161,20 +161,20 @@ fun SmsScanDialog(
                             onScanComplete(stats)
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = MpesaGreen)
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
-                    Text("Start Scan", color = Color.White)
+                    Text("Start Scan", color = MaterialTheme.colorScheme.onPrimary)
                 }
             }
         },
         dismissButton = {
             if (!isScanning && resultStats == null) {
                 TextButton(onClick = onDismiss) {
-                    Text("Cancel", color = TextSecondary)
+                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         },
-        containerColor = DarkSurface,
+        containerColor = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(16.dp)
     )
 }

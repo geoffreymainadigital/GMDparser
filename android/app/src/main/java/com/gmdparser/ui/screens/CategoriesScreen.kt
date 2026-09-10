@@ -39,7 +39,7 @@ fun CategoriesScreen() {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(DarkBackground)
+            .background(MaterialTheme.colorScheme.background)
             .padding(16.dp)
     ) {
         Row(
@@ -50,13 +50,13 @@ fun CategoriesScreen() {
             Column {
                 Text(
                     text = "Category Tracking ($monthTitle)",
-                    color = TextPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
                     text = "Monthly Goal vs Actual breakdown from spreadsheet",
-                    color = TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.sp
                 )
             }
@@ -81,19 +81,19 @@ fun CategoriesScreen() {
             items(sections) { sec ->
                 val isSelected = sec == selectedSection
                 Surface(
-                    color = if (isSelected) AccentCyan else DarkSurface,
+                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
                     shape = RoundedCornerShape(20.dp),
                     modifier = Modifier
                         .border(
                             1.dp,
-                            if (isSelected) AccentCyan else DarkSurfaceBorder,
+                            if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
                             RoundedCornerShape(20.dp)
                         )
                         .clickable { selectedSection = sec }
                 ) {
                     Text(
                         text = sec,
-                        color = if (isSelected) DarkBackground else TextPrimary,
+                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
                         fontSize = 13.sp,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
@@ -108,11 +108,11 @@ fun CategoriesScreen() {
             if (itemsForSection.isEmpty()) {
                 item {
                     Card(
-                        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .border(1.dp, DarkSurfaceBorder, RoundedCornerShape(12.dp))
+                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
                     ) {
                         Box(
                             modifier = Modifier
@@ -122,7 +122,7 @@ fun CategoriesScreen() {
                         ) {
                             Text(
                                 text = "Loading $selectedSection categories from spreadsheet...",
-                                color = TextMuted,
+                                color = MaterialTheme.colorScheme.outline,
                                 fontSize = 13.sp
                             )
                         }
@@ -131,11 +131,11 @@ fun CategoriesScreen() {
             } else {
                 items(itemsForSection) { item ->
                     Card(
-                        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .border(1.dp, DarkSurfaceBorder, RoundedCornerShape(12.dp))
+                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
                             Row(
@@ -145,14 +145,14 @@ fun CategoriesScreen() {
                             ) {
                                 Text(
                                     text = item.category,
-                                    color = TextPrimary,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 14.sp
                                 )
                                 val diffColor = when {
                                     item.diff < 0 -> AccentAmber
-                                    item.diff > 0 -> MpesaGreen
-                                    else -> TextMuted
+                                    item.diff > 0 -> MaterialTheme.colorScheme.primary
+                                    else -> MaterialTheme.colorScheme.outline
                                 }
                                 Text(
                                     text = "Diff: Ksh ${String.format("%,.0f", item.diff)}",
@@ -168,7 +168,7 @@ fun CategoriesScreen() {
                             ) {
                                 Text(
                                     text = "Goal: Ksh ${String.format("%,.0f", item.goal)}",
-                                    color = TextSecondary,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontSize = 12.sp
                                 )
                                 Text(

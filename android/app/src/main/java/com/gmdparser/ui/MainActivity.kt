@@ -22,10 +22,7 @@ import androidx.core.content.ContextCompat
 import com.gmdparser.data.repository.TaxonomyRepository
 import com.gmdparser.data.repository.TransactionRepository
 import com.gmdparser.ui.screens.*
-import com.gmdparser.ui.theme.DarkBackground
-import com.gmdparser.ui.theme.DarkSurface
 import com.gmdparser.ui.theme.GMDParserTheme
-import com.gmdparser.ui.theme.MpesaGreen
 import com.gmdparser.ui.theme.ThemeManager
 import com.gmdparser.util.AppPreferences
 import kotlinx.coroutines.launch
@@ -142,14 +139,14 @@ fun MainAppHost(initialScreen: Screen = Screen.DASHBOARD) {
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = DarkSurface,
-                    titleContentColor = androidx.compose.ui.graphics.Color.White
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface
                 )
             )
         },
         bottomBar = {
             NavigationBar(
-                containerColor = DarkSurface,
+                containerColor = MaterialTheme.colorScheme.surface,
                 tonalElevation = 8.dp
             ) {
                 val primaryTabs = listOf(Screen.DASHBOARD, Screen.REVIEW, Screen.HISTORY, Screen.ACCOUNTS, Screen.SETTINGS)
@@ -160,7 +157,7 @@ fun MainAppHost(initialScreen: Screen = Screen.DASHBOARD) {
                         icon = {
                             if (screen == Screen.REVIEW && pendingCount.isNotEmpty()) {
                                 BadgedBox(badge = {
-                                    Badge(containerColor = MpesaGreen) {
+                                    Badge(containerColor = MaterialTheme.colorScheme.primary) {
                                         Text(pendingCount.size.toString())
                                     }
                                 }) {
@@ -172,9 +169,11 @@ fun MainAppHost(initialScreen: Screen = Screen.DASHBOARD) {
                         },
                         label = { Text(screen.title, fontSize = 10.sp) },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = MpesaGreen,
-                            selectedTextColor = MpesaGreen,
-                            indicatorColor = DarkBackground
+                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            indicatorColor = MaterialTheme.colorScheme.surfaceVariant
                         )
                     )
                 }
@@ -185,7 +184,7 @@ fun MainAppHost(initialScreen: Screen = Screen.DASHBOARD) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(DarkBackground)
+                .background(MaterialTheme.colorScheme.background)
         ) {
             when (currentScreen) {
                 Screen.DASHBOARD -> DashboardScreen(

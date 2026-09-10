@@ -121,7 +121,7 @@ fun PinLockScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(DarkBackground),
+            .background(MaterialTheme.colorScheme.background),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -135,14 +135,14 @@ fun PinLockScreen(
             Box(
                 modifier = Modifier
                     .size(72.dp)
-                    .background(MpesaGreen.copy(alpha = 0.15f), CircleShape)
-                    .border(2.dp, MpesaGreen.copy(alpha = 0.4f), CircleShape),
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), CircleShape)
+                    .border(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     Icons.Default.Lock,
                     contentDescription = null,
-                    tint = MpesaGreen,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(32.dp)
                 )
             }
@@ -150,14 +150,14 @@ fun PinLockScreen(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = titleText,
-                    color = TextPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text = subtitleText,
-                    color = TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 13.sp,
                     textAlign = TextAlign.Center
                 )
@@ -171,14 +171,14 @@ fun PinLockScreen(
                 repeat(maxLen) { i ->
                     val filled = i < entered.length
                     val dotColor by animateColorAsState(
-                        targetValue = if (filled) MpesaGreen else DarkSurfaceBorder,
+                        targetValue = if (filled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
                         label = "dot_$i"
                     )
                     Box(
                         modifier = Modifier
                             .size(14.dp)
                             .background(dotColor, CircleShape)
-                            .border(1.dp, if (filled) MpesaGreen else DarkSurfaceBorder, CircleShape)
+                            .border(1.dp, if (filled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant, CircleShape)
                     )
                 }
             }
@@ -221,7 +221,7 @@ fun PinLockScreen(
             // Cancel (only available in SET mode or if a cancel callback is provided)
             if (onCancel != null) {
                 TextButton(onClick = onCancel) {
-                    Text("Cancel", color = TextSecondary, fontSize = 13.sp)
+                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
                 }
             }
         }
@@ -246,12 +246,12 @@ private fun PinKey(
             .size(72.dp)
             .scale(scale)
             .background(
-                if (label.isEmpty()) Color.Transparent else DarkSurface,
+                if (label.isEmpty()) Color.Transparent else MaterialTheme.colorScheme.surface,
                 CircleShape
             )
             .then(
                 if (label.isNotEmpty())
-                    Modifier.border(1.dp, DarkSurfaceBorder, CircleShape)
+                    Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
                 else Modifier
             )
             .clickable(enabled = label.isNotEmpty()) {
@@ -259,11 +259,11 @@ private fun PinKey(
             }
     ) {
         if (label == "⌫") {
-            Icon(Icons.Default.Backspace, contentDescription = "Delete", tint = TextSecondary, modifier = Modifier.size(22.dp))
+            Icon(Icons.Default.Backspace, contentDescription = "Delete", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
         } else if (label.isNotEmpty()) {
             Text(
                 text = label,
-                color = TextPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold
             )

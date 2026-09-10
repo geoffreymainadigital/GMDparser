@@ -58,7 +58,7 @@ fun AccountsScreen() {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(DarkBackground)
+            .background(MaterialTheme.colorScheme.background)
             .padding(16.dp)
     ) {
         Row(
@@ -69,13 +69,13 @@ fun AccountsScreen() {
             Column {
                 Text(
                     text = "Financial Accounts",
-                    color = TextPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
                     text = "Live balances from Accounts tab in Google Sheets",
-                    color = TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.sp
                 )
             }
@@ -93,11 +93,11 @@ fun AccountsScreen() {
                 val liveAcct = liveAccounts?.firstOrNull { it.accountName.equals(acc.name, ignoreCase = true) }
 
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .border(1.dp, DarkSurfaceBorder, RoundedCornerShape(12.dp))
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
                         Row(
@@ -124,13 +124,13 @@ fun AccountsScreen() {
                                 Column {
                                     Text(
                                         text = acc.name,
-                                        color = TextPrimary,
+                                        color = MaterialTheme.colorScheme.onSurface,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 15.sp
                                     )
                                     Text(
                                         text = acc.type,
-                                        color = TextSecondary,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         fontSize = 12.sp
                                     )
                                 }
@@ -138,12 +138,12 @@ fun AccountsScreen() {
 
                             if (acc.isDefault) {
                                 Surface(
-                                    color = MpesaGreen.copy(alpha = 0.2f),
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
                                     shape = RoundedCornerShape(6.dp)
                                 ) {
                                     Text(
                                         text = "DEFAULT",
-                                        color = MpesaGreen,
+                                        color = MaterialTheme.colorScheme.primary,
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
                                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
@@ -153,7 +153,7 @@ fun AccountsScreen() {
                         }
 
                         Spacer(modifier = Modifier.height(10.dp))
-                        Divider(color = DarkSurfaceBorder, thickness = 1.dp)
+                        Divider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
                         Spacer(modifier = Modifier.height(10.dp))
 
                         val curBal = liveAcct?.currentBalance ?: 0.0
@@ -165,25 +165,25 @@ fun AccountsScreen() {
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Column {
-                                Text("Current Balance", color = TextMuted, fontSize = 11.sp)
+                                Text("Current Balance", color = MaterialTheme.colorScheme.outline, fontSize = 11.sp)
                                 Text(
                                     text = "Ksh ${String.format("%,.2f", curBal)}",
-                                    color = if (curBal >= 0) TextPrimary else AccentRed,
+                                    color = if (curBal >= 0) MaterialTheme.colorScheme.onSurface else AccentRed,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 15.sp
                                 )
                             }
                             Column(horizontalAlignment = Alignment.End) {
-                                Text("Deposits (+)", color = TextMuted, fontSize = 11.sp)
+                                Text("Deposits (+)", color = MaterialTheme.colorScheme.outline, fontSize = 11.sp)
                                 Text(
                                     text = "+Ksh ${String.format("%,.2f", dep)}",
-                                    color = MpesaGreen,
+                                    color = MaterialTheme.colorScheme.primary,
                                     fontWeight = FontWeight.Medium,
                                     fontSize = 12.sp
                                 )
                             }
                             Column(horizontalAlignment = Alignment.End) {
-                                Text("Withdrawals (-)", color = TextMuted, fontSize = 11.sp)
+                                Text("Withdrawals (-)", color = MaterialTheme.colorScheme.outline, fontSize = 11.sp)
                                 Text(
                                     text = "Ksh ${String.format("%,.2f", wth)}",
                                     color = AccentAmber,
@@ -201,7 +201,7 @@ fun AccountsScreen() {
             if (totalAcct != null) {
                 item {
                     Card(
-                        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .fillMaxWidth()
@@ -216,7 +216,7 @@ fun AccountsScreen() {
                                 Text("TOTAL NET ACCOUNTS", color = AccentCyan, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                 Text(
                                     text = "Ksh ${String.format("%,.2f", totalAcct.currentBalance)}",
-                                    color = if (totalAcct.currentBalance >= 0) MpesaGreen else AccentRed,
+                                    color = if (totalAcct.currentBalance >= 0) MaterialTheme.colorScheme.primary else AccentRed,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 15.sp
                                 )
@@ -226,7 +226,7 @@ fun AccountsScreen() {
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text("Deposits: +Ksh ${String.format("%,.2f", totalAcct.deposits)}", color = MpesaGreen, fontSize = 11.sp)
+                                Text("Deposits: +Ksh ${String.format("%,.2f", totalAcct.deposits)}", color = MaterialTheme.colorScheme.primary, fontSize = 11.sp)
                                 Text("Withdrawals: Ksh ${String.format("%,.2f", totalAcct.withdrawals)}", color = AccentAmber, fontSize = 11.sp)
                             }
                         }

@@ -27,31 +27,31 @@ fun SavingsScreen() {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(DarkBackground)
+            .background(MaterialTheme.colorScheme.background)
             .padding(16.dp)
     ) {
-        Text("Savings & Investments", color = TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-        Text("Capital reserves tracked through M-PESA deposits", color = TextSecondary, fontSize = 12.sp)
+        Text("Savings & Investments", color = MaterialTheme.colorScheme.onSurface, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        Text("Capital reserves tracked through M-PESA deposits", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
 
         Spacer(modifier = Modifier.height(16.dp))
 
         LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             items(funds) { f ->
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth().border(1.dp, DarkSurfaceBorder, RoundedCornerShape(12.dp))
+                    modifier = Modifier.fillMaxWidth().border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
-                        Text(f.name, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                        Text(f.institution, color = TextMuted, fontSize = 11.sp)
+                        Text(f.name, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text(f.institution, color = MaterialTheme.colorScheme.outline, fontSize = 11.sp)
                         Spacer(modifier = Modifier.height(8.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text("Current: Ksh ${String.format("%,.0f", f.balance)}", color = MpesaGreen, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                            Text("Target: Ksh ${String.format("%,.0f", f.target)}", color = TextSecondary, fontSize = 12.sp)
+                            Text("Current: Ksh ${String.format("%,.0f", f.balance)}", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text("Target: Ksh ${String.format("%,.0f", f.target)}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                         }
                     }
                 }

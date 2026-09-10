@@ -38,22 +38,22 @@ fun DashboardScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(DarkBackground)
+            .background(MaterialTheme.colorScheme.background)
             .padding(16.dp)
             .verticalScroll(rememberScrollState())
     ) {
         // Top Balance / Status Banner
         Card(
-            colors = CardDefaults.cardColors(containerColor = DarkSurface),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier
                 .fillMaxWidth()
-                .border(1.dp, DarkSurfaceBorder, RoundedCornerShape(16.dp))
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp))
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Text(
                     text = "M-PESA OPERATING LEDGER",
-                    color = TextMuted,
+                    color = MaterialTheme.colorScheme.outline,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.sp
@@ -65,19 +65,19 @@ fun DashboardScreen(
 
                 Text(
                     text = "Ksh ${String.format("%,.2f", totalSyncedAmount)}",
-                    color = TextPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 28.sp,
                     fontWeight = FontWeight.ExtraBold
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Surface(
-                        color = MpesaGreen.copy(alpha = 0.2f),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
                         shape = RoundedCornerShape(4.dp)
                     ) {
                         Text(
                             text = "● Google Sheets Synchronized",
-                            color = MpesaGreen,
+                            color = MaterialTheme.colorScheme.primary,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -86,7 +86,7 @@ fun DashboardScreen(
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = "${confirmedList.size} transactions recorded",
-                        color = TextSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 12.sp
                     )
                 }
@@ -106,11 +106,11 @@ fun DashboardScreen(
         val showLoading = activeData == null
 
         Card(
-            colors = CardDefaults.cardColors(containerColor = DarkSurface),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier
                 .fillMaxWidth()
-                .border(1.dp, DarkSurfaceBorder, RoundedCornerShape(16.dp))
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp))
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(
@@ -129,88 +129,88 @@ fun DashboardScreen(
                     }
                     Text(
                         text = titleText,
-                        color = TextPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold,
                         fontSize = 15.sp,
                         modifier = Modifier.weight(1f)
                     )
                     Surface(
-                        color = if (showLoading) AccentAmber.copy(alpha = 0.2f) else AccentCyan.copy(alpha = 0.2f),
+                        color = if (showLoading) AccentAmber.copy(alpha = 0.2f) else MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f),
                         shape = RoundedCornerShape(4.dp)
                     ) {
                         Text(
                             text = if (showLoading) "LOADING" else "LIVE",
-                            color = if (showLoading) AccentAmber else AccentCyan,
+                            color = if (showLoading) AccentAmber else MaterialTheme.colorScheme.secondary,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
                     }
                 }
-                    Spacer(modifier = Modifier.height(10.dp))
-                    
-                    // Period Toggle
-                    Row(
+                Spacer(modifier = Modifier.height(10.dp))
+                
+                // Period Toggle
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.background, RoundedCornerShape(8.dp))
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
+                        .padding(4.dp),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    val isMonthly = selectedPeriod == "monthly"
+                    Surface(
+                        color = if (isMonthly) MaterialTheme.colorScheme.primary else Color.Transparent,
+                        shape = RoundedCornerShape(6.dp),
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .background(DarkBackground, RoundedCornerShape(8.dp))
-                            .border(1.dp, DarkSurfaceBorder, RoundedCornerShape(8.dp))
-                            .padding(4.dp),
-                        horizontalArrangement = Arrangement.Center
+                            .weight(1f)
+                            .clickable { selectedPeriod = "monthly" }
                     ) {
-                        val isMonthly = selectedPeriod == "monthly"
-                        Surface(
-                            color = if (isMonthly) MpesaGreen else Color.Transparent,
-                            shape = RoundedCornerShape(6.dp),
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable { selectedPeriod = "monthly" }
-                        ) {
-                            Text(
-                                text = "Monthly",
-                                color = if (isMonthly) Color.Black else TextPrimary,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp,
-                                modifier = Modifier.padding(vertical = 6.dp),
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                            )
-                        }
-                        Surface(
-                            color = if (!isMonthly) MpesaGreen else Color.Transparent,
-                            shape = RoundedCornerShape(6.dp),
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable { selectedPeriod = "annual" }
-                        ) {
-                            Text(
-                                text = "Annual",
-                                color = if (!isMonthly) Color.Black else TextPrimary,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp,
-                                modifier = Modifier.padding(vertical = 6.dp),
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                            )
-                        }
+                        Text(
+                            text = "Monthly",
+                            color = if (isMonthly) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(vertical = 6.dp),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
                     }
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    val tiles = activeData?.summaryTiles
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        BudgetSummaryTile("Income", tiles?.totalIncome?.actual ?: 0.0, tiles?.totalIncome?.goal, MpesaGreen, Modifier.weight(1f))
-                        BudgetSummaryTile("Bills", tiles?.totalBills?.actual ?: 0.0, tiles?.totalBills?.goal, AccentAmber, Modifier.weight(1f))
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        BudgetSummaryTile("Debt", tiles?.totalDebtPayoff?.actual ?: 0.0, tiles?.totalDebtPayoff?.goal, AccentBlue, Modifier.weight(1f))
-                        BudgetSummaryTile("Expenses", tiles?.totalExpenses?.actual ?: 0.0, tiles?.totalExpenses?.goal, AccentRed, Modifier.weight(1f))
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        BudgetSummaryTile("Savings", tiles?.totalSavings?.actual ?: 0.0, tiles?.totalSavings?.goal, AccentCyan, Modifier.weight(1f))
-                        BudgetSummaryTile("Unallocated", tiles?.unallocatedIncome?.actual ?: 0.0, null, TextSecondary, Modifier.weight(1f))
+                    Surface(
+                        color = if (!isMonthly) MaterialTheme.colorScheme.primary else Color.Transparent,
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { selectedPeriod = "annual" }
+                    ) {
+                        Text(
+                            text = "Annual",
+                            color = if (!isMonthly) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(vertical = 6.dp),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
                     }
                 }
+                Spacer(modifier = Modifier.height(12.dp))
+
+                val tiles = activeData?.summaryTiles
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    BudgetSummaryTile("Income", tiles?.totalIncome?.actual ?: 0.0, tiles?.totalIncome?.goal, MaterialTheme.colorScheme.primary, Modifier.weight(1f))
+                    BudgetSummaryTile("Bills", tiles?.totalBills?.actual ?: 0.0, tiles?.totalBills?.goal, AccentAmber, Modifier.weight(1f))
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    BudgetSummaryTile("Debt", tiles?.totalDebtPayoff?.actual ?: 0.0, tiles?.totalDebtPayoff?.goal, AccentBlue, Modifier.weight(1f))
+                    BudgetSummaryTile("Expenses", tiles?.totalExpenses?.actual ?: 0.0, tiles?.totalExpenses?.goal, AccentRed, Modifier.weight(1f))
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    BudgetSummaryTile("Savings", tiles?.totalSavings?.actual ?: 0.0, tiles?.totalSavings?.goal, AccentCyan, Modifier.weight(1f))
+                    BudgetSummaryTile("Unallocated", tiles?.unallocatedIncome?.actual ?: 0.0, null, MaterialTheme.colorScheme.onSurfaceVariant, Modifier.weight(1f))
+                }
             }
+        }
         Spacer(modifier = Modifier.height(16.dp))
 
         // Pending Reviews Call-To-Action Banner (if any pending)
@@ -234,13 +234,13 @@ fun DashboardScreen(
                         Column {
                             Text(
                                 text = "${pendingList.size} Transaction${if (pendingList.size > 1) "s" else ""} Awaiting Confirmation",
-                                color = TextPrimary,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.sp
                             )
                             Text(
                                 text = "Tap to review classification and record to sheet",
-                                color = TextSecondary,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 11.sp
                             )
                         }
@@ -287,17 +287,17 @@ fun MetricQuickCard(
     onClick: () -> Unit
 ) {
     Card(
-        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(14.dp),
         modifier = modifier
-            .border(1.dp, DarkSurfaceBorder, RoundedCornerShape(14.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(14.dp))
             .clickable { onClick() }
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(22.dp))
             Spacer(modifier = Modifier.height(8.dp))
-            Text(title, color = TextMuted, fontSize = 11.sp)
-            Text(value, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            Text(title, color = MaterialTheme.colorScheme.outline, fontSize = 11.sp)
+            Text(value, color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -311,12 +311,12 @@ fun BudgetSummaryTile(
     modifier: Modifier = Modifier
 ) {
     Surface(
-        color = DarkBackground,
+        color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(10.dp),
         modifier = modifier
     ) {
         Column(modifier = Modifier.padding(10.dp)) {
-            Text(text = label, color = TextMuted, fontSize = 11.sp)
+            Text(text = label, color = MaterialTheme.colorScheme.outline, fontSize = 11.sp)
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = "Ksh ${String.format("%,.0f", actual)}",
@@ -328,7 +328,7 @@ fun BudgetSummaryTile(
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = "Goal: Ksh ${String.format("%,.0f", goal)}",
-                    color = TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 10.sp
                 )
             }

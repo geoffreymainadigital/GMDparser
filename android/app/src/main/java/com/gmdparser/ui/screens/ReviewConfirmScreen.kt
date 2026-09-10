@@ -182,7 +182,7 @@ fun ReviewConfirmScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(DarkBackground)
+            .background(MaterialTheme.colorScheme.background)
             .padding(16.dp)
             .verticalScroll(rememberScrollState())
     ) {
@@ -193,14 +193,14 @@ fun ReviewConfirmScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
-                Text("Review Queue", color = TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                Text("Verify and confirm before writing to spreadsheet", color = TextSecondary, fontSize = 12.sp)
+                Text("Review Queue", color = MaterialTheme.colorScheme.onSurface, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text("Verify and confirm before writing to spreadsheet", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
             }
 
             OutlinedButton(
                 onClick = { showScanDialog = true },
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = MpesaGreen),
-                border = androidx.compose.foundation.BorderStroke(1.dp, MpesaGreen.copy(alpha = 0.6f)),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)),
                 shape = RoundedCornerShape(10.dp),
                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
             ) {
@@ -215,10 +215,10 @@ fun ReviewConfirmScreen(
         // Feedback Banner
         if (feedbackMessage != null) {
             val (containerColor, textColor) = when (feedbackStyle) {
-                FeedbackStyle.SUCCESS -> Pair(MpesaGreen.copy(alpha = 0.18f), MpesaGreen)
+                FeedbackStyle.SUCCESS -> Pair(MaterialTheme.colorScheme.primary.copy(alpha = 0.18f), MaterialTheme.colorScheme.primary)
                 FeedbackStyle.DUPLICATE -> Pair(AccentAmber.copy(alpha = 0.22f), AccentAmber)
                 FeedbackStyle.ERROR -> Pair(AccentRed.copy(alpha = 0.2f), AccentRed)
-                FeedbackStyle.NONE -> Pair(DarkSurfaceCard, TextPrimary)
+                FeedbackStyle.NONE -> Pair(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.onSurface)
             }
             Card(
                 colors = CardDefaults.cardColors(containerColor = containerColor),
@@ -252,20 +252,20 @@ fun ReviewConfirmScreen(
                     Icon(
                         Icons.Default.CheckCircle,
                         contentDescription = null,
-                        tint = MpesaGreen,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(48.dp)
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
                         text = "All Caught Up!",
-                        color = TextPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 17.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "No pending M-PESA transactions waiting for review.",
-                        color = TextSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 12.sp
                     )
                 }
@@ -298,7 +298,7 @@ fun ReviewConfirmScreen(
         ) {
             Text(
                 text = "Pending Items (${orderedPending.size}) — Oldest First",
-                color = TextPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -307,7 +307,7 @@ fun ReviewConfirmScreen(
             if (orderedPending.size >= 2 && !batchSubmitting && submittingTxCode == null) {
                 Button(
                     onClick = { submitBatch(orderedPending) },
-                    colors = ButtonDefaults.buttonColors(containerColor = MpesaGreen),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                     shape = RoundedCornerShape(10.dp),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                 ) {
@@ -425,11 +425,11 @@ fun BatchTransactionItemCard(
     val availableCategories = liveCategoriesByType[selectedType] ?: emptyList()
 
     Card(
-        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(14.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, if (isExpanded) MpesaGreen.copy(alpha = 0.6f) else DarkSurfaceBorder, RoundedCornerShape(14.dp))
+            .border(1.dp, if (isExpanded) MaterialTheme.colorScheme.primary.copy(alpha = 0.6f) else MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(14.dp))
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             // Header Row: Code, Time, Dismiss button
@@ -455,7 +455,7 @@ fun BatchTransactionItemCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = "${transaction.date} ${transaction.time}".trim(),
-                        color = TextMuted,
+                        color = MaterialTheme.colorScheme.outline,
                         fontSize = 11.sp
                     )
                     Spacer(modifier = Modifier.width(8.dp))
@@ -464,7 +464,7 @@ fun BatchTransactionItemCard(
                         enabled = !isSubmitting,
                         modifier = Modifier.size(24.dp)
                     ) {
-                        Icon(Icons.Default.Close, contentDescription = "Dismiss", tint = TextMuted, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.Close, contentDescription = "Dismiss", tint = MaterialTheme.colorScheme.outline, modifier = Modifier.size(16.dp))
                     }
                 }
             }
@@ -480,13 +480,13 @@ fun BatchTransactionItemCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Ksh ${String.format(java.util.Locale.ROOT, "%,.2f", transaction.amount)}",
-                        color = TextPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = transaction.description,
-                        color = TextSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 13.sp,
                         maxLines = if (isExpanded) 3 else 1
                     )
@@ -502,12 +502,12 @@ fun BatchTransactionItemCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Surface(
-                    color = DarkSurfaceCard,
+                    color = MaterialTheme.colorScheme.surfaceVariant,
                     shape = RoundedCornerShape(6.dp)
                 ) {
                     Text(
                         text = transaction.type,
-                        color = TextPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 11.sp,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                     )
@@ -515,12 +515,12 @@ fun BatchTransactionItemCard(
 
                 if (transaction.category.isNotBlank()) {
                     Surface(
-                        color = MpesaGreen.copy(alpha = 0.15f),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
                         shape = RoundedCornerShape(6.dp)
                     ) {
                         Text(
                             text = transaction.category,
-                            color = MpesaGreen,
+                            color = MaterialTheme.colorScheme.primary,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
@@ -546,7 +546,7 @@ fun BatchTransactionItemCard(
             // Expandable Inline Editor Section
             AnimatedVisibility(visible = isExpanded) {
                 Column(modifier = Modifier.padding(top = 12.dp)) {
-                    Divider(color = DarkSurfaceBorder, thickness = 1.dp)
+                    Divider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
                     Spacer(modifier = Modifier.height(10.dp))
 
                     // Amount Override
@@ -555,10 +555,10 @@ fun BatchTransactionItemCard(
                         onValueChange = { amountText = it },
                         label = { Text("Amount (Ksh)") },
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MpesaGreen,
-                            unfocusedBorderColor = DarkSurfaceBorder,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                         ),
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
@@ -567,7 +567,7 @@ fun BatchTransactionItemCard(
                     Spacer(modifier = Modifier.height(10.dp))
 
                     // Type Chips
-                    Text("Type", color = TextSecondary, fontSize = 11.sp)
+                    Text("Type", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -583,8 +583,10 @@ fun BatchTransactionItemCard(
                                 },
                                 label = { Text(t, fontSize = 11.sp) },
                                 colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = MpesaGreen,
-                                    selectedLabelColor = Color.White
+                                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             )
                         }
@@ -604,8 +606,10 @@ fun BatchTransactionItemCard(
                                     },
                                     label = { Text(t, fontSize = 11.sp) },
                                     colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = MpesaGreen,
-                                        selectedLabelColor = Color.White
+                                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                        labelColor = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 )
                             }
@@ -620,10 +624,10 @@ fun BatchTransactionItemCard(
                         onValueChange = { selectedCategory = it },
                         label = { Text("Category") },
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MpesaGreen,
-                            unfocusedBorderColor = DarkSurfaceBorder,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                         ),
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
@@ -642,7 +646,7 @@ fun BatchTransactionItemCard(
                                     onClick = { selectedCategory = cat },
                                     label = { Text(cat, fontSize = 10.sp) },
                                     colors = AssistChipDefaults.assistChipColors(
-                                        containerColor = if (selectedCategory == cat) MpesaGreen.copy(alpha = 0.3f) else DarkSurfaceCard
+                                        containerColor = if (selectedCategory == cat) MaterialTheme.colorScheme.primary.copy(alpha = 0.3f) else MaterialTheme.colorScheme.surfaceVariant
                                     )
                                 )
                             }
@@ -657,10 +661,10 @@ fun BatchTransactionItemCard(
                         onValueChange = { descriptionText = it },
                         label = { Text("Description / Payee") },
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MpesaGreen,
-                            unfocusedBorderColor = DarkSurfaceBorder,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                         ),
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
@@ -674,10 +678,10 @@ fun BatchTransactionItemCard(
                         onValueChange = { selectedAccount = it },
                         label = { Text("Account") },
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MpesaGreen,
-                            unfocusedBorderColor = DarkSurfaceBorder,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                         ),
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
@@ -691,9 +695,9 @@ fun BatchTransactionItemCard(
                             label = { Text("Destination Account") },
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = AccentCyan,
-                                unfocusedBorderColor = DarkSurfaceBorder,
-                                focusedTextColor = TextPrimary,
-                                unfocusedTextColor = TextPrimary
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                             ),
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true
@@ -704,7 +708,7 @@ fun BatchTransactionItemCard(
                     if (transaction.cost != null && transaction.cost > 0.0) {
                         Spacer(modifier = Modifier.height(10.dp))
                         Surface(
-                            color = if (recordFee) MpesaGreen.copy(alpha = 0.12f) else DarkSurfaceCard,
+                            color = if (recordFee) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant,
                             shape = RoundedCornerShape(8.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -717,19 +721,19 @@ fun BatchTransactionItemCard(
                                 Checkbox(
                                     checked = recordFee,
                                     onCheckedChange = { recordFee = it },
-                                    colors = CheckboxDefaults.colors(checkedColor = MpesaGreen)
+                                    colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Column {
                                     Text(
                                         text = "Record Fee: Ksh ${String.format(java.util.Locale.ROOT, "%.2f", transaction.cost)}",
-                                        color = TextPrimary,
+                                        color = MaterialTheme.colorScheme.onSurface,
                                         fontWeight = FontWeight.SemiBold,
                                         fontSize = 12.sp
                                     )
                                     Text(
                                         text = "Will record fee as Expenses → Transaction Cost",
-                                        color = TextSecondary,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         fontSize = 10.sp
                                     )
                                 }
@@ -764,8 +768,8 @@ fun BatchTransactionItemCard(
                     OutlinedButton(
                         onClick = onToggleExpand,
                         enabled = !isSubmitting,
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, DarkSurfaceBorder),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(10.dp)
                     ) {
@@ -796,16 +800,16 @@ fun BatchTransactionItemCard(
                             }
                         },
                         enabled = !isSubmitting && !isUncategorized,
-                        colors = ButtonDefaults.buttonColors(containerColor = MpesaGreen),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                         modifier = Modifier.weight(2f),
                         shape = RoundedCornerShape(10.dp)
                     ) {
                         if (isSubmitting) {
-                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                         } else {
                             Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text(if (isExpanded) "Save Edited" else "1-Tap Confirm", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text(if (isExpanded) "Save Edited" else "1-Tap Confirm", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         }
                     }
                 }
@@ -821,22 +825,22 @@ fun SmsManualSimulatorCard(
     onParseAndAdd: (String) -> Unit
 ) {
     Card(
-        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(14.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, DarkSurfaceBorder, RoundedCornerShape(14.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(14.dp))
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 text = "SMS Detection & Parser Simulator",
-                color = TextPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold
             )
             Text(
                 text = "Paste any Kenyan M-PESA SMS to test parser and add to review queue.",
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 11.sp
             )
 
@@ -845,14 +849,14 @@ fun SmsManualSimulatorCard(
             OutlinedTextField(
                 value = smsText,
                 onValueChange = onSmsTextChange,
-                placeholder = { Text("Paste M-PESA SMS text here...", color = TextMuted) },
+                placeholder = { Text("Paste M-PESA SMS text here...", color = MaterialTheme.colorScheme.outline) },
                 modifier = Modifier.fillMaxWidth(),
                 maxLines = 4,
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MpesaGreen,
-                    unfocusedBorderColor = DarkSurfaceBorder,
-                    focusedTextColor = TextPrimary,
-                    unfocusedTextColor = TextPrimary
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                 )
             )
 
@@ -887,18 +891,18 @@ fun SmsManualSimulatorCard(
 
             Button(
                 onClick = { onParseAndAdd(smsText) },
-                colors = ButtonDefaults.buttonColors(containerColor = MpesaGreen),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(10.dp)
             ) {
                 Icon(Icons.Default.Done, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("Parse & Stage in Queue", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Text("Parse & Stage in Queue", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
             }
 
             if (!feedback.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(text = feedback, color = AccentCyan, fontSize = 12.sp)
+                Text(text = feedback, color = MaterialTheme.colorScheme.primary, fontSize = 12.sp)
             }
         }
     }

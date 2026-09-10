@@ -39,18 +39,18 @@ fun HistoryScreen() {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(DarkBackground)
+            .background(MaterialTheme.colorScheme.background)
             .padding(16.dp)
     ) {
         Text(
             text = "Transaction Ledger",
-            color = TextPrimary,
+            color = MaterialTheme.colorScheme.onSurface,
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold
         )
         Text(
             text = "Confirmed M-PESA records synced with Google Sheets",
-            color = TextSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 12.sp
         )
 
@@ -62,13 +62,22 @@ fun HistoryScreen() {
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             filterOptions.take(4).forEach { option ->
+                val isSelected = selectedFilter == option
                 FilterChip(
-                    selected = selectedFilter == option,
+                    selected = isSelected,
                     onClick = { selectedFilter = option },
                     label = { Text(option, fontSize = 11.sp) },
                     colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MpesaGreen,
-                        selectedLabelColor = Color.White
+                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    ),
+                    border = FilterChipDefaults.filterChipBorder(
+                        enabled = true,
+                        selected = isSelected,
+                        borderColor = MaterialTheme.colorScheme.outlineVariant,
+                        selectedBorderColor = MaterialTheme.colorScheme.primary
                     )
                 )
             }
@@ -85,7 +94,7 @@ fun HistoryScreen() {
             ) {
                 Text(
                     text = "No transactions found in this view.",
-                    color = TextMuted,
+                    color = MaterialTheme.colorScheme.outline,
                     fontSize = 14.sp
                 )
             }
@@ -105,11 +114,11 @@ fun HistoryScreen() {
 @Composable
 fun HistoryItemCard(transaction: Transaction) {
     Card(
-        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, DarkSurfaceBorder, RoundedCornerShape(12.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
     ) {
         Row(
             modifier = Modifier
@@ -122,7 +131,7 @@ fun HistoryItemCard(transaction: Transaction) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = transaction.description,
-                        color = TextPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -131,12 +140,12 @@ fun HistoryItemCard(transaction: Transaction) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = transaction.category,
-                        color = TextSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 11.sp
                     )
                     Text(
                         text = " • ${transaction.date}",
-                        color = TextMuted,
+                        color = MaterialTheme.colorScheme.outline,
                         fontSize = 11.sp
                     )
                 }
@@ -153,14 +162,14 @@ fun HistoryItemCard(transaction: Transaction) {
                 val isIncome = transaction.type == "Income"
                 Text(
                     text = "${if (isIncome) "+" else "-"}Ksh ${String.format("%,.2f", transaction.amount)}",
-                    color = if (isIncome) MpesaGreen else TextPrimary,
+                    color = if (isIncome) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Surface(
                     color = when (transaction.status) {
-                        TransactionStatus.SYNCED -> MpesaGreen.copy(alpha = 0.2f)
+                        TransactionStatus.SYNCED -> MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
                         TransactionStatus.DUPLICATE -> AccentAmber.copy(alpha = 0.2f)
                         else -> AccentRed.copy(alpha = 0.2f)
                     },
@@ -169,7 +178,7 @@ fun HistoryItemCard(transaction: Transaction) {
                     Text(
                         text = transaction.status.name,
                         color = when (transaction.status) {
-                            TransactionStatus.SYNCED -> MpesaGreen
+                            TransactionStatus.SYNCED -> MaterialTheme.colorScheme.primary
                             TransactionStatus.DUPLICATE -> AccentAmber
                             else -> AccentRed
                         },

@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -85,31 +86,31 @@ fun SettingsScreen() {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(DarkBackground)
+            .background(MaterialTheme.colorScheme.background)
             .padding(16.dp)
             .verticalScroll(rememberScrollState())
     ) {
-        Text("System Settings", color = TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-        Text("Security, appearance, reminders, and gateway configuration", color = TextSecondary, fontSize = 12.sp)
+        Text("System Settings", color = MaterialTheme.colorScheme.onSurface, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        Text("Security, appearance, reminders, and gateway configuration", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
 
         Spacer(modifier = Modifier.height(16.dp))
 
         // ── PIN Lock ────────────────────────────────────────────────────
         Card(
-            colors = CardDefaults.cardColors(containerColor = DarkSurface),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             shape = RoundedCornerShape(14.dp),
-            modifier = Modifier.fillMaxWidth().border(1.dp, DarkSurfaceBorder, RoundedCornerShape(14.dp))
+            modifier = Modifier.fillMaxWidth().border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(14.dp))
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Lock, contentDescription = null, tint = AccentPurple, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("PIN Lock", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text("PIN Lock", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 }
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     "Require a 6-digit PIN each time the app is opened.",
-                    color = TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 11.sp
                 )
                 Spacer(modifier = Modifier.height(12.dp))
@@ -153,7 +154,7 @@ fun SettingsScreen() {
                         ) {
                             Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Set PIN", color = TextPrimary, fontWeight = FontWeight.Bold)
+                            Text("Set PIN", color = Color.White, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -161,7 +162,7 @@ fun SettingsScreen() {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = if (pinEnabled) "✓ PIN lock is active" else "PIN lock is disabled",
-                    color = if (pinEnabled) MpesaGreen else TextMuted,
+                    color = if (pinEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -172,18 +173,18 @@ fun SettingsScreen() {
 
         // ── Theme Selector ───────────────────────────────────────────────
         Card(
-            colors = CardDefaults.cardColors(containerColor = DarkSurface),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             shape = RoundedCornerShape(14.dp),
-            modifier = Modifier.fillMaxWidth().border(1.dp, DarkSurfaceBorder, RoundedCornerShape(14.dp))
+            modifier = Modifier.fillMaxWidth().border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(14.dp))
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Palette, contentDescription = null, tint = AccentCyan, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Default.Palette, contentDescription = null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("App Theme", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text("App Theme", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 }
                 Spacer(modifier = Modifier.height(4.dp))
-                Text("Choose a colour scheme for the app interface.", color = TextSecondary, fontSize = 11.sp)
+                Text("Choose a colour scheme for the app interface.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -202,13 +203,14 @@ fun SettingsScreen() {
                             AppTheme.LIGHT    -> Icons.Default.LightMode
                         }
                         Surface(
-                            color = if (isSelected) accentColor.copy(alpha = 0.12f) else DarkSurfaceCard,
+                            onClick = { ThemeManager.setTheme(theme) },
+                            color = if (isSelected) accentColor.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant,
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .border(
                                     1.dp,
-                                    if (isSelected) accentColor.copy(alpha = 0.6f) else DarkSurfaceBorder,
+                                    if (isSelected) accentColor.copy(alpha = 0.6f) else MaterialTheme.colorScheme.outlineVariant,
                                     RoundedCornerShape(10.dp)
                                 )
                         ) {
@@ -223,7 +225,7 @@ fun SettingsScreen() {
                                     onClick = { ThemeManager.setTheme(theme) },
                                     colors = RadioButtonDefaults.colors(
                                         selectedColor = accentColor,
-                                        unselectedColor = TextMuted
+                                        unselectedColor = MaterialTheme.colorScheme.outline
                                     )
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
@@ -231,7 +233,7 @@ fun SettingsScreen() {
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = theme.label,
-                                    color = if (isSelected) TextPrimary else TextSecondary,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                     fontSize = 13.sp
                                 )
@@ -246,20 +248,20 @@ fun SettingsScreen() {
 
         // ── Review Cadence & Reminders ───────────────────────────────────
         Card(
-            colors = CardDefaults.cardColors(containerColor = DarkSurface),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             shape = RoundedCornerShape(14.dp),
-            modifier = Modifier.fillMaxWidth().border(1.dp, DarkSurfaceBorder, RoundedCornerShape(14.dp))
+            modifier = Modifier.fillMaxWidth().border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(14.dp))
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Notifications, contentDescription = null, tint = AccentCyan, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Default.Notifications, contentDescription = null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Review Reminder Cadence", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text("Review Reminder Cadence", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 }
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     "Receive notification alerts when unreviewed transactions are waiting in your queue.",
-                    color = TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 11.sp
                 )
 
@@ -279,16 +281,16 @@ fun SettingsScreen() {
                             },
                             label = { Text(cadence.label, fontSize = 12.sp) },
                             colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = AccentCyan.copy(alpha = 0.2f),
-                                selectedLabelColor = AccentCyan,
-                                containerColor = DarkSurfaceCard,
-                                labelColor = TextSecondary
+                                selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                                selectedLabelColor = MaterialTheme.colorScheme.primary,
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                labelColor = MaterialTheme.colorScheme.onSurfaceVariant
                             ),
                             border = FilterChipDefaults.filterChipBorder(
                                 enabled = true,
                                 selected = isSelected,
-                                borderColor = DarkSurfaceBorder,
-                                selectedBorderColor = AccentCyan
+                                borderColor = MaterialTheme.colorScheme.outlineVariant,
+                                selectedBorderColor = MaterialTheme.colorScheme.primary
                             )
                         )
                     }
@@ -302,7 +304,7 @@ fun SettingsScreen() {
                         ReminderCadence.WEEKLY  -> "Weekly reminders scheduled every 7 days when queue is non-empty."
                         ReminderCadence.MONTHLY -> "Monthly reminders scheduled every 30 days when queue is non-empty."
                     },
-                    color = if (currentCadence == ReminderCadence.OFF) TextMuted else AccentCyan,
+                    color = if (currentCadence == ReminderCadence.OFF) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.primary,
                     fontSize = 11.sp
                 )
             }
@@ -312,20 +314,20 @@ fun SettingsScreen() {
 
         // ── Advanced Inbox History Scan ───────────────────────────────────
         Card(
-            colors = CardDefaults.cardColors(containerColor = DarkSurface),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             shape = RoundedCornerShape(14.dp),
-            modifier = Modifier.fillMaxWidth().border(1.dp, DarkSurfaceBorder, RoundedCornerShape(14.dp))
+            modifier = Modifier.fillMaxWidth().border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(14.dp))
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Search, contentDescription = null, tint = AccentCyan, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Advanced Inbox History Scan", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text("Advanced Inbox History Scan", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 }
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     "Perform deep custom-range scans across your SMS inbox history (7d, 14d, 30d, 90d, or All time) to recover and deduplicate older records.",
-                    color = TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 11.sp
                 )
 
@@ -349,13 +351,13 @@ fun SettingsScreen() {
 
         // ── Vercel API Gateway Endpoint ──────────────────────────────────
         Card(
-            colors = CardDefaults.cardColors(containerColor = DarkSurface),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             shape = RoundedCornerShape(14.dp),
-            modifier = Modifier.fillMaxWidth().border(1.dp, DarkSurfaceBorder, RoundedCornerShape(14.dp))
+            modifier = Modifier.fillMaxWidth().border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(14.dp))
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text("Vercel Public API Gateway", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                Text("Public HTTPS proxy routing traffic to Apps Script", color = TextSecondary, fontSize = 11.sp)
+                Text("Vercel Public API Gateway", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text("Public HTTPS proxy routing traffic to Apps Script", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
 
                 Spacer(modifier = Modifier.height(10.dp))
 
@@ -367,10 +369,10 @@ fun SettingsScreen() {
                     },
                     label = { Text("Base URL") },
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MpesaGreen,
-                        unfocusedBorderColor = DarkSurfaceBorder,
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                     ),
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
@@ -399,16 +401,16 @@ fun SettingsScreen() {
                         }
                     },
                     enabled = !isCheckingHealth,
-                    colors = ButtonDefaults.buttonColors(containerColor = AccentCyan),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                     shape = RoundedCornerShape(10.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     if (isCheckingHealth) {
-                        CircularProgressIndicator(color = DarkBackground, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                     } else {
                         Icon(Icons.Default.NetworkCheck, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Test Gateway Health (/api/health)", color = DarkBackground, fontWeight = FontWeight.Bold)
+                        Text("Test Gateway Health (/api/health)", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
                     }
                 }
 
@@ -416,7 +418,7 @@ fun SettingsScreen() {
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
                         text = healthStatusMessage!!,
-                        color = if (healthStatusMessage!!.startsWith("✓")) MpesaGreen else AccentAmber,
+                        color = if (healthStatusMessage!!.startsWith("✓")) MaterialTheme.colorScheme.primary else AccentAmber,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -428,16 +430,16 @@ fun SettingsScreen() {
 
         // ── App Metadata ──────────────────────────────────────────────────
         Card(
-            colors = CardDefaults.cardColors(containerColor = DarkSurface),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             shape = RoundedCornerShape(14.dp),
-            modifier = Modifier.fillMaxWidth().border(1.dp, DarkSurfaceBorder, RoundedCornerShape(14.dp))
+            modifier = Modifier.fillMaxWidth().border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(14.dp))
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text("GMDParser Android Client", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Text("GMDParser Android Client", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 Spacer(modifier = Modifier.height(4.dp))
-                Text("Version: 1.0.0 (Clean-Slate Architecture)", color = TextSecondary, fontSize = 12.sp)
-                Text("Target SDK: 34 (Android 14)", color = TextSecondary, fontSize = 12.sp)
-                Text("Spreadsheet Write Boundary: C:D, G:H, J:L", color = TextMuted, fontSize = 11.sp)
+                Text("Version: 1.0.0 (Clean-Slate Architecture)", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                Text("Target SDK: 34 (Android 14)", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                Text("Spreadsheet Write Boundary: C:D, G:H, J:L", color = MaterialTheme.colorScheme.outline, fontSize = 11.sp)
             }
         }
     }

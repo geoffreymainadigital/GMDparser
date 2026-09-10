@@ -27,30 +27,30 @@ fun DebtsScreen() {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(DarkBackground)
+            .background(MaterialTheme.colorScheme.background)
             .padding(16.dp)
     ) {
-        Text("Debts & Obligations", color = TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-        Text("Loan servicing and credit repayments monitored in sheet", color = TextSecondary, fontSize = 12.sp)
+        Text("Debts & Obligations", color = MaterialTheme.colorScheme.onSurface, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        Text("Loan servicing and credit repayments monitored in sheet", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
 
         Spacer(modifier = Modifier.height(16.dp))
 
         LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             items(debts) { d ->
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth().border(1.dp, DarkSurfaceBorder, RoundedCornerShape(12.dp))
+                    modifier = Modifier.fillMaxWidth().border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(d.creditor, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text(d.creditor, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                             Text(
                                 if (d.balance > 0) "Ksh ${String.format("%,.0f", d.balance)}" else "CLEARED",
-                                color = if (d.balance > 0) AccentRed else MpesaGreen,
+                                color = if (d.balance > 0) AccentRed else MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.sp
                             )
@@ -60,8 +60,8 @@ fun DebtsScreen() {
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(d.category, color = TextMuted, fontSize = 11.sp)
-                            Text("Due: ${d.dueDate}", color = TextSecondary, fontSize = 11.sp)
+                            Text(d.category, color = MaterialTheme.colorScheme.outline, fontSize = 11.sp)
+                            Text("Due: ${d.dueDate}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
                         }
                     }
                 }
