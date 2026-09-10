@@ -843,8 +843,39 @@ async function fetchLiveTransactions() {
 // Live Monthly & Annual Dashboard Synchronizer
 let currentCatSection = 'Income';
 let currentDashboardPeriod = 'monthly';
+let dashboardFetchRequestId = 0;
+let dashboardLoading = false;
+
+function renderDashboardLoadingState(targetPeriod) {
+  dashboardLoading = true;
+  currentDashboardPeriod = targetPeriod;
+  const badge = document.getElementById('monthly-sheet-badge');
+  const title = document.getElementById('monthly-budget-title');
+  if (badge) badge.textContent = 'SYNCING...';
+  if (title) {
+    title.textContent = targetPeriod === 'annual' ? 'Annual Dashboard (Loading...)' : 'Monthly Budget & Tracking (Loading...)';
+  }
+
+  // Show loading skeleton / reset tiles
+  ['income', 'bills', 'debt', 'expenses', 'savings'].forEach(prefix => {
+    const valEl = document.getElementById(`tile-${prefix}-val`);
+    const subEl = document.getElementById(`tile-${prefix}-sub`);
+    if (valEl) valEl.textContent = 'Loading...';
+    if (subEl) subEl.textContent = 'Updating dataset...';
+  });
+  const unallocEl = document.getElementById('tile-unallocated-val');
+  if (unallocEl) unallocEl.textContent = 'Loading...';
+
+  const tbody = document.getElementById('month-categories-tbody');
+  if (tbody) {
+    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted">Loading ${currentCatSection} categories...</td></tr>`;
+  }
+}
 
 async function fetchDashboardData(period = 'monthly') {
+  const requestId = ++dashboardFetchRequestId;
+  renderDashboardLoadingState(period);
+
   try {
     let res = await fetch(`/api/dashboard?period=${period}`);
     if (!res.ok) {
@@ -856,7 +887,12 @@ async function fetchDashboardData(period = 'monthly') {
       return;
     }
     const json = await res.json();
+    if (requestId !== dashboardFetchRequestId) {
+      console.log(`[Race Condition Guard] Ignored stale fetch response #${requestId} for period ${period}`);
+      return;
+    }
     if (json.success) {
+      dashboardLoading = false;
       state.dashboardData = json.period === 'annual' ? json.annual : json.month;
       currentDashboardPeriod = json.period || period;
       state.accountsData = json.accounts;
@@ -871,7 +907,12 @@ async function fetchDashboardData(period = 'monthly') {
       const fbRes = await fetch(`${FALLBACK_GAS_URL}?action=dashboard&period=${period}`);
       if (fbRes.ok) {
         const json = await fbRes.json();
+        if (requestId !== dashboardFetchRequestId) {
+          console.log(`[Race Condition Guard] Ignored stale fallback fetch response #${requestId} for period ${period}`);
+          return;
+        }
         if (json.success) {
+          dashboardLoading = false;
           state.dashboardData = json.period === 'annual' ? json.annual : json.month;
           currentDashboardPeriod = json.period || period;
           state.accountsData = json.accounts;
@@ -892,8 +933,18 @@ function renderDashboardData() {
 
   const badge = document.getElementById('monthly-sheet-badge');
   const title = document.getElementById('monthly-budget-title');
-  if (badge) badge.textContent = `SHEET: ${data.tab || data.month}`;
-  if (title) title.textContent = currentDashboardPeriod === 'annual' ? `Annual Dashboard (${data.tab || 'Annual'})` : `Monthly Budget & Tracking (${data.month})`;
+  const sheetName = data.tab || data.month || (currentDashboardPeriod === 'annual' ? 'Annual Dashboard' : 'Current Month');
+  if (badge) badge.textContent = `SHEET: ${sheetName}`;
+
+  if (title) {
+    if (currentDashboardPeriod === 'annual') {
+      const label = data.tab || 'Annual';
+      title.textContent = `Annual Dashboard (${label})`;
+    } else {
+      const monthLabel = data.month || 'Current';
+      title.textContent = `Monthly Budget & Tracking (${monthLabel})`;
+    }
+  }
 
   const tiles = data.summaryTiles || {};
   function setTile(prefix, t) {

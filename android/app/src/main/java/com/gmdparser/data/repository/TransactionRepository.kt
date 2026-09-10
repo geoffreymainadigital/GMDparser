@@ -47,24 +47,30 @@ object TransactionRepository {
     private val _dashboardData = MutableStateFlow<com.gmdparser.data.model.DashboardResponse?>(null)
     val dashboardData: StateFlow<com.gmdparser.data.model.DashboardResponse?> = _dashboardData.asStateFlow()
 
+    @Volatile
+    private var dashboardFetchRequestId: Long = 0
+
     private const val FALLBACK_GAS_URL = "https://script.google.com/macros/s/AKfycbzLo8NZHU3rmGIT6R-une9xrjUqwIdSbUG6to1O_ZwohEbvST1-3MjpNvCaNq2TOF4_Xw/exec"
 
     suspend fun fetchDashboard(period: String = "monthly"): Result<com.gmdparser.data.model.DashboardResponse> {
+        val currentReqId = synchronized(this) { ++dashboardFetchRequestId }
         return try {
             val response = ApiClient.apiService.getDashboard(period)
             if (response.isSuccessful && response.body() != null && response.body()!!.success) {
                 val data = response.body()!!
-                _dashboardData.value = data
+                if (currentReqId == dashboardFetchRequestId) {
+                    _dashboardData.value = data
+                }
                 Result.success(data)
             } else {
-                fetchDashboardDirect(period)
+                fetchDashboardDirect(period, currentReqId)
             }
         } catch (e: Exception) {
-            fetchDashboardDirect(period)
+            fetchDashboardDirect(period, currentReqId)
         }
     }
 
-    private suspend fun fetchDashboardDirect(period: String): Result<com.gmdparser.data.model.DashboardResponse> {
+    private suspend fun fetchDashboardDirect(period: String, reqId: Long): Result<com.gmdparser.data.model.DashboardResponse> {
         return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 val client = okhttp3.OkHttpClient.Builder()
@@ -81,7 +87,9 @@ object TransactionRepository {
                 if (res.isSuccessful && !bodyStr.isNullOrBlank()) {
                     val data = gson.fromJson(bodyStr, com.gmdparser.data.model.DashboardResponse::class.java)
                     if (data != null && data.success) {
-                        _dashboardData.value = data
+                        if (reqId == dashboardFetchRequestId) {
+                            _dashboardData.value = data
+                        }
                         return@withContext Result.success(data)
                     }
                 }

@@ -98,52 +98,67 @@ fun DashboardScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Monthly/Annual Budget Sheet Live Card (if loaded)
+        // Monthly/Annual Budget Sheet Live Card (atomic update & loading skeleton)
         var selectedPeriod by remember { mutableStateOf("monthly") }
+        var isLoadingPeriod by remember { mutableStateOf(false) }
 
         LaunchedEffect(selectedPeriod) {
+            isLoadingPeriod = true
             TransactionRepository.fetchDashboard(selectedPeriod)
+            isLoadingPeriod = false
         }
 
-        val monthData = if (selectedPeriod == "annual") {
-            dashboardResponse?.annual ?: dashboardResponse?.month
-        } else {
-            dashboardResponse?.month ?: dashboardResponse?.annual
-        }
-        if (monthData != null) {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = DarkSurface),
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, DarkSurfaceBorder, RoundedCornerShape(16.dp))
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+        // Only select dataset matching current selectedPeriod if returned period matches
+        val currentResponsePeriod = dashboardResponse?.period
+        val isPeriodMatch = currentResponsePeriod == selectedPeriod
+        val activeData = if (isPeriodMatch) {
+            if (selectedPeriod == "annual") dashboardResponse?.annual else dashboardResponse?.month
+        } else null
+
+        val showLoading = isLoadingPeriod || activeData == null
+
+        Card(
+            colors = CardDefaults.cardColors(containerColor = DarkSurface),
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, DarkSurfaceBorder, RoundedCornerShape(16.dp))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val titleText = if (showLoading) {
+                        if (selectedPeriod == "annual") "Annual Dashboard (Loading...)" else "Monthly Budget (Loading...)"
+                    } else if (selectedPeriod == "annual") {
+                        val tabName = activeData?.tab ?: "Annual"
+                        "Annual Dashboard ($tabName)"
+                    } else {
+                        val monthName = activeData?.month ?: activeData?.tab ?: "Current"
+                        "Monthly Budget ($monthName)"
+                    }
+                    Text(
+                        text = titleText,
+                        color = TextPrimary,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Surface(
+                        color = if (showLoading) AccentAmber.copy(alpha = 0.2f) else AccentCyan.copy(alpha = 0.2f),
+                        shape = RoundedCornerShape(4.dp)
                     ) {
                         Text(
-                            text = if (selectedPeriod == "annual") "Annual Dashboard (${monthData.tab ?: "Annual"})" else "Monthly Budget (${monthData.month})",
-                            color = TextPrimary,
+                            text = if (showLoading) "SYNCING" else "LIVE",
+                            color = if (showLoading) AccentAmber else AccentCyan,
+                            fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
-                        Surface(
-                            color = AccentCyan.copy(alpha = 0.2f),
-                            shape = RoundedCornerShape(4.dp)
-                        ) {
-                            Text(
-                                text = "LIVE",
-                                color = AccentCyan,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
                     }
+                }
                     Spacer(modifier = Modifier.height(10.dp))
                     
                     // Period Toggle
@@ -192,25 +207,24 @@ fun DashboardScreen(
                     Spacer(modifier = Modifier.height(12.dp))
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    val tiles = monthData.summaryTiles
+                    val tiles = activeData?.summaryTiles
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        BudgetSummaryTile("Income", tiles.totalIncome?.actual ?: 0.0, tiles.totalIncome?.goal, MpesaGreen, Modifier.weight(1f))
-                        BudgetSummaryTile("Bills", tiles.totalBills?.actual ?: 0.0, tiles.totalBills?.goal, AccentAmber, Modifier.weight(1f))
+                        BudgetSummaryTile("Income", tiles?.totalIncome?.actual ?: 0.0, tiles?.totalIncome?.goal, MpesaGreen, Modifier.weight(1f))
+                        BudgetSummaryTile("Bills", tiles?.totalBills?.actual ?: 0.0, tiles?.totalBills?.goal, AccentAmber, Modifier.weight(1f))
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        BudgetSummaryTile("Debt", tiles.totalDebtPayoff?.actual ?: 0.0, tiles.totalDebtPayoff?.goal, AccentBlue, Modifier.weight(1f))
-                        BudgetSummaryTile("Expenses", tiles.totalExpenses?.actual ?: 0.0, tiles.totalExpenses?.goal, AccentRed, Modifier.weight(1f))
+                        BudgetSummaryTile("Debt", tiles?.totalDebtPayoff?.actual ?: 0.0, tiles?.totalDebtPayoff?.goal, AccentBlue, Modifier.weight(1f))
+                        BudgetSummaryTile("Expenses", tiles?.totalExpenses?.actual ?: 0.0, tiles?.totalExpenses?.goal, AccentRed, Modifier.weight(1f))
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        BudgetSummaryTile("Savings", tiles.totalSavings?.actual ?: 0.0, tiles.totalSavings?.goal, AccentCyan, Modifier.weight(1f))
-                        BudgetSummaryTile("Unallocated", tiles.unallocatedIncome?.actual ?: 0.0, null, TextSecondary, Modifier.weight(1f))
+                        BudgetSummaryTile("Savings", tiles?.totalSavings?.actual ?: 0.0, tiles?.totalSavings?.goal, AccentCyan, Modifier.weight(1f))
+                        BudgetSummaryTile("Unallocated", tiles?.unallocatedIncome?.actual ?: 0.0, null, TextSecondary, Modifier.weight(1f))
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(16.dp))
-        }
+        Spacer(modifier = Modifier.height(16.dp))
 
         // Pending Reviews Call-To-Action Banner (if any pending)
         if (pendingList.isNotEmpty()) {
