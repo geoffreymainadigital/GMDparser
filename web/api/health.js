@@ -35,7 +35,7 @@ export default async function handler(req, res) {
   if (appsScriptUrl) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
 
       const upstreamRes = await fetch(`${appsScriptUrl}?action=health`, {
         method: 'GET',

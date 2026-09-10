@@ -59,9 +59,10 @@ export default async function handler(req, res) {
   }
 
   try {
+    const authSecret = process.env.GMD_AUTH_SECRET || process.env.GMD_API_SECRET || process.env.APPS_SCRIPT_AUTH_SECRET || '';
     const backendPayload = {
       action: payload.action || 'createTransaction',
-      authKey: process.env.GMD_API_SECRET || undefined,
+      authKey: authSecret,
       transaction: transaction
     };
 
@@ -72,7 +73,7 @@ export default async function handler(req, res) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-GMD-Auth-Key': process.env.GMD_API_SECRET || ''
+        'X-GMD-Auth-Key': authSecret
       },
       body: JSON.stringify(backendPayload),
       signal: controller.signal

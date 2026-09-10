@@ -11,13 +11,18 @@ export default async function handler(req, res) {
   if (!appsScriptUrl) return res.status(503).json({ success: false, error: 'APPS_SCRIPT_URL not configured' });
 
   try {
+    const authSecret = process.env.GMD_AUTH_SECRET || process.env.GMD_API_SECRET || process.env.APPS_SCRIPT_AUTH_SECRET || '';
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
     const periodParam = req.query.period ? `&period=${req.query.period}` : '';
+    const authParam = authSecret ? `&authKey=${encodeURIComponent(authSecret)}` : '';
 
-    const upstreamRes = await fetch(appsScriptUrl + '?action=dashboard' + periodParam, {
+    const upstreamRes = await fetch(appsScriptUrl + '?action=dashboard' + periodParam + authParam, {
       method: 'GET',
+      headers: {
+        'X-GMD-Auth-Key': authSecret
+      },
       signal: controller.signal
     });
     clearTimeout(timeoutId);

@@ -43,6 +43,37 @@ function getCategoriesForType(type) {
 
 
 /**
+ * Mandatory authentication secret verification.
+ * Fails closed (500 SERVER_MISCONFIGURED) if GMD_AUTH_SECRET is not configured in Script Properties.
+ * Fails unauthorized (401 UNAUTHORIZED) if key is missing or invalid.
+ */
+function verifyAuthSecret(e, payload) {
+  const scriptProperties = PropertiesService.getScriptProperties();
+  const configuredSecret = scriptProperties.getProperty('GMD_AUTH_SECRET');
+  if (!configuredSecret) {
+    return createJsonResponse({
+      success: false,
+      status: 'SERVER_MISCONFIGURED',
+      error: 'Server misconfigured: GMD_AUTH_SECRET is not set in Apps Script Properties. Refusing to serve requests.'
+    }, 500);
+  }
+
+  const clientAuthKey = (payload && payload.authKey) ||
+    (e && e.parameter && (e.parameter.authKey || e.parameter.secret)) ||
+    (e && e.headers && (e.headers['X-GMD-Auth-Key'] || e.headers['x-gmd-auth-key'] || e.headers['X-GMD-AUTH-KEY']));
+
+  if (clientAuthKey !== configuredSecret) {
+    return createJsonResponse({
+      success: false,
+      status: 'UNAUTHORIZED',
+      error: 'Unauthorized: Invalid or missing API key'
+    }, 401);
+  }
+
+  return null; // Auth verified
+}
+
+/**
  * Handle HTTP GET Requests (Health check and taxonomy)
  */
 function doGet(e) {
@@ -50,6 +81,7 @@ function doGet(e) {
     const action = (e && e.parameter && e.parameter.action) || 'health';
     const ss = SpreadsheetApp.getActiveSpreadsheet();
 
+    // Public read-only endpoints (unauthenticated)
     if (action === 'health') {
       const sheet = ss.getSheetByName(SHEET_NAME_TRANSACTIONS);
       const isSheetReady = !!sheet;
@@ -76,6 +108,12 @@ function doGet(e) {
         data: taxonomy,
         timestamp: new Date().toISOString()
       }, 200);
+    }
+
+    // Protected endpoints require mandatory authentication check
+    const authError = verifyAuthSecret(e, null);
+    if (authError) {
+      return authError;
     }
 
     if (action === 'diagnoseTaxonomy') {
@@ -216,19 +254,10 @@ function doPost(e) {
       }, 400);
     }
 
-    // Verify Auth Secret if configured in Script Properties
-    const scriptProperties = PropertiesService.getScriptProperties();
-    const configuredSecret = scriptProperties.getProperty('GMD_AUTH_SECRET');
-    if (configuredSecret) {
-      const clientAuthKey = (payload && payload.authKey) ||
-        (e && e.headers && (e.headers['X-GMD-Auth-Key'] || e.headers['x-gmd-auth-key']));
-      if (clientAuthKey !== configuredSecret) {
-        return createJsonResponse({
-          success: false,
-          status: 'UNAUTHORIZED',
-          error: 'Unauthorized: Invalid or missing API key'
-        }, 401);
-      }
+    // Mandatory Auth Secret check for all POST operations
+    const authError = verifyAuthSecret(e, payload);
+    if (authError) {
+      return authError;
     }
 
     const action = payload.action || 'createTransaction';
