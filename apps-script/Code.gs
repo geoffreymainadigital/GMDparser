@@ -126,25 +126,40 @@ function doGet(e) {
         SpreadsheetApp.openById(e.parameter.spreadsheetId) : ss;
       const period = (e && e.parameter && e.parameter.period) || 'monthly';
 
+      const tStart = Date.now();
       if (period === 'annual') {
         const annualData = getAnnualDashboardData(targetSs);
+        const tAnnual = Date.now();
         const accountsData = getAccountsData(targetSs);
+        const tAccounts = Date.now();
         return createJsonResponse({
           success: true,
           period: 'annual',
           annual: annualData,
           accounts: accountsData,
+          timingReport: {
+            annualDataMs: tAnnual - tStart,
+            accountsDataMs: tAccounts - tAnnual,
+            totalServerMs: tAccounts - tStart
+          },
           timestamp: new Date().toISOString()
         }, 200);
       } else {
         // Default: monthly
         const monthData = getMonthlyDashboardData(targetSs);
+        const tMonth = Date.now();
         const accountsData = getAccountsData(targetSs);
+        const tAccounts = Date.now();
         return createJsonResponse({
           success: true,
           period: 'monthly',
           month: monthData,
           accounts: accountsData,
+          timingReport: {
+            monthDataMs: tMonth - tStart,
+            accountsDataMs: tAccounts - tMonth,
+            totalServerMs: tAccounts - tStart
+          },
           timestamp: new Date().toISOString()
         }, 200);
       }
@@ -1264,10 +1279,9 @@ function getMonthlyDashboardData(ss) {
   }
 
   const maxRows = Math.min(sheet.getMaxRows ? sheet.getMaxRows() : 160, 200);
-  const maxCols = Math.min(sheet.getMaxColumns ? sheet.getMaxColumns() : 90, 100);
+  const maxCols = Math.min(sheet.getMaxColumns ? sheet.getMaxColumns() : 60, 80);
   const dataRange = sheet.getRange(1, 1, maxRows, maxCols);
   const values = dataRange.getValues();
-  const displayValues = dataRange.getDisplayValues();
 
   // Helper to search label in values
   function findCell(targetLabel) {
@@ -1430,6 +1444,7 @@ function getMonthlyDashboardData(ss) {
  * Explicitly defers the "Annual Income by Month" trend section (not implemented).
  */
 function getAnnualDashboardData(ss) {
+  const t0 = Date.now();
   const sheetNames = ss.getSheets().map(function (s) { return s.getName(); });
 
   // Discover the Annual tab by prioritizing exact 'Annual Dashboard', then 'Annual Budget', then any containing 'annual'
@@ -1449,12 +1464,12 @@ function getAnnualDashboardData(ss) {
     throw new Error('Sheet "' + annualTabName + '" not found after discovery.');
   }
 
-  console.log('[getAnnualDashboardData] Reading tab: ' + annualTabName);
-
-  const maxRows = Math.min(sheet.getMaxRows ? sheet.getMaxRows() : 200, 250);
-  const maxCols = Math.min(sheet.getMaxColumns ? sheet.getMaxColumns() : 120, 130);
+  const tTab = Date.now();
+  const maxRows = Math.min(sheet.getMaxRows ? sheet.getMaxRows() : 120, 150);
+  const maxCols = Math.min(sheet.getMaxColumns ? sheet.getMaxColumns() : 60, 80);
   const dataRange = sheet.getRange(1, 1, maxRows, maxCols);
   const values = dataRange.getValues();
+  const tRead = Date.now();
 
   // Helper: find cell by label (contains, case-insensitive)
   function findCell(targetLabel) {
@@ -1587,11 +1602,19 @@ function getAnnualDashboardData(ss) {
   // as a chart-feed table — different from the point-in-time snapshot returned here.
   // This trend chart has been intentionally deferred to a future dedicated implementation.
 
+  const tDone = Date.now();
+
   return {
     tab: annualTabName,
     summaryTiles: summaryTiles,
     tables: tables,
-    tableDiscoveryReport: tableDiscoveryReport
+    tableDiscoveryReport: tableDiscoveryReport,
+    metrics: {
+      tabDiscoveryMs: tTab - t0,
+      dataReadMs: tRead - tTab,
+      discoveryAndParseMs: tDone - tRead,
+      totalAnnualMs: tDone - t0
+    }
   };
 }
 
