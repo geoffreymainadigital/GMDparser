@@ -365,7 +365,7 @@ object MpesaParser {
         }
 
         // Default P2P or personal expense
-        return Classification("Expenses", "House Supplies")
+        return Classification("Expenses", "")
     }
 
     private fun classifyMerchant(merchant: String): Classification {
@@ -401,7 +401,7 @@ object MpesaParser {
         if (m.contains("clothe") || m.contains("apparel") || m.contains("boutique")) {
             return Classification("Expenses", "Clothes")
         }
-        return Classification("Expenses", "House Supplies")
+        return Classification("Expenses", "")
     }
 
     private fun formatIsoDate(rawDate: String): String {

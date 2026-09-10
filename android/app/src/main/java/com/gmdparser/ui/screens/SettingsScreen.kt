@@ -125,7 +125,7 @@ fun SettingsScreen() {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // SMS Catch-Up Scanner Card
+        // Advanced Inbox History Scan Card (Custom Ranges)
         Card(
             colors = CardDefaults.cardColors(containerColor = DarkSurface),
             shape = RoundedCornerShape(14.dp),
@@ -133,28 +133,29 @@ fun SettingsScreen() {
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Search, contentDescription = null, tint = MpesaGreen, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Default.Search, contentDescription = null, tint = AccentCyan, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("SMS Inbox Catch-Up Scanner", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text("Advanced Inbox History Scan", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 }
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    "Re-scan device SMS messages across custom time ranges to queue any missed M-PESA transactions.",
+                    "Perform deep custom-range scans across your SMS inbox history (7d, 14d, 30d, 90d, or All time) to recover and deduplicate older records.",
                     color = TextSecondary,
                     fontSize = 11.sp
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                Button(
+                OutlinedButton(
                     onClick = { showScanDialog = true },
-                    colors = ButtonDefaults.buttonColors(containerColor = MpesaGreen),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentCyan),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, AccentCyan.copy(alpha = 0.6f)),
                     shape = RoundedCornerShape(10.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp), tint = DarkBackground)
+                    Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Scan SMS Inbox", color = DarkBackground, fontWeight = FontWeight.Bold)
+                    Text("Launch Custom Range Scanner", fontWeight = FontWeight.SemiBold)
                 }
             }
         }

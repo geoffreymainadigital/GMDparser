@@ -24,6 +24,7 @@ import com.gmdparser.data.model.Transaction
 import com.gmdparser.data.model.TransactionStatus
 import com.gmdparser.data.repository.TaxonomyRepository
 import com.gmdparser.data.repository.TransactionRepository
+import com.gmdparser.parser.MpesaParser
 import com.gmdparser.ui.components.SmsScanDialog
 import com.gmdparser.ui.theme.*
 import kotlinx.coroutines.launch
@@ -211,43 +212,6 @@ fun ReviewConfirmScreen(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // Mandatory Confirmation Policy Banner
-        Card(
-            colors = CardDefaults.cardColors(containerColor = DarkSurfaceCard),
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, MpesaGreen.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
-        ) {
-            Row(
-                modifier = Modifier.padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Warning,
-                    contentDescription = "Confirmation Policy",
-                    tint = MpesaGreen,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Column {
-                    Text(
-                        text = "Explicit Confirmation Enforced",
-                        color = TextPrimary,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp
-                    )
-                    Text(
-                        text = "AutoSync is locked off. No transaction is recorded without your review.",
-                        color = TextSecondary,
-                        fontSize = 11.sp
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(14.dp))
-
         // Feedback Banner
         if (feedbackMessage != null) {
             val (containerColor, textColor) = when (feedbackStyle) {
@@ -272,12 +236,16 @@ fun ReviewConfirmScreen(
             Spacer(modifier = Modifier.height(14.dp))
         }
 
-        // Empty state vs Batch List
-        if (orderedPending.isEmpty()) {
+    var manualSmsText by remember { mutableStateOf("") }
+    var manualParseFeedback by remember { mutableStateOf<String?>(null) }
+
+    // Empty state vs Batch List
+    if (orderedPending.isEmpty()) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 36.dp),
+                    .padding(vertical = 20.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -285,121 +253,149 @@ fun ReviewConfirmScreen(
                         Icons.Default.CheckCircle,
                         contentDescription = null,
                         tint = MpesaGreen,
-                        modifier = Modifier.size(52.dp)
+                        modifier = Modifier.size(48.dp)
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
                     Text(
                         text = "All Caught Up!",
                         color = TextPrimary,
-                        fontSize = 18.sp,
+                        fontSize = 17.sp,
                         fontWeight = FontWeight.Bold
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "No pending M-PESA transactions waiting for review.",
                         color = TextSecondary,
-                        fontSize = 13.sp
+                        fontSize = 12.sp
                     )
-                    Spacer(modifier = Modifier.height(18.dp))
-                    Button(
-                        onClick = { showScanDialog = true },
-                        colors = ButtonDefaults.buttonColors(containerColor = MpesaGreen),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Scan SMS Inbox to Catch Up", fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-        } else {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Pending Items (${orderedPending.size}) — Oldest First",
-                    color = TextPrimary,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                // Confirm All — uses batch endpoint; one round-trip for all pending items.
-                // Only shown when there are ≥ 2 items and nothing is currently being sent.
-                if (orderedPending.size >= 2 && !batchSubmitting && submittingTxCode == null) {
-                    Button(
-                        onClick = { submitBatch(orderedPending) },
-                        colors = ButtonDefaults.buttonColors(containerColor = MpesaGreen),
-                        shape = RoundedCornerShape(10.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Icon(Icons.Default.Done, contentDescription = null, modifier = Modifier.size(15.dp))
-                        Spacer(modifier = Modifier.width(5.dp))
-                        Text("Confirm All", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    }
                 }
             }
 
-            // Batch progress indicator
-            if (batchSubmitting) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MpesaGreen.copy(alpha = 0.12f)),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth()
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // SMS Detection & Parser Simulator
+            SmsManualSimulatorCard(
+                smsText = manualSmsText,
+                onSmsTextChange = { manualSmsText = it },
+                feedback = manualParseFeedback,
+                onParseAndAdd = { text ->
+                    val parsed = MpesaParser.parse(text)
+                    if (parsed != null && parsed.transactionCode.isNotBlank()) {
+                        TransactionRepository.addPendingTransaction(parsed)
+                        manualParseFeedback = "✓ Parsed code ${parsed.transactionCode} (${parsed.type}) added to queue!"
+                        manualSmsText = ""
+                    } else {
+                        manualParseFeedback = "⚠ Could not parse a valid M-PESA confirmed message."
+                    }
+                }
+            )
+        }
+    } else {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Pending Items (${orderedPending.size}) — Oldest First",
+                color = TextPrimary,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold
+            )
+            // Confirm All — uses batch endpoint; one round-trip for all pending items.
+            // Only shown when there are ≥ 2 items and nothing is currently being sent.
+            if (orderedPending.size >= 2 && !batchSubmitting && submittingTxCode == null) {
+                Button(
+                    onClick = { submitBatch(orderedPending) },
+                    colors = ButtonDefaults.buttonColors(containerColor = MpesaGreen),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            color = MpesaGreen,
-                            strokeWidth = 2.dp
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = batchProgress,
-                            color = MpesaGreen,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
+                    Icon(Icons.Default.Done, contentDescription = null, modifier = Modifier.size(15.dp))
+                    Spacer(modifier = Modifier.width(5.dp))
+                    Text("Confirm All", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Batch list items
-            orderedPending.forEach { tx ->
-                val isExpanded = expandedTxCode == tx.transactionCode
-                val isSubmittingThis = submittingTxCode == tx.transactionCode
-
-                BatchTransactionItemCard(
-                    transaction = tx,
-                    isExpanded = isExpanded,
-                    isSubmitting = isSubmittingThis,
-                    onToggleExpand = {
-                        expandedTxCode = if (isExpanded) null else tx.transactionCode
-                    },
-                    onQuickConfirm = {
-                        val recordFee = tx.cost != null && tx.cost > 0.0
-                        submitTransaction(tx, recordFee)
-                    },
-                    onCustomConfirm = { editedTx, recordFee ->
-                        submitTransaction(editedTx, recordFee)
-                    },
-                    onDismiss = {
-                        TransactionRepository.removePendingTransaction(tx.transactionCode)
-                        feedbackStyle = FeedbackStyle.NONE
-                        feedbackMessage = "Transaction ${tx.transactionCode} dismissed."
-                    }
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
             }
         }
+
+        // Batch progress indicator
+        if (batchSubmitting) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MpesaGreen.copy(alpha = 0.12f)),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        color = MpesaGreen,
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = batchProgress,
+                        color = MpesaGreen,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Batch list items
+        orderedPending.forEach { tx ->
+            val isExpanded = expandedTxCode == tx.transactionCode
+            val isSubmittingThis = submittingTxCode == tx.transactionCode
+
+            BatchTransactionItemCard(
+                transaction = tx,
+                isExpanded = isExpanded,
+                isSubmitting = isSubmittingThis,
+                onToggleExpand = {
+                    expandedTxCode = if (isExpanded) null else tx.transactionCode
+                },
+                onQuickConfirm = {
+                    val recordFee = tx.cost != null && tx.cost > 0.0
+                    submitTransaction(tx, recordFee)
+                },
+                onCustomConfirm = { editedTx, recordFee ->
+                    submitTransaction(editedTx, recordFee)
+                },
+                onDismiss = {
+                    TransactionRepository.removePendingTransaction(tx.transactionCode)
+                    feedbackStyle = FeedbackStyle.NONE
+                    feedbackMessage = "Transaction ${tx.transactionCode} dismissed."
+                }
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+        SmsManualSimulatorCard(
+            smsText = manualSmsText,
+            onSmsTextChange = { manualSmsText = it },
+            feedback = manualParseFeedback,
+            onParseAndAdd = { text ->
+                val parsed = MpesaParser.parse(text)
+                if (parsed != null && parsed.transactionCode.isNotBlank()) {
+                    TransactionRepository.addPendingTransaction(parsed)
+                    manualParseFeedback = "✓ Parsed code ${parsed.transactionCode} (${parsed.type}) added to queue!"
+                    manualSmsText = ""
+                } else {
+                    manualParseFeedback = "⚠ Could not parse a valid M-PESA confirmed message."
+                }
+            }
+        )
+        Spacer(modifier = Modifier.height(24.dp))
     }
+}
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -767,6 +763,21 @@ fun BatchTransactionItemCard(
                     Text(if (isExpanded) "Collapse" else "Edit", fontSize = 12.sp)
                 }
 
+                // Part C restriction logic
+                val isUncategorized = (if (isExpanded) selectedCategory else transaction.category).isBlank()
+
+                if (isUncategorized && !isExpanded) {
+                    Text(
+                        text = "⚠️ Needs categorization",
+                        color = AccentAmber,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 6.dp)
+                    )
+                }
+
                 Button(
                     onClick = {
                         if (isExpanded) {
@@ -784,7 +795,7 @@ fun BatchTransactionItemCard(
                             onQuickConfirm()
                         }
                     },
-                    enabled = !isSubmitting,
+                    enabled = !isSubmitting && !isUncategorized,
                     colors = ButtonDefaults.buttonColors(containerColor = MpesaGreen),
                     modifier = Modifier.weight(2f),
                     shape = RoundedCornerShape(10.dp)
@@ -797,6 +808,97 @@ fun BatchTransactionItemCard(
                         Text(if (isExpanded) "Save Edited" else "1-Tap Confirm", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun SmsManualSimulatorCard(
+    smsText: String,
+    onSmsTextChange: (String) -> Unit,
+    feedback: String?,
+    onParseAndAdd: (String) -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+        shape = RoundedCornerShape(14.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, DarkSurfaceBorder, RoundedCornerShape(14.dp))
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "SMS Detection & Parser Simulator",
+                color = TextPrimary,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "Paste any Kenyan M-PESA SMS to test parser and add to review queue.",
+                color = TextSecondary,
+                fontSize = 11.sp
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            OutlinedTextField(
+                value = smsText,
+                onValueChange = onSmsTextChange,
+                placeholder = { Text("Paste M-PESA SMS text here...", color = TextMuted) },
+                modifier = Modifier.fillMaxWidth(),
+                maxLines = 4,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MpesaGreen,
+                    unfocusedBorderColor = DarkSurfaceBorder,
+                    focusedTextColor = TextPrimary,
+                    unfocusedTextColor = TextPrimary
+                )
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Sample quick chips
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                SuggestionChip(
+                    onClick = {
+                        onSmsTextChange("TD47XYZ123 Confirmed. Ksh3,500.00 sent to Kenya Power and Lighting Company for account 12345678 on 7/9/26 at 8:15 PM. New M-PESA balance is Ksh12,450.00. Transaction cost, Ksh23.00.")
+                    },
+                    label = { Text("KPLC Bill", fontSize = 11.sp) }
+                )
+                SuggestionChip(
+                    onClick = {
+                        onSmsTextChange("TD48ABC456 Confirmed. Ksh1,250.00 paid to NAIVAS SUPERMARKET. on 7/9/26 at 2:30 PM. New M-PESA balance is Ksh11,200.00. Transaction cost, Ksh0.00.")
+                    },
+                    label = { Text("Naivas Till", fontSize = 11.sp) }
+                )
+                SuggestionChip(
+                    onClick = {
+                        onSmsTextChange("TD51JKL345 Confirmed. Ksh10,000.00 sent to NCBA LOOP for account 0123456789 on 7/9/26 at 1:15 PM. New M-PESA balance is Ksh49,200.00.")
+                    },
+                    label = { Text("Bank Transfer", fontSize = 11.sp) }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Button(
+                onClick = { onParseAndAdd(smsText) },
+                colors = ButtonDefaults.buttonColors(containerColor = MpesaGreen),
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Icon(Icons.Default.Done, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Parse & Stage in Queue", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            }
+
+            if (!feedback.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(text = feedback, color = AccentCyan, fontSize = 12.sp)
             }
         }
     }

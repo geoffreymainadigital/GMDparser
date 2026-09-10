@@ -124,14 +124,30 @@ function doGet(e) {
     if (action === 'dashboard') {
       const targetSs = (e && e.parameter && e.parameter.spreadsheetId) ?
         SpreadsheetApp.openById(e.parameter.spreadsheetId) : ss;
-      const monthData = getMonthlyDashboardData(targetSs);
-      const accountsData = getAccountsData(targetSs);
-      return createJsonResponse({
-        success: true,
-        month: monthData,
-        accounts: accountsData,
-        timestamp: new Date().toISOString()
-      }, 200);
+      const period = (e && e.parameter && e.parameter.period) || 'monthly';
+
+      if (period === 'annual') {
+        const annualData = getAnnualDashboardData(targetSs);
+        const accountsData = getAccountsData(targetSs);
+        return createJsonResponse({
+          success: true,
+          period: 'annual',
+          annual: annualData,
+          accounts: accountsData,
+          timestamp: new Date().toISOString()
+        }, 200);
+      } else {
+        // Default: monthly
+        const monthData = getMonthlyDashboardData(targetSs);
+        const accountsData = getAccountsData(targetSs);
+        return createJsonResponse({
+          success: true,
+          period: 'monthly',
+          month: monthData,
+          accounts: accountsData,
+          timestamp: new Date().toISOString()
+        }, 200);
+      }
     }
 
 
@@ -1220,19 +1236,27 @@ function testTaxonomyAgainstSpreadsheet(spreadsheetId) {
  */
 function getMonthlyDashboardData(ss) {
   const monthNames = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+
+  // PART B: Use server-side date only, explicit Africa/Nairobi timezone — never client-supplied.
+  // No automatic year/spreadsheet switching: that is a deliberate manual user action.
   const now = new Date();
   const monthIndex = parseInt(Utilities.formatDate(now, 'Africa/Nairobi', 'M'), 10) - 1;
   const currentMonthCode = monthNames[monthIndex];
+  const debugDateStr = Utilities.formatDate(now, 'Africa/Nairobi', 'yyyy-MM-dd HH:mm:ss z');
+
+  console.log('[getMonthlyDashboardData] Server time (Africa/Nairobi): ' + debugDateStr +
+              ' → resolved month: ' + currentMonthCode);
 
   const sheetNames = ss.getSheets().map(function (s) { return s.getName(); });
-  let targetSheetName = currentMonthCode;
-  if (sheetNames.indexOf(targetSheetName) === -1) {
-    const found = sheetNames.find(function (n) { return monthNames.indexOf(n.toUpperCase().trim()) !== -1; });
-    if (!found) {
-      throw new Error('Could not dynamically find any monthly budget sheet (searched: ' + monthNames.join(', ') + ')');
-    }
-    targetSheetName = found;
+
+  // Strict: require the exact month tab to exist. Never silently fall back to another month.
+  if (sheetNames.indexOf(currentMonthCode) === -1) {
+    throw new Error('MONTH_TAB_NOT_FOUND: "' + currentMonthCode + '". ' +
+      'Available sheets: [' + sheetNames.join(', ') + ']. ' +
+      'The current month tab has not been created yet — please add it to the spreadsheet.');
   }
+
+  const targetSheetName = currentMonthCode;
 
   const sheet = ss.getSheetByName(targetSheetName);
   if (!sheet) {
@@ -1395,6 +1419,172 @@ function getMonthlyDashboardData(ss) {
       unallocatedIncome: { actual: unallocatedActual, statusText: 'Remaining balance' }
     },
     tables: tables
+  };
+}
+
+/**
+ * PART E: Reads the Annual Dashboard tab (Read-Only).
+ * Uses header-text discovery — no hardcoded cell coordinates — to survive
+ * future spreadsheet clones. Discovers the tab name by searching sheetNames.
+ * Extracts six summary tiles and five category breakdown tables.
+ * Explicitly defers the "Annual Income by Month" trend section (not implemented).
+ */
+function getAnnualDashboardData(ss) {
+  const sheetNames = ss.getSheets().map(function (s) { return s.getName(); });
+
+  // Discover the Annual Dashboard tab by name (case-insensitive contains "annual")
+  const annualTabName = sheetNames.find(function (n) {
+    return n.toLowerCase().indexOf('annual') !== -1;
+  });
+  if (!annualTabName) {
+    throw new Error('ANNUAL_TAB_NOT_FOUND. Available sheets: [' + sheetNames.join(', ') + '].');
+  }
+
+  const sheet = ss.getSheetByName(annualTabName);
+  if (!sheet) {
+    throw new Error('Sheet "' + annualTabName + '" not found after discovery.');
+  }
+
+  console.log('[getAnnualDashboardData] Reading tab: ' + annualTabName);
+
+  const maxRows = Math.min(sheet.getMaxRows ? sheet.getMaxRows() : 200, 250);
+  const maxCols = Math.min(sheet.getMaxColumns ? sheet.getMaxColumns() : 120, 130);
+  const dataRange = sheet.getRange(1, 1, maxRows, maxCols);
+  const values = dataRange.getValues();
+
+  // Helper: find cell by label (exact, case-insensitive)
+  function findCell(targetLabel) {
+    const target = String(targetLabel).toLowerCase().trim();
+    for (var r = 0; r < values.length; r++) {
+      for (var c = 0; c < values[r].length; c++) {
+        const val = String(values[r][c] || '').toLowerCase().trim();
+        if (val === target) {
+          return { row: r, col: c };
+        }
+      }
+    }
+    return null;
+  }
+
+  function parseAmount(val) {
+    if (typeof val === 'number') return val;
+    if (!val) return 0;
+    const clean = String(val).replace(/[^0-9.\-]/g, '');
+    return parseFloat(clean) || 0;
+  }
+
+  // Discover the six summary tiles by their label text.
+  // For each label, the value is typically in the same column a few rows above.
+  // We search for the header label then look in the cell(s) around it for a numeric value.
+  const TILE_LABELS = [
+    { key: 'totalIncome',    label: 'Total Income' },
+    { key: 'totalBills',     label: 'Total Bills' },
+    { key: 'totalDebtPayoff',label: 'Total Debt Payoff' },
+    { key: 'totalExpenses',  label: 'Total Expenses' },
+    { key: 'totalSavings',   label: 'Total Savings' },
+    { key: 'unallocatedIncome', label: 'Unallocated Income' }
+  ];
+
+  var summaryTiles = {};
+  TILE_LABELS.forEach(function (tile) {
+    var pos = findCell(tile.label);
+    if (!pos) {
+      summaryTiles[tile.key] = { actual: 0, goal: 0, diff: 0, statusText: 'NOT FOUND: ' + tile.label };
+      return;
+    }
+    // Search rows near the header (within ±5 rows, same column) for a numeric value
+    var bestVal = 0;
+    for (var dr = -5; dr <= 5; dr++) {
+      var checkRow = pos.row + dr;
+      if (checkRow < 0 || checkRow >= values.length) continue;
+      var candidate = values[checkRow][pos.col];
+      if (typeof candidate === 'number' && candidate !== 0) {
+        bestVal = candidate;
+        break;
+      }
+    }
+    summaryTiles[tile.key] = { actual: bestVal, statusText: tile.label + ' (Annual)' };
+  });
+
+  // Discover category breakdown tables using "Category" header scan (same as monthly)
+  var categoryHeaders = [];
+  for (var r = 0; r < values.length; r++) {
+    for (var c = 0; c < Math.min(10, values[r].length); c++) {
+      if (String(values[r][c] || '').trim() === 'Category') {
+        categoryHeaders.push({ row: r, col: c });
+      }
+    }
+  }
+
+  var tables = {
+    Income: [],
+    Bills: [],
+    Debt: [],
+    Expenses: [],
+    Savings: []
+  };
+  var tableDiscoveryReport = {};
+  var sectionNames = ['Income', 'Bills', 'Debt', 'Expenses', 'Savings'];
+
+  categoryHeaders.forEach(function (h, idx) {
+    var r = h.row;
+    var headerRowValues = values[r];
+    var goalCol = -1, actualCol = -1, diffCol = -1;
+
+    for (var c = h.col + 1; c < Math.min(h.col + 35, headerRowValues.length); c++) {
+      var ct = String(headerRowValues[c] || '').toLowerCase().trim();
+      if (ct === 'goal' || ct === 'budget') goalCol = c;
+      else if (ct === 'actual') actualCol = c;
+      else if (ct === 'diff' || ct === 'diff.') diffCol = c;
+    }
+
+    if (actualCol === -1) return;
+
+    var detectedSection = sectionNames[idx] || 'Expenses';
+    for (var checkR = r - 1; checkR >= Math.max(0, r - 5); checkR--) {
+      var checkText = String(values[checkR][1] || values[checkR][0] || '').toUpperCase();
+      if (checkText.indexOf('INCOME') !== -1)  { detectedSection = 'Income'; break; }
+      if (checkText.indexOf('BILL') !== -1)    { detectedSection = 'Bills'; break; }
+      if (checkText.indexOf('DEBT') !== -1)    { detectedSection = 'Debt'; break; }
+      if (checkText.indexOf('EXPENSE') !== -1) { detectedSection = 'Expenses'; break; }
+      if (checkText.indexOf('SAVING') !== -1)  { detectedSection = 'Savings'; break; }
+    }
+
+    var items = [];
+    var catValCol = h.col + 1;
+    for (var dataR = r + 1; dataR < values.length; dataR++) {
+      var rawCat = String(values[dataR][catValCol] || values[dataR][h.col] || '').trim();
+      if (!rawCat) break;
+      if (rawCat.indexOf('THIS SPREADSHEET') !== -1 || rawCat.indexOf('Total') !== -1) break;
+
+      var gVal = goalCol !== -1 ? parseAmount(values[dataR][goalCol + 1] !== undefined && values[dataR][goalCol + 1] !== '' ? values[dataR][goalCol + 1] : values[dataR][goalCol]) : 0;
+      var aVal = actualCol !== -1 ? parseAmount(values[dataR][actualCol + 1] !== undefined && values[dataR][actualCol + 1] !== '' ? values[dataR][actualCol + 1] : values[dataR][actualCol]) : 0;
+      var dVal = diffCol !== -1 ? parseAmount(values[dataR][diffCol + 1] !== undefined && values[dataR][diffCol + 1] !== '' ? values[dataR][diffCol + 1] : values[dataR][diffCol]) : (aVal - gVal);
+
+      items.push({ category: rawCat, goal: gVal, actual: aVal, diff: dVal });
+    }
+
+    tables[detectedSection] = items;
+    tableDiscoveryReport[detectedSection] = { found: true, rowCount: items.length };
+  });
+
+  // Report missing tables explicitly
+  sectionNames.forEach(function (sec) {
+    if (!tableDiscoveryReport[sec]) {
+      tableDiscoveryReport[sec] = { found: false, rowCount: 0 };
+    }
+  });
+
+  // NOTE (Part E scope decision): The "Annual Income by Month" trend section exists around row 40
+  // of the Annual Dashboard tab. It contains monthly breakdown data (12-point series) structured
+  // as a chart-feed table — different from the point-in-time snapshot returned here.
+  // This trend chart has been intentionally deferred to a future dedicated implementation.
+
+  return {
+    tab: annualTabName,
+    summaryTiles: summaryTiles,
+    tables: tables,
+    tableDiscoveryReport: tableDiscoveryReport
   };
 }
 

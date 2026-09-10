@@ -13,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -36,9 +37,6 @@ fun DashboardScreen(
     LaunchedEffect(Unit) {
         TransactionRepository.fetchDashboard()
     }
-
-    var testSmsText by remember { mutableStateOf("") }
-    var parseFeedback by remember { mutableStateOf<String?>(null) }
 
     Column(
         modifier = Modifier
@@ -100,8 +98,14 @@ fun DashboardScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Monthly Budget Sheet Live Card (if loaded)
-        val monthData = dashboardResponse?.month
+        // Monthly/Annual Budget Sheet Live Card (if loaded)
+        var selectedPeriod by remember { mutableStateOf("monthly") }
+
+        LaunchedEffect(selectedPeriod) {
+            TransactionRepository.fetchDashboard(selectedPeriod)
+        }
+
+        val monthData = dashboardResponse?.month ?: dashboardResponse?.annual
         if (monthData != null) {
             Card(
                 colors = CardDefaults.cardColors(containerColor = DarkSurface),
@@ -117,10 +121,11 @@ fun DashboardScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Monthly Budget (${monthData.month})",
+                            text = if (selectedPeriod == "annual") "Annual Dashboard (${monthData.tab ?: "Annual"})" else "Monthly Budget (${monthData.month})",
                             color = TextPrimary,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp
+                            fontSize = 15.sp,
+                            modifier = Modifier.weight(1f)
                         )
                         Surface(
                             color = AccentCyan.copy(alpha = 0.2f),
@@ -135,6 +140,52 @@ fun DashboardScreen(
                             )
                         }
                     }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    
+                    // Period Toggle
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(DarkBackground, RoundedCornerShape(8.dp))
+                            .border(1.dp, DarkSurfaceBorder, RoundedCornerShape(8.dp))
+                            .padding(4.dp),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        val isMonthly = selectedPeriod == "monthly"
+                        Surface(
+                            color = if (isMonthly) MpesaGreen else Color.Transparent,
+                            shape = RoundedCornerShape(6.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { selectedPeriod = "monthly" }
+                        ) {
+                            Text(
+                                text = "Monthly",
+                                color = if (isMonthly) Color.Black else TextPrimary,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(vertical = 6.dp),
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                        }
+                        Surface(
+                            color = if (!isMonthly) MpesaGreen else Color.Transparent,
+                            shape = RoundedCornerShape(6.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { selectedPeriod = "annual" }
+                        ) {
+                            Text(
+                                text = "Annual",
+                                color = if (!isMonthly) Color.Black else TextPrimary,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(vertical = 6.dp),
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
                     Spacer(modifier = Modifier.height(12.dp))
 
                     val tiles = monthData.summaryTiles
@@ -218,100 +269,6 @@ fun DashboardScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Live Test SMS Parser (clean manual tester for real verification)
-        Card(
-            colors = CardDefaults.cardColors(containerColor = DarkSurface),
-            shape = RoundedCornerShape(16.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, DarkSurfaceBorder, RoundedCornerShape(16.dp))
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "SMS Detection & Parser Simulator",
-                    color = TextPrimary,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "Paste any Kenyan M-PESA SMS to test parser and launch review flow.",
-                    color = TextSecondary,
-                    fontSize = 11.sp
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                OutlinedTextField(
-                    value = testSmsText,
-                    onValueChange = { testSmsText = it },
-                    placeholder = { Text("Paste M-PESA SMS text here...", color = TextMuted) },
-                    modifier = Modifier.fillMaxWidth(),
-                    maxLines = 4,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MpesaGreen,
-                        unfocusedBorderColor = DarkSurfaceBorder,
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary
-                    )
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Pre-canned test chips
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    SuggestionChip(
-                        onClick = {
-                            testSmsText = "TD47XYZ123 Confirmed. Ksh3,500.00 sent to Kenya Power and Lighting Company for account 12345678 on 7/9/26 at 8:15 PM. New M-PESA balance is Ksh12,450.00. Transaction cost, Ksh23.00."
-                        },
-                        label = { Text("KPLC Bill", fontSize = 11.sp) }
-                    )
-                    SuggestionChip(
-                        onClick = {
-                            testSmsText = "TD48ABC456 Confirmed. Ksh1,250.00 paid to NAIVAS SUPERMARKET. on 7/9/26 at 2:30 PM. New M-PESA balance is Ksh11,200.00. Transaction cost, Ksh0.00."
-                        },
-                        label = { Text("Naivas Till", fontSize = 11.sp) }
-                    )
-                    SuggestionChip(
-                        onClick = {
-                            testSmsText = "TD51JKL345 Confirmed. Ksh10,000.00 sent to NCBA LOOP for account 0123456789 on 7/9/26 at 1:15 PM. New M-PESA balance is Ksh49,200.00."
-                        },
-                        label = { Text("Bank Transfer", fontSize = 11.sp) }
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Button(
-                    onClick = {
-                        val parsed = MpesaParser.parse(testSmsText)
-                        if (parsed != null && parsed.transactionCode.isNotBlank()) {
-                            TransactionRepository.addPendingTransaction(parsed)
-                            parseFeedback = "✓ Parsed code ${parsed.transactionCode} (${parsed.type}) added to review queue!"
-                            onNavigateToReview()
-                        } else {
-                            parseFeedback = "⚠ Could not parse a valid M-PESA confirmed message."
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MpesaGreen),
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Parse & Open Confirmation")
-                }
-
-                if (parseFeedback != null) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(text = parseFeedback!!, color = AccentCyan, fontSize = 12.sp)
-                }
-            }
-        }
     }
 }
 

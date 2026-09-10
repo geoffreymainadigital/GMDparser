@@ -31,6 +31,7 @@ fun SmsScanDialog(
     val scope = rememberCoroutineScope()
 
     val options = listOf(
+        Pair("Today / Last 24 hours (Daily)", 1),
         Pair("Last 7 days", 7),
         Pair("Last 14 days", 14),
         Pair("Last 30 days (Recommended)", 30),
@@ -38,7 +39,7 @@ fun SmsScanDialog(
         Pair("All time (Full history)", null)
     )
 
-    var selectedIndex by remember { mutableIntStateOf(2) } // default 30 days
+    var selectedIndex by remember { mutableIntStateOf(0) } // default Today / Daily
     var isScanning by remember { mutableStateOf(false) }
     var resultStats by remember { mutableStateOf<ScanStats?>(null) }
 

@@ -14,7 +14,9 @@ export default async function handler(req, res) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 12000);
 
-    const upstreamRes = await fetch(appsScriptUrl + '?action=dashboard', {
+    const periodParam = req.query.period ? `&period=${req.query.period}` : '';
+
+    const upstreamRes = await fetch(appsScriptUrl + '?action=dashboard' + periodParam, {
       method: 'GET',
       signal: controller.signal
     });

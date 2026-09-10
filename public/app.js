@@ -200,7 +200,7 @@ function parseMpesaMessage(smsBody) {
     const timeStr = paidMatch[4];
 
     const lower = merchant.toLowerCase();
-    let category = 'House Supplies';
+    let category = '';
     let type = 'Expenses';
     if (lower.includes('mboga') || lower.includes('market') || lower.includes('fruit') || lower.includes('veg')) {
       category = 'Mama Mboga';
@@ -449,6 +449,7 @@ function renderReviewCards() {
         <div class="form-group">
           <label>Category</label>
           <select id="tx-category-${index}">
+            ${!tx.category ? `<option value="" disabled selected>-- Select Category --</option>` : ''}
             ${categoriesForType.map(c =>
               `<option value="${c}" ${c === tx.category ? 'selected' : ''}>${c}</option>`
             ).join('')}
@@ -475,8 +476,9 @@ function renderReviewCards() {
       ${tx.rawText ? `<div class="review-raw-sms">${tx.rawText}</div>` : ''}
 
       <div class="review-actions-row">
+        ${!tx.category ? '<span class="text-amber" style="margin-right: 12px; font-size: 13px;">⚠️ Needs categorization</span>' : ''}
         <button class="btn btn-danger btn-sm btn-dismiss" data-index="${index}">Dismiss</button>
-        <button class="btn btn-primary btn-confirm" data-index="${index}" id="btn-confirm-${index}">
+        <button class="btn btn-primary btn-confirm" data-index="${index}" id="btn-confirm-${index}" ${!tx.category ? 'disabled' : ''}>
           <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
           Confirm & Record to Sheet
         </button>
@@ -489,13 +491,25 @@ function renderReviewCards() {
     const typeSelect = card.querySelector(`#tx-type-${index}`);
     const catSelect = card.querySelector(`#tx-category-${index}`);
     const destGroup = card.querySelector(`#tx-dest-group-${index}`);
+    const confirmBtn = card.querySelector(`#btn-confirm-${index}`);
 
-    typeSelect.addEventListener('change', (e) => {
-      const selectedType = e.target.value;
-      const cats = TAXONOMY[selectedType] || (selectedType === 'Balance' ? [''] : ['General']);
-      catSelect.innerHTML = cats.map(c => `<option value="${c}">${c}</option>`).join('');
-      destGroup.style.display = (selectedType === 'Transfer' || selectedType === 'Balance') ? 'block' : 'none';
-    });
+      typeSelect.addEventListener('change', (e) => {
+        const selectedType = e.target.value;
+        const cats = TAXONOMY[selectedType] || (selectedType === 'Balance' ? [''] : ['General']);
+        catSelect.innerHTML = cats.map(c => `<option value="${c}">${c}</option>`).join('');
+        destGroup.style.display = (selectedType === 'Transfer' || selectedType === 'Balance') ? 'block' : 'none';
+        if (catSelect.value !== '') {
+          confirmBtn.disabled = false;
+        }
+      });
+
+      catSelect.addEventListener('change', (e) => {
+        if (e.target.value !== '') {
+          confirmBtn.disabled = false;
+        } else {
+          confirmBtn.disabled = true;
+        }
+      });
 
     // Dismiss Handler
     card.querySelector('.btn-dismiss').addEventListener('click', () => {
@@ -826,15 +840,16 @@ async function fetchLiveTransactions() {
   }
 }
 
-// Live Monthly Dashboard & Account Balances Synchronizer
+// Live Monthly & Annual Dashboard Synchronizer
 let currentCatSection = 'Income';
+let currentDashboardPeriod = 'monthly';
 
-async function fetchMonthlyDashboard() {
+async function fetchDashboardData(period = 'monthly') {
   try {
-    let res = await fetch('/api/dashboard');
+    let res = await fetch(`/api/dashboard?period=${period}`);
     if (!res.ok) {
       console.warn('Vercel /api/dashboard returned', res.status, 'trying direct Apps Script fallback...');
-      res = await fetch(`${FALLBACK_GAS_URL}?action=dashboard`);
+      res = await fetch(`${FALLBACK_GAS_URL}?action=dashboard&period=${period}`);
     }
     if (!res.ok) {
       console.warn('Could not fetch dashboard from fallback either, status:', res.status);
@@ -842,23 +857,25 @@ async function fetchMonthlyDashboard() {
     }
     const json = await res.json();
     if (json.success) {
-      state.monthlyData = json.month;
+      state.dashboardData = json.period === 'annual' ? json.annual : json.month;
+      currentDashboardPeriod = json.period || period;
       state.accountsData = json.accounts;
-      renderMonthlyDashboard();
+      renderDashboardData();
       renderAccountsAndBudgets();
       renderAccountsBalanceTable();
-      console.log('✓ Synchronized live monthly budget and account balances from Google Sheets:', json);
+      console.log(`✓ Synchronized live ${currentDashboardPeriod} budget and account balances from Google Sheets:`, json);
     }
   } catch (err) {
     console.warn('Could not fetch live dashboard:', err.message);
     try {
-      const fbRes = await fetch(`${FALLBACK_GAS_URL}?action=dashboard`);
+      const fbRes = await fetch(`${FALLBACK_GAS_URL}?action=dashboard&period=${period}`);
       if (fbRes.ok) {
         const json = await fbRes.json();
         if (json.success) {
-          state.monthlyData = json.month;
+          state.dashboardData = json.period === 'annual' ? json.annual : json.month;
+          currentDashboardPeriod = json.period || period;
           state.accountsData = json.accounts;
-          renderMonthlyDashboard();
+          renderDashboardData();
           renderAccountsAndBudgets();
           renderAccountsBalanceTable();
         }
@@ -869,16 +886,16 @@ async function fetchMonthlyDashboard() {
   }
 }
 
-function renderMonthlyDashboard() {
-  if (!state.monthlyData) return;
-  const m = state.monthlyData;
+function renderDashboardData() {
+  if (!state.dashboardData) return;
+  const data = state.dashboardData;
 
   const badge = document.getElementById('monthly-sheet-badge');
   const title = document.getElementById('monthly-budget-title');
-  if (badge) badge.textContent = `SHEET: ${m.month}`;
-  if (title) title.textContent = `Monthly Budget & Tracking (${m.month})`;
+  if (badge) badge.textContent = `SHEET: ${data.tab || data.month}`;
+  if (title) title.textContent = currentDashboardPeriod === 'annual' ? `Annual Dashboard (${data.tab || 'Annual'})` : `Monthly Budget & Tracking (${data.month})`;
 
-  const tiles = m.summaryTiles || {};
+  const tiles = data.summaryTiles || {};
   function setTile(prefix, t) {
     const valEl = document.getElementById(`tile-${prefix}-val`);
     const subEl = document.getElementById(`tile-${prefix}-sub`);
@@ -918,7 +935,7 @@ function renderCategoryTable(section) {
     btn.classList.toggle('active', btn.getAttribute('data-cat-section') === currentCatSection);
   });
 
-  const tables = (state.monthlyData && state.monthlyData.tables) || {};
+  const tables = (state.dashboardData && state.dashboardData.tables) || {};
   const items = tables[currentCatSection] || [];
 
   if (items.length === 0) {
@@ -967,7 +984,27 @@ document.addEventListener('DOMContentLoaded', () => {
   checkNetworkStatus();
   fetchTaxonomyFromApi();
   fetchLiveTransactions();
-  fetchMonthlyDashboard();
+  fetchDashboardData('monthly');
+
+  // Period Toggle Listeners
+  const btnMonthly = document.getElementById('btn-period-monthly');
+  const btnAnnual = document.getElementById('btn-period-annual');
+  if (btnMonthly && btnAnnual) {
+    btnMonthly.addEventListener('click', () => {
+      btnMonthly.style.background = 'var(--mpesa-green)';
+      btnMonthly.style.color = '#000';
+      btnAnnual.style.background = 'transparent';
+      btnAnnual.style.color = 'var(--text-primary)';
+      fetchDashboardData('monthly');
+    });
+    btnAnnual.addEventListener('click', () => {
+      btnAnnual.style.background = 'var(--mpesa-green)';
+      btnAnnual.style.color = '#000';
+      btnMonthly.style.background = 'transparent';
+      btnMonthly.style.color = 'var(--text-primary)';
+      fetchDashboardData('annual');
+    });
+  }
 
   // Category Tabs click handlers
   document.querySelectorAll('#cat-tabs button').forEach(btn => {

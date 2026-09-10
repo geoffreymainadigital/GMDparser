@@ -135,12 +135,18 @@
 
           <!-- Monthly Budget Live Summary (SEP) -->
           <div class="card monthly-budget-card" id="card-monthly-budget">
-            <div class="card-header">
+            <div class="card-header" style="flex-wrap: wrap; gap: 12px;">
               <div>
-                <h3 id="monthly-budget-title">Monthly Budget & Category Tracking</h3>
-                <p class="card-desc" id="monthly-budget-subtitle">Goal vs Actual summary synced from active month tab.</p>
+                <h3 id="monthly-budget-title">Dashboard Summary</h3>
+                <p class="card-desc" id="monthly-budget-subtitle">Goal vs Actual summary synced from active tab.</p>
               </div>
-              <span class="tag tag-cyan" id="monthly-sheet-badge">SYNCING...</span>
+              <div style="display: flex; gap: 12px; align-items: center;">
+                <div style="display: flex; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden;">
+                  <button id="btn-period-monthly" style="padding: 6px 12px; border: none; background: var(--mpesa-green); color: #000; font-weight: bold; cursor: pointer; font-size: 12px;">Monthly</button>
+                  <button id="btn-period-annual" style="padding: 6px 12px; border: none; background: transparent; color: var(--text-primary); font-weight: bold; cursor: pointer; font-size: 12px;">Annual</button>
+                </div>
+                <span class="tag tag-cyan" id="monthly-sheet-badge">SYNCING...</span>
+              </div>
             </div>
 
             <!-- Summary Tiles Grid -->
@@ -238,13 +244,6 @@
 
         <!-- 2. REVIEW & CONFIRM VIEW -->
         <section id="view-review" class="tab-view">
-          <div class="banner banner-warning">
-            <div class="banner-icon">⚠️</div>
-            <div class="banner-body">
-              <strong>Mandatory Confirmation Gate</strong>
-              <p>isAutoSync is permanently locked to <code>false</code>. No financial data is ever written to Google Sheets without explicit confirmation by the user.</p>
-            </div>
-          </div>
 
           <div id="review-container">
             <!-- Rendered transaction cards inserted here via JS -->

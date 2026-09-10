@@ -165,7 +165,8 @@ data class CategoryItem(
 )
 
 data class MonthlyDashboardData(
-    @SerializedName("month") val month: String,
+    @SerializedName("month") val month: String? = null,
+    @SerializedName("tab") val tab: String? = null,
     @SerializedName("summaryTiles") val summaryTiles: SummaryTiles,
     @SerializedName("tables") val tables: Map<String, List<CategoryItem>>
 )
@@ -180,7 +181,9 @@ data class AccountBalanceItem(
 
 data class DashboardResponse(
     @SerializedName("success") val success: Boolean,
+    @SerializedName("period") val period: String? = null,
     @SerializedName("month") val month: MonthlyDashboardData? = null,
+    @SerializedName("annual") val annual: MonthlyDashboardData? = null,
     @SerializedName("accounts") val accounts: List<AccountBalanceItem>? = null,
     @SerializedName("timestamp") val timestamp: String? = null,
     @SerializedName("error") val error: String? = null

@@ -49,22 +49,22 @@ object TransactionRepository {
 
     private const val FALLBACK_GAS_URL = "https://script.google.com/macros/s/AKfycbzLo8NZHU3rmGIT6R-une9xrjUqwIdSbUG6to1O_ZwohEbvST1-3MjpNvCaNq2TOF4_Xw/exec"
 
-    suspend fun fetchDashboard(): Result<com.gmdparser.data.model.DashboardResponse> {
+    suspend fun fetchDashboard(period: String = "monthly"): Result<com.gmdparser.data.model.DashboardResponse> {
         return try {
-            val response = ApiClient.apiService.getDashboard()
+            val response = ApiClient.apiService.getDashboard(period)
             if (response.isSuccessful && response.body() != null && response.body()!!.success) {
                 val data = response.body()!!
                 _dashboardData.value = data
                 Result.success(data)
             } else {
-                fetchDashboardDirect()
+                fetchDashboardDirect(period)
             }
         } catch (e: Exception) {
-            fetchDashboardDirect()
+            fetchDashboardDirect(period)
         }
     }
 
-    private suspend fun fetchDashboardDirect(): Result<com.gmdparser.data.model.DashboardResponse> {
+    private suspend fun fetchDashboardDirect(period: String): Result<com.gmdparser.data.model.DashboardResponse> {
         return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 val client = okhttp3.OkHttpClient.Builder()
@@ -73,7 +73,7 @@ object TransactionRepository {
                     .followRedirects(true)
                     .build()
                 val request = okhttp3.Request.Builder()
-                    .url("$FALLBACK_GAS_URL?action=dashboard")
+                    .url("$FALLBACK_GAS_URL?action=dashboard&period=$period")
                     .get()
                     .build()
                 val res = client.newCall(request).execute()

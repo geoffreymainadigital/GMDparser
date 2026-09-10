@@ -28,7 +28,9 @@ interface ApiService {
     suspend fun getTaxonomy(): Response<TaxonomyResponse>
 
     @GET("/api/dashboard")
-    suspend fun getDashboard(): Response<com.gmdparser.data.model.DashboardResponse>
+    suspend fun getDashboard(
+        @retrofit2.http.Query("period") period: String = "monthly"
+    ): Response<com.gmdparser.data.model.DashboardResponse>
 
     @POST("/api/transaction")
     suspend fun recordTransaction(
