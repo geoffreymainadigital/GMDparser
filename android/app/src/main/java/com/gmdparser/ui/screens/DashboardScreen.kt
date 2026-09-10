@@ -98,9 +98,21 @@ fun DashboardScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Monthly/Annual Budget Sheet Live Card (atomic update & loading skeleton)
+        // Monthly/Annual Budget Sheet Live Card (SWR: instant toggle with background revalidation)
         var selectedPeriod by remember { mutableStateOf("monthly") }
         var isLoadingPeriod by remember { mutableStateOf(false) }
+
+        // SWR Memory Cache for Android client session
+        var cachedMonthlyData by remember { mutableStateOf<com.gmdparser.data.model.MonthlyDashboardData?>(null) }
+        var cachedAnnualData by remember { mutableStateOf<com.gmdparser.data.model.MonthlyDashboardData?>(null) }
+
+        LaunchedEffect(dashboardResponse) {
+            if (dashboardResponse?.period == "monthly" && dashboardResponse?.month != null) {
+                cachedMonthlyData = dashboardResponse?.month
+            } else if (dashboardResponse?.period == "annual" && dashboardResponse?.annual != null) {
+                cachedAnnualData = dashboardResponse?.annual
+            }
+        }
 
         LaunchedEffect(selectedPeriod) {
             isLoadingPeriod = true
@@ -108,14 +120,14 @@ fun DashboardScreen(
             isLoadingPeriod = false
         }
 
-        // Only select dataset matching current selectedPeriod if returned period matches
-        val currentResponsePeriod = dashboardResponse?.period
-        val isPeriodMatch = currentResponsePeriod == selectedPeriod
-        val activeData = if (isPeriodMatch) {
+        // Active data: prioritize newly fetched data matching selectedPeriod, else fallback to cached period data
+        val activeData = if (dashboardResponse?.period == selectedPeriod) {
             if (selectedPeriod == "annual") dashboardResponse?.annual else dashboardResponse?.month
-        } else null
+        } else {
+            if (selectedPeriod == "annual") cachedAnnualData else cachedMonthlyData
+        }
 
-        val showLoading = isLoadingPeriod || activeData == null
+        val showLoading = activeData == null || (isLoadingPeriod && activeData == null)
 
         Card(
             colors = CardDefaults.cardColors(containerColor = DarkSurface),

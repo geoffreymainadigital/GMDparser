@@ -845,10 +845,25 @@ let currentCatSection = 'Income';
 let currentDashboardPeriod = 'monthly';
 let dashboardFetchRequestId = 0;
 let dashboardLoading = false;
+const dashboardCache = {
+  monthly: null,
+  annual: null
+};
 
 function renderDashboardLoadingState(targetPeriod) {
   dashboardLoading = true;
   currentDashboardPeriod = targetPeriod;
+
+  // SWR: If cached data exists for this period, render it immediately while revalidating in background!
+  if (dashboardCache[targetPeriod]) {
+    state.dashboardData = dashboardCache[targetPeriod].data;
+    state.accountsData = dashboardCache[targetPeriod].accounts;
+    renderDashboardData();
+    const badge = document.getElementById('monthly-sheet-badge');
+    if (badge) badge.textContent = 'SYNCING (CACHED)...';
+    return;
+  }
+
   const badge = document.getElementById('monthly-sheet-badge');
   const title = document.getElementById('monthly-budget-title');
   if (badge) badge.textContent = 'SYNCING...';
@@ -893,9 +908,15 @@ async function fetchDashboardData(period = 'monthly') {
     }
     if (json.success) {
       dashboardLoading = false;
-      state.dashboardData = json.period === 'annual' ? json.annual : json.month;
+      const periodData = json.period === 'annual' ? json.annual : json.month;
+      state.dashboardData = periodData;
       currentDashboardPeriod = json.period || period;
       state.accountsData = json.accounts;
+      dashboardCache[currentDashboardPeriod] = {
+        data: periodData,
+        accounts: json.accounts,
+        timestamp: Date.now()
+      };
       renderDashboardData();
       renderAccountsAndBudgets();
       renderAccountsBalanceTable();
@@ -913,9 +934,15 @@ async function fetchDashboardData(period = 'monthly') {
         }
         if (json.success) {
           dashboardLoading = false;
-          state.dashboardData = json.period === 'annual' ? json.annual : json.month;
+          const periodData = json.period === 'annual' ? json.annual : json.month;
+          state.dashboardData = periodData;
           currentDashboardPeriod = json.period || period;
           state.accountsData = json.accounts;
+          dashboardCache[currentDashboardPeriod] = {
+            data: periodData,
+            accounts: json.accounts,
+            timestamp: Date.now()
+          };
           renderDashboardData();
           renderAccountsAndBudgets();
           renderAccountsBalanceTable();
