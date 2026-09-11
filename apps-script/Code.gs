@@ -1618,8 +1618,8 @@ function getAnnualDashboardData(ss) {
   var categoryHeaders = [];
   for (var r = 5; r < Math.min(300, values.length); r++) {
     for (var c = 0; c < Math.min(10, values[r].length); c++) {
-      var headerText = String(values[r][c] || '').trim();
-      if (headerText === 'Category' || headerText === 'Savings' || headerText === 'Savings Goal') {
+      var headerText = String(values[r][c] || '').trim().toUpperCase();
+      if (headerText === 'CATEGORY' || headerText === 'SAVINGS' || headerText === 'SAVINGS GOAL') {
         categoryHeaders.push({ row: r, col: c });
       }
     }
