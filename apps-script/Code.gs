@@ -175,6 +175,17 @@ function doGet(e) {
       }
     }
 
+    if (action === 'savings') {
+      const targetSs = (e && e.parameter && e.parameter.spreadsheetId) ?
+        SpreadsheetApp.openById(e.parameter.spreadsheetId) : ss;
+      const savingsData = getSavingsDashboardData(targetSs);
+      return createJsonResponse({
+        success: true,
+        data: savingsData,
+        timestamp: new Date().toISOString()
+      }, 200);
+    }
+
     // Protected endpoints require mandatory authentication check (admin/diagnostic only)
     const authError = verifyAuthSecret(e, null, false);
     if (authError) {
@@ -1341,6 +1352,36 @@ function getMonthlyDashboardData(ss) {
     return parseFloat(clean) || 0;
   }
 
+  function findTileValue(pos) {
+    // Check directly below (up to 3 rows down in the same column)
+    for (let dr = 1; dr <= 3; dr++) {
+      let r = pos.row + dr;
+      if (r < values.length) {
+         let val = values[r][pos.col];
+         if (val !== '' && val !== null) {
+            let num = parseAmount(val);
+            if (typeof val === 'number' || (typeof val === 'string' && val.match(/[0-9]/))) {
+               return num;
+            }
+         }
+      }
+    }
+    // Check directly right (up to 3 cols right in the same row)
+    for (let dc = 1; dc <= 3; dc++) {
+      let c = pos.col + dc;
+      if (c < values[pos.row].length) {
+         let val = values[pos.row][c];
+         if (val !== '' && val !== null) {
+            let num = parseAmount(val);
+            if (typeof val === 'number' || (typeof val === 'string' && val.match(/[0-9]/))) {
+               return num;
+            }
+         }
+      }
+    }
+    return null;
+  }
+
   // 1. Discover Category Tables by searching for "Category" headers
   const categoryHeaders = [];
   for (let r = 0; r < values.length; r++) {
@@ -1455,9 +1496,30 @@ function getMonthlyDashboardData(ss) {
   const expensesTile = aggregateSection(tables.Expenses, 'Expenses');
   const savingsTile = aggregateSection(tables.Savings, 'Savings');
 
-  // Unallocated Income = Total Income Actual - (Bills + Debt + Expenses + Savings Actuals)
+  // Unallocated Income fallback
   const totalAllocatedActual = billsTile.actual + debtTile.actual + expensesTile.actual + savingsTile.actual;
   const unallocatedActual = incomeTile.actual - totalAllocatedActual;
+  const unallocatedFallback = { actual: unallocatedActual, statusText: 'Remaining balance' };
+
+  // Discover the six summary tiles by their label text directly from the sheet
+  const TILE_LABELS = [
+    { key: 'totalIncome',       label: 'Total Income', obj: incomeTile },
+    { key: 'totalBills',        label: 'Total Bills', obj: billsTile },
+    { key: 'totalDebtPayoff',   label: 'Total Debt', obj: debtTile },
+    { key: 'totalExpenses',     label: 'Total Expenses', obj: expensesTile },
+    { key: 'totalSavings',      label: 'Total Savings', obj: savingsTile },
+    { key: 'unallocatedIncome', label: 'Unallocated', obj: unallocatedFallback }
+  ];
+
+  TILE_LABELS.forEach(function (tile) {
+    let pos = findCell(tile.label);
+    if (pos) {
+       let val = findTileValue(pos);
+       if (val !== null && val !== undefined) {
+           tile.obj.actual = val;
+       }
+    }
+  });
 
   return {
     month: targetSheetName,
@@ -1467,7 +1529,7 @@ function getMonthlyDashboardData(ss) {
       totalDebtPayoff: debtTile,
       totalExpenses: expensesTile,
       totalSavings: savingsTile,
-      unallocatedIncome: { actual: unallocatedActual, statusText: 'Remaining balance' }
+      unallocatedIncome: TILE_LABELS[5].obj
     },
     tables: tables
   };
@@ -1529,6 +1591,36 @@ function getAnnualDashboardData(ss) {
     return parseFloat(clean) || 0;
   }
 
+  function findTileValue(pos) {
+    // Check directly below (up to 3 rows down in the same column)
+    for (let dr = 1; dr <= 3; dr++) {
+      let r = pos.row + dr;
+      if (r < values.length) {
+         let val = values[r][pos.col];
+         if (val !== '' && val !== null) {
+            let num = parseAmount(val);
+            if (typeof val === 'number' || (typeof val === 'string' && val.match(/[0-9]/))) {
+               return num;
+            }
+         }
+      }
+    }
+    // Check directly right (up to 3 cols right in the same row)
+    for (let dc = 1; dc <= 3; dc++) {
+      let c = pos.col + dc;
+      if (c < values[pos.row].length) {
+         let val = values[pos.row][c];
+         if (val !== '' && val !== null) {
+            let num = parseAmount(val);
+            if (typeof val === 'number' || (typeof val === 'string' && val.match(/[0-9]/))) {
+               return num;
+            }
+         }
+      }
+    }
+    return null;
+  }
+
   // Discover the six summary tiles by their label text.
   // For each label, the numeric value is in nearby cells (above, below, or offset by 1-2 columns/rows)
   const TILE_LABELS = [
@@ -1547,22 +1639,9 @@ function getAnnualDashboardData(ss) {
       summaryTiles[tile.key] = { actual: 0, goal: 0, diff: 0, statusText: 'NOT FOUND: ' + tile.label };
       return;
     }
-    // Search a 7x7 bounding box around the header for the largest numeric value
-    var bestVal = 0;
-    for (var dr = -4; dr <= 4; dr++) {
-      for (var dc = -3; dc <= 3; dc++) {
-        var checkRow = pos.row + dr;
-        var checkCol = pos.col + dc;
-        if (checkRow < 0 || checkRow >= values.length) continue;
-        if (checkCol < 0 || checkCol >= values[checkRow].length) continue;
-        var candidate = values[checkRow][checkCol];
-        var num = parseAmount(candidate);
-        if (num !== 0 && Math.abs(num) > Math.abs(bestVal)) {
-          bestVal = num;
-        }
-      }
-    }
-    summaryTiles[tile.key] = { actual: bestVal, statusText: tile.label + ' (Annual)' };
+    
+    var actualVal = findTileValue(pos) || 0;
+    summaryTiles[tile.key] = { actual: actualVal, statusText: tile.label + ' (Annual)' };
   });
 
   // Discover category breakdown tables using "Category" header scan (same as monthly)
@@ -1763,7 +1842,121 @@ function getAccountsData(ss) {
  * Creates standardized JSON HTTP Response with CORS headers
  */
 function createJsonResponse(data, statusCode) {
-  const output = ContentService.createTextOutput(JSON.stringify(data));
-  output.setMimeType(ContentService.MimeType.JSON);
-  return output;
+  return ContentService.createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * Programmatically discovers and parses the Savings tab (Read-Only)
+ */
+function getSavingsDashboardData(ss) {
+  const sheetNames = ss.getSheets().map(function (s) { return s.getName(); });
+  let tabName = sheetNames.find(function (n) { return n.toLowerCase().indexOf('savings dashboard') !== -1; });
+  if (!tabName) {
+    tabName = sheetNames.find(function (n) { return n.toLowerCase().indexOf('savings') !== -1; });
+  }
+  if (!tabName) {
+    throw new Error('SAVINGS_TAB_NOT_FOUND. Available sheets: [' + sheetNames.join(', ') + '].');
+  }
+
+  const sheet = ss.getSheetByName(tabName);
+  const maxRows = Math.min(sheet.getMaxRows ? sheet.getMaxRows() : 100, 100);
+  const maxCols = Math.min(sheet.getMaxColumns ? sheet.getMaxColumns() : 60, 60);
+  const dataRange = sheet.getRange(1, 1, maxRows, maxCols);
+  const values = dataRange.getValues();
+
+  function parseAmount(val) {
+    if (typeof val === 'number') return val;
+    if (!val) return 0;
+    const clean = String(val).replace(/[^0-9.\-]/g, '');
+    return parseFloat(clean) || 0;
+  }
+
+  function extractNumRight(rowIdx, startCol) {
+    let str = '';
+    // Look at up to 4 cells to the right to catch merged values
+    for (let dc = 0; dc <= 3; dc++) {
+       let val = values[rowIdx][startCol + dc];
+       if (val !== undefined && val !== null) {
+          str += ' ' + val;
+       }
+    }
+    return parseAmount(str);
+  }
+
+  // Find header row by looking for 'Category' and 'Already Saved'
+  let headerRow = -1;
+  let cols = { category: -1, goal: -1, saved: -1, remaining: -1, progress: -1 };
+
+  for (let r = 0; r < values.length; r++) {
+    let foundCategory = -1;
+    let foundSaved = -1;
+    for (let c = 0; c < values[r].length; c++) {
+      const val = String(values[r][c] || '').toLowerCase().trim();
+      if (val === 'category') foundCategory = c;
+      if (val === 'already saved') foundSaved = c;
+    }
+    if (foundCategory !== -1 && foundSaved !== -1) {
+      headerRow = r;
+      cols.category = foundCategory;
+      cols.saved = foundSaved;
+      // Now find the rest in this row
+      for (let c = 0; c < values[r].length; c++) {
+        const val = String(values[r][c] || '').toLowerCase().trim();
+        if (val === 'goal') cols.goal = c;
+        if (val === 'remaining to save') cols.remaining = c;
+        if (val === 'progress') cols.progress = c;
+      }
+      break;
+    }
+  }
+
+  if (headerRow === -1) {
+    throw new Error('Could not find savings table headers in ' + tabName);
+  }
+
+  const goals = [];
+  let blankCount = 0;
+  for (let r = headerRow + 1; r < values.length; r++) {
+    let cat = String(values[r][cols.category + 1] || values[r][cols.category] || '').trim();
+    if (!cat) {
+        blankCount++;
+        if (blankCount > 3) break;
+        continue;
+    }
+    if (cat.indexOf('Total') !== -1 || cat.indexOf('Spreadsheet') !== -1) {
+        break;
+    }
+    blankCount = 0;
+
+    let goalVal = extractNumRight(r, cols.goal);
+    let savedVal = extractNumRight(r, cols.saved);
+    let remainingVal = extractNumRight(r, cols.remaining);
+    
+    let progCell = values[r][cols.progress + 1] !== '' ? values[r][cols.progress + 1] : values[r][cols.progress];
+    let progressVal = 0;
+    if (typeof progCell === 'number') {
+        progressVal = progCell;
+    } else if (typeof progCell === 'string') {
+        let num = parseFloat(progCell.replace(/[^0-9.]/g, ''));
+        if (progCell.indexOf('%') !== -1) {
+            progressVal = num / 100;
+        } else {
+            progressVal = num;
+        }
+    }
+
+    goals.push({
+      category: cat,
+      goal: goalVal,
+      saved: savedVal,
+      remaining: remainingVal,
+      progress: progressVal || 0
+    });
+  }
+
+  return {
+    tab: tabName,
+    goals: goals
+  };
 }

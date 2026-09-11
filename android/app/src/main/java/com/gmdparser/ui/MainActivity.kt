@@ -191,7 +191,7 @@ fun MainAppHost(initialScreen: Screen = Screen.DASHBOARD) {
                     onNavigateToReview = { currentScreen = Screen.REVIEW },
                     onNavigateToHistory = { currentScreen = Screen.HISTORY },
                     onNavigateToAccounts = { currentScreen = Screen.ACCOUNTS },
-                    onNavigateToCategories = { currentScreen = Screen.CATEGORIES }
+                    onNavigateToSavings = { currentScreen = Screen.SAVINGS }
                 )
                 Screen.REVIEW    -> ReviewConfirmScreen()
                 Screen.HISTORY   -> HistoryScreen()

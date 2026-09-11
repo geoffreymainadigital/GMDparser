@@ -28,7 +28,7 @@ fun DashboardScreen(
     onNavigateToReview: () -> Unit,
     onNavigateToHistory: () -> Unit,
     onNavigateToAccounts: () -> Unit,
-    onNavigateToCategories: () -> Unit
+    onNavigateToSavings: () -> Unit
 ) {
     val pendingList by TransactionRepository.pendingTransactions.collectAsState()
     val confirmedList by TransactionRepository.confirmedTransactions.collectAsState()
@@ -265,12 +265,12 @@ fun DashboardScreen(
                 onClick = onNavigateToAccounts
             )
             MetricQuickCard(
-                title = "Categories",
-                value = "Taxonomy",
-                icon = Icons.Default.Category,
+                title = "Savings Goals",
+                value = "Progress & Goals",
+                icon = Icons.Default.Savings, // Assuming Savings icon exists or use AccountBalanceWallet
                 color = AccentPurple,
                 modifier = Modifier.weight(1f),
-                onClick = onNavigateToCategories
+                onClick = onNavigateToSavings
             )
         }
 
