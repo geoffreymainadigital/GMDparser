@@ -49,34 +49,8 @@ function getCategoriesForType(type) {
  * When GMD_AUTH_SECRET is set, all protected GET/POST endpoints require valid key (401 UNAUTHORIZED if invalid).
  */
 function verifyAuthSecret(e, payload, isWriteOperation) {
-  const scriptProperties = PropertiesService.getScriptProperties();
-  const configuredSecret = scriptProperties.getProperty('GMD_AUTH_SECRET');
-  
-  if (!configuredSecret) {
-    if (isWriteOperation) {
-      return createJsonResponse({
-        success: false,
-        status: 'SERVER_MISCONFIGURED',
-        error: 'Server misconfigured: GMD_AUTH_SECRET is not set in Apps Script Properties. Refusing write operations.'
-      }, 500);
-    }
-    // For read operations when unconfigured: allow read access so website displays dashboard values
-    return null;
-  }
-
-  const clientAuthKey = (payload && payload.authKey) ||
-    (e && e.parameter && (e.parameter.authKey || e.parameter.secret)) ||
-    (e && e.headers && (e.headers['X-GMD-Auth-Key'] || e.headers['x-gmd-auth-key'] || e.headers['X-GMD-AUTH-KEY']));
-
-  if (clientAuthKey !== configuredSecret) {
-    return createJsonResponse({
-      success: false,
-      status: 'UNAUTHORIZED',
-      error: 'Unauthorized: Invalid or missing API key'
-    }, 401);
-  }
-
-  return null; // Auth verified
+  // Authentication requirement removed as requested
+  return null;
 }
 
 /**
