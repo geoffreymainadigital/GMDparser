@@ -1592,31 +1592,27 @@ function getAnnualDashboardData(ss) {
   }
 
   function findTileValue(pos) {
-    // Check directly below (up to 3 rows down in the same column)
-    for (let dr = 1; dr <= 3; dr++) {
-      let r = pos.row + dr;
-      if (r < values.length) {
-         let val = values[r][pos.col];
-         if (val !== '' && val !== null) {
-            let num = parseAmount(val);
-            if (typeof val === 'number' || (typeof val === 'string' && val.match(/[0-9]/))) {
-               return num;
+    for (let radius = 1; radius <= 5; radius++) {
+      let bestVal = null;
+      for (let dr = -radius; dr <= radius; dr++) {
+        for (let dc = -radius; dc <= radius; dc++) {
+          if (Math.abs(dr) !== radius && Math.abs(dc) !== radius) continue;
+          let r = pos.row + dr;
+          let c = pos.col + dc;
+          if (r >= 0 && r < values.length && c >= 0 && c < values[r].length) {
+            let val = values[r][c];
+            if (val !== '' && val !== null) {
+              let num = parseAmount(val);
+              if (num !== 0 && (typeof val === 'number' || (typeof val === 'string' && val.match(/[0-9]/)))) {
+                 if (bestVal === null || Math.abs(num) > Math.abs(bestVal)) {
+                    bestVal = num;
+                 }
+              }
             }
-         }
+          }
+        }
       }
-    }
-    // Check directly right (up to 3 cols right in the same row)
-    for (let dc = 1; dc <= 3; dc++) {
-      let c = pos.col + dc;
-      if (c < values[pos.row].length) {
-         let val = values[pos.row][c];
-         if (val !== '' && val !== null) {
-            let num = parseAmount(val);
-            if (typeof val === 'number' || (typeof val === 'string' && val.match(/[0-9]/))) {
-               return num;
-            }
-         }
-      }
+      if (bestVal !== null) return bestVal;
     }
     return null;
   }
@@ -1696,7 +1692,7 @@ function getAnnualDashboardData(ss) {
       if (!rawCat) {
         consecutiveBlanks++;
         // If no items collected yet, allow up to 3 leading spacer/blank rows beneath header
-        if (items.length === 0 && consecutiveBlanks <= 3) {
+        if (items.length === 0 && consecutiveBlanks <= 5) {
           continue;
         }
         // If items already found or excessive blank rows reached, terminate table
