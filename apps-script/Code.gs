@@ -1732,6 +1732,7 @@ function getAnnualDashboardData(ss) {
 
   return {
     tab: annualTabName,
+    debugValues: values.slice(0, 50).map(r => r.slice(0, 15)),
     summaryTiles: summaryTiles,
     tables: tables,
     tableDiscoveryReport: tableDiscoveryReport,
