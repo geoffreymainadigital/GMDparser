@@ -1656,12 +1656,12 @@ function getAnnualDashboardData(ss) {
 
     var detectedSection = sectionNames[idx] || 'Expenses';
     for (var checkR = r - 1; checkR >= Math.max(0, r - 5); checkR--) {
-      var checkText = String(values[checkR][1] || values[checkR][0] || '').toUpperCase();
-      if (checkText.indexOf('INCOME') !== -1)  { detectedSection = 'Income'; break; }
-      if (checkText.indexOf('BILL') !== -1)    { detectedSection = 'Bills'; break; }
-      if (checkText.indexOf('DEBT') !== -1)    { detectedSection = 'Debt'; break; }
-      if (checkText.indexOf('EXPENSE') !== -1) { detectedSection = 'Expenses'; break; }
-      if (checkText.indexOf('SAVING') !== -1)  { detectedSection = 'Savings'; break; }
+      var secCheckText = String(values[checkR][1] || values[checkR][0] || '').toUpperCase();
+      if (secCheckText.indexOf('INCOME') !== -1)  { detectedSection = 'Income'; break; }
+      if (secCheckText.indexOf('BILL') !== -1)    { detectedSection = 'Bills'; break; }
+      if (secCheckText.indexOf('DEBT') !== -1)    { detectedSection = 'Debt'; break; }
+      if (secCheckText.indexOf('EXPENSE') !== -1) { detectedSection = 'Expenses'; break; }
+      if (secCheckText.indexOf('SAVING') !== -1)  { detectedSection = 'Savings'; break; }
     }
 
     var items = [];
