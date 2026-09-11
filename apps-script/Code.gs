@@ -16,8 +16,8 @@ const COL_AMOUNT = 10;          // J (Amount)
 const COL_ACCOUNT = 11;         // K (Account)
 const COL_NOTES = 12;           // L (Notes)
 
-const SCRIPT_VERSION = '2026.09.10.v18_monthly_perf';
-const SCRIPT_BUILD_ID = 'GMD_GAS_20260910_PROD_18';
+const SCRIPT_VERSION = '2026.09.11.v20_annual_income_fix';
+const SCRIPT_BUILD_ID = 'GMD_GAS_20260911_PROD_20';
 
 let VALID_TYPES = ['Income', 'Expenses', 'Bills', 'Debt', 'Savings', 'Balance'];
 
@@ -1611,9 +1611,19 @@ function getAnnualDashboardData(ss) {
 
     var items = [];
     var catValCol = h.col + 1;
+    var consecutiveBlanks = 0;
     for (var dataR = r + 1; dataR < values.length; dataR++) {
       var rawCat = String(values[dataR][catValCol] || values[dataR][h.col] || '').trim();
-      if (!rawCat) break;
+      if (!rawCat) {
+        consecutiveBlanks++;
+        // If no items collected yet, allow up to 3 leading spacer/blank rows beneath header
+        if (items.length === 0 && consecutiveBlanks <= 3) {
+          continue;
+        }
+        // If items already found or excessive blank rows reached, terminate table
+        break;
+      }
+      consecutiveBlanks = 0;
       if (rawCat.indexOf('THIS SPREADSHEET') !== -1 || rawCat.indexOf('Total') !== -1) break;
 
       var gVal = goalCol !== -1 ? parseAmount(values[dataR][goalCol + 1] !== undefined && values[dataR][goalCol + 1] !== '' ? values[dataR][goalCol + 1] : values[dataR][goalCol]) : 0;
