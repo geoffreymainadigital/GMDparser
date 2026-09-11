@@ -1577,7 +1577,7 @@ function getAnnualDashboardData(ss) {
             let val = values[r][c];
             if (val !== '' && val !== null) {
               let num = parseAmount(val);
-              if (num !== 0 && (typeof val === 'number' || (typeof val === 'string' && val.match(/[0-9]/)))) {
+              if (num !== 0 && Math.abs(num) > 2 && (typeof val === 'number' || (typeof val === 'string' && val.match(/[0-9]/)))) {
                  if (bestVal === null || Math.abs(num) > Math.abs(bestVal)) {
                     bestVal = num;
                  }
@@ -1616,9 +1616,10 @@ function getAnnualDashboardData(ss) {
 
   // Discover category breakdown tables using "Category" header scan (same as monthly)
   var categoryHeaders = [];
-  for (var r = 0; r < values.length; r++) {
+  for (var r = 5; r < Math.min(300, values.length); r++) {
     for (var c = 0; c < Math.min(10, values[r].length); c++) {
-      if (String(values[r][c] || '').trim() === 'Category') {
+      var headerText = String(values[r][c] || '').trim();
+      if (headerText === 'Category' || headerText === 'Savings' || headerText === 'Savings Goal') {
         categoryHeaders.push({ row: r, col: c });
       }
     }
@@ -1637,12 +1638,17 @@ function getAnnualDashboardData(ss) {
   categoryHeaders.forEach(function (h, idx) {
     var r = h.row;
     var headerRowValues = values[r];
+    const checkText = headerRowValues.join(' ').toUpperCase();
+    // Savings table might use "SAVINGS" instead of "CATEGORY" and "SAVED" instead of "ACTUAL"
+    const hasCategory = checkText.indexOf('CATEGORY') !== -1 || checkText.indexOf('SAVINGS') !== -1;
+    const hasActual = checkText.indexOf('ACTUAL') !== -1 || checkText.indexOf('SAVED') !== -1;
+
     var goalCol = -1, actualCol = -1, diffCol = -1;
 
     for (var c = h.col + 1; c < Math.min(h.col + 35, headerRowValues.length); c++) {
       var ct = String(headerRowValues[c] || '').toLowerCase().trim();
       if (ct === 'goal' || ct === 'budget') goalCol = c;
-      else if (ct === 'actual') actualCol = c;
+      else if (ct === 'actual' || ct === 'saved') actualCol = c;
       else if (ct === 'diff' || ct === 'diff.') diffCol = c;
     }
 
