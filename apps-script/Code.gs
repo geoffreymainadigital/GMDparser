@@ -16,8 +16,8 @@ const COL_AMOUNT = 10;          // J (Amount)
 const COL_ACCOUNT = 11;         // K (Account)
 const COL_NOTES = 12;           // L (Notes)
 
-const SCRIPT_VERSION = '2026.09.12.v26_mpesa_tile_savings_card';
-const SCRIPT_BUILD_ID = 'GMD_GAS_20260912_PROD_26';
+const SCRIPT_VERSION = '2026.09.12.v27_savings_totals';
+const SCRIPT_BUILD_ID = 'GMD_GAS_20260912_PROD_27';
 
 let VALID_TYPES = ['Income', 'Expenses', 'Bills', 'Debt', 'Savings', 'Balance'];
 
@@ -1838,8 +1838,26 @@ function getSavingsDashboardData(ss) {
     });
   });
 
+  var totalGoal = 0;
+  var totalSaved = 0;
+  var totalRemaining = 0;
+
+  filteredGoals.forEach(function (g) {
+    totalGoal += (Number(g.goal) || 0);
+    totalSaved += (Number(g.saved) || 0);
+    totalRemaining += (Number(g.remaining) || 0);
+  });
+
+  var overallProgress = totalGoal > 0 ? (totalSaved / totalGoal) : 0;
+
   return {
     tab: tabName,
+    totals: {
+      totalGoal: totalGoal,
+      totalSaved: totalSaved,
+      totalRemaining: totalRemaining,
+      overallProgress: overallProgress
+    },
     goals: filteredGoals
   };
 }

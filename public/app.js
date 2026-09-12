@@ -963,6 +963,20 @@ function renderSavingsProgressTable() {
 
   const savingsObj = state.savingsData || (dashboardCache.monthly && dashboardCache.monthly.savings);
   const goals = (savingsObj && savingsObj.goals) || [];
+  const totals = (savingsObj && savingsObj.totals) || null;
+
+  if (totals) {
+    const elSaved = document.getElementById('savings-total-saved');
+    const elGoal = document.getElementById('savings-total-goal');
+    const elRem = document.getElementById('savings-total-remaining');
+    const elProg = document.getElementById('savings-overall-progress');
+
+    const overallPct = Math.round((Number(totals.overallProgress) || 0) * 100);
+    if (elSaved) elSaved.textContent = `Ksh ${Number(totals.totalSaved || 0).toLocaleString('en-KE', { minimumFractionDigits: 2 })}`;
+    if (elGoal) elGoal.textContent = `Ksh ${Number(totals.totalGoal || 0).toLocaleString('en-KE', { minimumFractionDigits: 2 })}`;
+    if (elRem) elRem.textContent = `Ksh ${Number(totals.totalRemaining || 0).toLocaleString('en-KE', { minimumFractionDigits: 2 })}`;
+    if (elProg) elProg.textContent = `${overallPct}% Overall Progress`;
+  }
 
   if (goals.length === 0) {
     tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted">No savings targets found.</td></tr>`;

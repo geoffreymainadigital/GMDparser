@@ -196,7 +196,29 @@ fun DashboardScreen(
                         )
                     }
                 }
-                Spacer(modifier = Modifier.height(12.dp))
+                val savingsTotals = savingsData?.totals
+                if (savingsTotals != null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        BudgetSummaryTile(
+                            label = "Total Saved",
+                            actual = savingsTotals.totalSaved,
+                            goal = savingsTotals.totalGoal,
+                            color = MpesaGreen,
+                            modifier = Modifier.weight(1f)
+                        )
+                        BudgetSummaryTile(
+                            label = "Remaining",
+                            actual = savingsTotals.totalRemaining,
+                            goal = null,
+                            color = AccentAmber,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
 
                 if (savingsGoals.isEmpty()) {
                     Text(

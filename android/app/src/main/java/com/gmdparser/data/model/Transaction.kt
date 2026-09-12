@@ -187,8 +187,16 @@ data class SavingsGoalItem(
     @SerializedName("progress") val progress: Double = 0.0
 )
 
+data class SavingsTotals(
+    @SerializedName("totalGoal") val totalGoal: Double = 0.0,
+    @SerializedName("totalSaved") val totalSaved: Double = 0.0,
+    @SerializedName("totalRemaining") val totalRemaining: Double = 0.0,
+    @SerializedName("overallProgress") val overallProgress: Double = 0.0
+)
+
 data class SavingsData(
     @SerializedName("tab") val tab: String? = null,
+    @SerializedName("totals") val totals: SavingsTotals? = null,
     @SerializedName("goals") val goals: List<SavingsGoalItem> = emptyList()
 )
 
