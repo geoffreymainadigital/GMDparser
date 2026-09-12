@@ -207,46 +207,50 @@ fun DashboardScreen(
                 } else {
                     savingsGoals.forEachIndexed { index, item ->
                         if (index > 0) Spacer(modifier = Modifier.height(10.dp))
-                        Column {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = item.category,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp
+                                    )
+                                    val pctInt = (item.progress * 100).toInt()
+                                    Text(
+                                        text = "$pctInt%",
+                                        color = AccentMpesaGreen,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = item.category,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 13.sp
-                                )
-                                val pctInt = (item.progress * 100).toInt()
-                                Text(
-                                    text = "$pctInt%",
+                                    text = "Ksh ${String.format("%,.2f", item.saved)}",
                                     color = AccentMpesaGreen,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.ExtraBold
                                 )
-                            }
-                            Spacer(modifier = Modifier.height(4.dp))
-                            LinearProgressIndicator(
-                                progress = { Math.min(1.0f, Math.max(0.0f, item.progress.toFloat())) },
-                                modifier = Modifier.fillMaxWidth().height(6.dp),
-                                color = AccentMpesaGreen,
-                                trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
+                                Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = "Saved: Ksh ${String.format("%,.2f", item.saved)}",
-                                    color = AccentMpesaGreen,
-                                    fontSize = 11.sp
-                                )
-                                Text(
-                                    text = "Goal: Ksh ${String.format("%,.2f", item.goal)}",
+                                    text = "Goal: Ksh ${String.format("%,.2f", item.goal)} • Remaining: Ksh ${String.format("%,.2f", item.remaining)}",
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontSize = 11.sp
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                LinearProgressIndicator(
+                                    progress = { Math.min(1.0f, Math.max(0.0f, item.progress.toFloat())) },
+                                    modifier = Modifier.fillMaxWidth().height(6.dp),
+                                    color = AccentMpesaGreen,
+                                    trackColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
                                 )
                             }
                         }

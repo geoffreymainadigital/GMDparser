@@ -971,12 +971,19 @@ function renderSavingsProgressTable() {
 
   tbody.innerHTML = goals.map(item => {
     const pct = Math.round((Number(item.progress) || 0) * 100);
+    const savedFormatted = Number(item.saved).toLocaleString('en-KE', { minimumFractionDigits: 2 });
+    const goalFormatted = Number(item.goal).toLocaleString('en-KE', { minimumFractionDigits: 2 });
+    const remFormatted = Number(item.remaining).toLocaleString('en-KE', { minimumFractionDigits: 2 });
+
     return `
       <tr>
         <td><strong>${item.category}</strong></td>
-        <td>Ksh ${Number(item.goal).toLocaleString('en-KE', { minimumFractionDigits: 2 })}</td>
-        <td class="text-green">Ksh ${Number(item.saved).toLocaleString('en-KE', { minimumFractionDigits: 2 })}</td>
-        <td>Ksh ${Number(item.remaining).toLocaleString('en-KE', { minimumFractionDigits: 2 })}</td>
+        <td class="text-green">
+          <strong>Ksh ${savedFormatted}</strong>
+          <div style="font-size: 11px; color: var(--text-muted);">Goal: Ksh ${goalFormatted}</div>
+        </td>
+        <td>Ksh ${goalFormatted}</td>
+        <td>Ksh ${remFormatted}</td>
         <td>
           <div style="display: flex; align-items: center; gap: 8px;">
             <div style="flex: 1; height: 6px; background: var(--surface); border-radius: 3px; overflow: hidden; border: 1px solid var(--border);">
