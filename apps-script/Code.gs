@@ -16,8 +16,8 @@ const COL_AMOUNT = 10;          // J (Amount)
 const COL_ACCOUNT = 11;         // K (Account)
 const COL_NOTES = 12;           // L (Notes)
 
-const SCRIPT_VERSION = '2026.09.12.v22_summary_tiles_direct_read';
-const SCRIPT_BUILD_ID = 'GMD_GAS_20260912_PROD_22';
+const SCRIPT_VERSION = '2026.09.12.v23_font23_row2_tiles_fix';
+const SCRIPT_BUILD_ID = 'GMD_GAS_20260912_PROD_23';
 
 let VALID_TYPES = ['Income', 'Expenses', 'Bills', 'Debt', 'Savings', 'Balance'];
 
@@ -169,6 +169,51 @@ function doGet(e) {
       }, 200);
     }
 
+    if (action === 'debug_tiles') {
+      const monthNames = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+      const now = new Date();
+      const monthIndex = parseInt(Utilities.formatDate(now, 'Africa/Nairobi', 'M'), 10) - 1;
+      const currentMonthCode = monthNames[monthIndex];
+      const sheet = ss.getSheetByName(currentMonthCode);
+      const range = sheet.getRange(1, 1, 15, 120);
+      const values = range.getValues();
+      const displayValues = range.getDisplayValues();
+      const fontSizes = range.getFontSizes();
+
+      const headersFound = [];
+      const font23Cells = [];
+
+      for (let r = 0; r < values.length; r++) {
+        for (let c = 0; c < values[r].length; c++) {
+          const v = String(values[r][c] || '').trim();
+          if (v.toLowerCase().includes('total') || v.toLowerCase().includes('unallocated') || v.toLowerCase().includes('savings')) {
+            headersFound.push({ r: r + 1, c: c + 1, text: v, size: fontSizes[r][c] });
+          }
+          if (fontSizes[r][c] >= 18) {
+            font23Cells.push({ r: r + 1, c: c + 1, val: values[r][c], disp: displayValues[r][c], size: fontSizes[r][c] });
+          }
+        }
+      }
+
+      const unallocArea = [];
+      for (let r = 0; r < 6; r++) {
+        for (let c = 75; c < 85; c++) {
+          if (values[r][c] !== '' && values[r][c] !== null) {
+            unallocArea.push({ r: r + 1, c: c + 1, val: values[r][c], disp: displayValues[r][c], size: fontSizes[r][c] });
+          }
+        }
+      }
+
+      return createJsonResponse({
+        success: true,
+        month: currentMonthCode,
+        headersFound,
+        font23Cells,
+        unallocArea,
+        timestamp: new Date().toISOString()
+      }, 200);
+    }
+
     // Protected endpoints require mandatory authentication check (admin/diagnostic only)
     const authError = verifyAuthSecret(e, null, false);
     if (authError) {
@@ -199,6 +244,8 @@ function doGet(e) {
         timestamp: new Date().toISOString()
       }, 200);
     }
+
+
 
     if (action === 'findOrphanedRows') {
       const sheet = ss.getSheetByName(SHEET_NAME_TRANSACTIONS);
@@ -1321,7 +1368,7 @@ function getMonthlyDashboardData(ss) {
   // Read a bounded range — monthly budget sheets rarely exceed 120 rows x 60 cols.
   // Keeping this tight avoids forcing Apps Script to evaluate trailing formula cells.
   const maxRows = Math.min(sheet.getMaxRows ? sheet.getMaxRows() : 120, 120);
-  const maxCols = Math.min(sheet.getMaxColumns ? sheet.getMaxColumns() : 60, 60);
+  const maxCols = Math.min(sheet.getMaxColumns ? sheet.getMaxColumns() : 90, 90);
   const dataRange = sheet.getRange(1, 1, maxRows, maxCols);
   const values = dataRange.getValues();
 
@@ -1347,21 +1394,34 @@ function getMonthlyDashboardData(ss) {
   }
 
   function findTileValue(pos) {
+    // 1. Precise positional read: Large headline totals sit on row index 1 (Row 2 in sheet) at pos.col
+    if (pos.row > 1 && pos.col < values[1].length) {
+      const valRow2 = values[1][pos.col];
+      if (valRow2 !== '' && valRow2 !== null && valRow2 !== undefined) {
+        return parseAmount(valRow2);
+      }
+    }
+
+    // 2. Search radius using font size >= 18 or largest-font numeric candidate
     for (let radius = 1; radius <= 5; radius++) {
       let bestVal = null;
       for (let dr = -radius; dr <= radius; dr++) {
         for (let dc = -radius; dc <= radius; dc++) {
-          if (Math.abs(dr) !== radius && Math.abs(dc) !== radius) continue;
           let r = pos.row + dr;
           let c = pos.col + dc;
           if (r >= 0 && r < values.length && c >= 0 && c < values[r].length) {
             let val = values[r][c];
             if (val !== '' && val !== null) {
+              const strVal = String(val);
+              // Ignore subtitle annotation strings like "Ksh... under goal/budget"
+              if (strVal.includes('under') || strVal.includes('over') || strVal.includes('goal') || strVal.includes('budget')) {
+                continue;
+              }
               let num = parseAmount(val);
-              if (num !== 0 && Math.abs(num) > 2 && (typeof val === 'number' || (typeof val === 'string' && val.match(/[0-9]/)))) {
-                 if (bestVal === null || Math.abs(num) > Math.abs(bestVal)) {
-                    bestVal = num;
-                 }
+              if (typeof val === 'number' || (typeof val === 'string' && val.match(/[0-9]/))) {
+                if (bestVal === null) {
+                  bestVal = num;
+                }
               }
             }
           }
@@ -1517,7 +1577,7 @@ function getMonthlyDashboardData(ss) {
   const expensesTile = buildTile('Total Expenses', tables.Expenses, 'Expenses');
   const savingsTile = buildTile('Total Savings', tables.Savings, 'Savings');
 
-  // Direct read for Unallocated Income tile
+  // Direct read for Unallocated Income tile (Row 5 col 80 in sheet)
   const unallocHeaderPos = findCell('Unallocated Income');
   let unallocVal = unallocHeaderPos ? findTileValue(unallocHeaderPos) : null;
   if (unallocVal === null || unallocVal === undefined) {
