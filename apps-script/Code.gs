@@ -16,8 +16,8 @@ const COL_AMOUNT = 10;          // J (Amount)
 const COL_ACCOUNT = 11;         // K (Account)
 const COL_NOTES = 12;           // L (Notes)
 
-const SCRIPT_VERSION = '2026.09.12.v25_section_boundary_fix';
-const SCRIPT_BUILD_ID = 'GMD_GAS_20260912_PROD_25';
+const SCRIPT_VERSION = '2026.09.12.v26_mpesa_tile_savings_card';
+const SCRIPT_BUILD_ID = 'GMD_GAS_20260912_PROD_26';
 
 let VALID_TYPES = ['Income', 'Expenses', 'Bills', 'Debt', 'Savings', 'Balance'];
 
@@ -144,15 +144,24 @@ function doGet(e) {
       const tMonth = Date.now();
       const accountsData = getAccountsData(targetSs);
       const tAccounts = Date.now();
+      let savingsData = null;
+      try {
+        savingsData = getSavingsDashboardData(targetSs);
+      } catch (sErr) {
+        console.warn('Savings Dashboard read error:', sErr.message);
+      }
+      const tSavings = Date.now();
       return createJsonResponse({
         success: true,
         period: 'monthly',
         month: monthData,
         accounts: accountsData,
+        savings: savingsData,
         timingReport: {
           monthDataMs: tMonth - tStart,
           accountsDataMs: tAccounts - tMonth,
-          totalServerMs: tAccounts - tStart
+          savingsDataMs: tSavings - tAccounts,
+          totalServerMs: tSavings - tStart
         },
         timestamp: new Date().toISOString()
       }, 200);
@@ -1790,17 +1799,20 @@ function getSavingsDashboardData(ss) {
     let savedVal = extractNumRight(r, cols.saved);
     let remainingVal = extractNumRight(r, cols.remaining);
     
-    let progCell = values[r][cols.progress + 1] !== '' ? values[r][cols.progress + 1] : values[r][cols.progress];
+    let progCell = (cols.progress !== -1 && values[r][cols.progress + 1] !== undefined && values[r][cols.progress + 1] !== '') ? values[r][cols.progress + 1] : (cols.progress !== -1 ? values[r][cols.progress] : '');
     let progressVal = 0;
     if (typeof progCell === 'number') {
         progressVal = progCell;
-    } else if (typeof progCell === 'string') {
+    } else if (typeof progCell === 'string' && progCell.length > 0) {
         let num = parseFloat(progCell.replace(/[^0-9.]/g, ''));
         if (progCell.indexOf('%') !== -1) {
             progressVal = num / 100;
         } else {
             progressVal = num;
         }
+    }
+    if (!progressVal && goalVal > 0) {
+        progressVal = savedVal / goalVal;
     }
 
     goals.push({
@@ -1812,8 +1824,22 @@ function getSavingsDashboardData(ss) {
     });
   }
 
+  const allowedCategories = [
+    'Sanlam MMF',
+    'NCA Sacco',
+    'Tower Sacco',
+    'Faida Stocks',
+    'Britam EQ and MMF'
+  ];
+
+  const filteredGoals = goals.filter(function (item) {
+    return allowedCategories.some(function (allowed) {
+      return item.category.toLowerCase().trim() === allowed.toLowerCase().trim();
+    });
+  });
+
   return {
     tab: tabName,
-    goals: goals
+    goals: filteredGoals
   };
 }

@@ -41,6 +41,10 @@ fun DashboardScreen(
             .padding(16.dp)
             .verticalScroll(rememberScrollState())
     ) {
+        val dashboardData by TransactionRepository.dashboardData.collectAsState()
+        val mpesaAccount = dashboardData?.accounts?.find { it.accountName.equals("Mpesa", ignoreCase = true) || it.accountName.equals("M-PESA", ignoreCase = true) }
+        val mpesaBalance = mpesaAccount?.currentBalance ?: 0.0
+
         // Top Balance / Status Banner
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -51,19 +55,15 @@ fun DashboardScreen(
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Text(
-                    text = "M-PESA OPERATING LEDGER",
+                    text = "M-PESA BALANCE",
                     color = MaterialTheme.colorScheme.outline,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.sp
                 )
                 Spacer(modifier = Modifier.height(6.dp))
-                val totalSyncedAmount = confirmedList
-                    .filter { it.status == TransactionStatus.SYNCED }
-                    .sumOf { it.amount }
-
                 Text(
-                    text = "Ksh ${String.format("%,.2f", totalSyncedAmount)}",
+                    text = "Ksh ${String.format("%,.2f", mpesaBalance)}",
                     color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 28.sp,
                     fontWeight = FontWeight.ExtraBold
@@ -156,6 +156,101 @@ fun DashboardScreen(
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     BudgetSummaryTile("Savings", tiles?.totalSavings?.actual ?: 0.0, tiles?.totalSavings?.goal, AccentCyan, Modifier.weight(1f))
                     BudgetSummaryTile("Unallocated", tiles?.unallocatedIncome?.actual ?: 0.0, null, MaterialTheme.colorScheme.onSurfaceVariant, Modifier.weight(1f))
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Savings Progress Card
+        val savingsData = dashboardData?.savings
+        val savingsGoals = savingsData?.goals ?: emptyList()
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Savings Progress",
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp
+                    )
+                    Surface(
+                        color = AccentCyan.copy(alpha = 0.2f),
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            text = "SAVINGS DASHBOARD",
+                            color = AccentCyan,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+
+                if (savingsGoals.isEmpty()) {
+                    Text(
+                        text = "Loading savings progress...",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp
+                    )
+                } else {
+                    savingsGoals.forEachIndexed { index, item ->
+                        if (index > 0) Spacer(modifier = Modifier.height(10.dp))
+                        Column {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = item.category,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 13.sp
+                                )
+                                val pctInt = (item.progress * 100).toInt()
+                                Text(
+                                    text = "$pctInt%",
+                                    color = AccentMpesaGreen,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            LinearProgressIndicator(
+                                progress = { Math.min(1.0f, Math.max(0.0f, item.progress.toFloat())) },
+                                modifier = Modifier.fillMaxWidth().height(6.dp),
+                                color = AccentMpesaGreen,
+                                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "Saved: Ksh ${String.format("%,.2f", item.saved)}",
+                                    color = AccentMpesaGreen,
+                                    fontSize = 11.sp
+                                )
+                                Text(
+                                    text = "Goal: Ksh ${String.format("%,.2f", item.goal)}",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }

@@ -83,9 +83,9 @@
           <!-- Metrics Row -->
           <div class="metrics-grid">
             <div class="metric-card">
-              <span class="metric-label">Confirmed Inflow (Month)</span>
-              <div class="metric-val text-green" id="dash-inflow">Ksh 0.00</div>
-              <span class="metric-sub">Recorded Income transactions</span>
+              <span class="metric-label">M-PESA Balance</span>
+              <div class="metric-val text-green" id="dash-mpesa-balance">Ksh 0.00</div>
+              <span class="metric-sub">Google Sheets Synchronized</span>
             </div>
             <div class="metric-card">
               <span class="metric-label">Confirmed Expenses & Bills</span>
@@ -206,6 +206,36 @@
                   </tbody>
                 </table>
               </div>
+            </div>
+          </div>
+
+          <!-- Savings Progress Card -->
+          <div class="card savings-progress-card" id="card-savings-progress" style="margin-top: 24px;">
+            <div class="card-header" style="flex-wrap: wrap; gap: 12px;">
+              <div>
+                <h3>Savings Progress</h3>
+                <p class="card-desc">Target vehicle balances synced from Savings Dashboard.</p>
+              </div>
+              <span class="tag tag-cyan" id="savings-sheet-badge">SAVINGS DASHBOARD</span>
+            </div>
+
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Category</th>
+                    <th>Goal</th>
+                    <th>Already Saved</th>
+                    <th>Remaining</th>
+                    <th>Progress</th>
+                  </tr>
+                </thead>
+                <tbody id="savings-progress-tbody">
+                  <tr>
+                    <td colspan="5" class="text-center text-muted">Loading savings progress...</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
 

@@ -179,12 +179,26 @@ data class AccountBalanceItem(
     @SerializedName("withdrawals") val withdrawals: Double = 0.0
 )
 
+data class SavingsGoalItem(
+    @SerializedName("category") val category: String,
+    @SerializedName("goal") val goal: Double = 0.0,
+    @SerializedName("saved") val saved: Double = 0.0,
+    @SerializedName("remaining") val remaining: Double = 0.0,
+    @SerializedName("progress") val progress: Double = 0.0
+)
+
+data class SavingsData(
+    @SerializedName("tab") val tab: String? = null,
+    @SerializedName("goals") val goals: List<SavingsGoalItem> = emptyList()
+)
+
 data class DashboardResponse(
     @SerializedName("success") val success: Boolean,
     @SerializedName("period") val period: String? = null,
     @SerializedName("month") val month: MonthlyDashboardData? = null,
     @SerializedName("dashboard") val dashboard: MonthlyDashboardData? = null,
     @SerializedName("accounts") val accounts: List<AccountBalanceItem>? = null,
+    @SerializedName("savings") val savings: SavingsData? = null,
     @SerializedName("timestamp") val timestamp: String? = null,
     @SerializedName("error") val error: String? = null
 )

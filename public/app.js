@@ -610,9 +610,10 @@ function renderLedgerTables() {
 }
 
 function updateDashboardMetrics() {
-  const inflow = state.confirmedRecords
-    .filter(r => r.type === 'Income' && r.status === 'SYNCED')
-    .reduce((acc, c) => acc + (Number(c.amount) || 0), 0);
+  const mpesaAcc = Array.isArray(state.accountsData)
+    ? state.accountsData.find(a => a.accountName.toLowerCase() === 'mpesa')
+    : null;
+  const mpesaBal = mpesaAcc && mpesaAcc.currentBalance !== undefined ? mpesaAcc.currentBalance : 0;
 
   const expenses = state.confirmedRecords
     .filter(r => (r.type === 'Expenses' || r.type === 'Bills') && r.status === 'SYNCED')
@@ -622,11 +623,11 @@ function updateDashboardMetrics() {
     .filter(r => r.type === 'Transfer' && r.status === 'SYNCED')
     .reduce((acc, c) => acc + (Number(c.amount) || 0), 0);
 
-  const elInflow = document.getElementById('dash-inflow');
+  const elMpesa = document.getElementById('dash-mpesa-balance');
   const elExp = document.getElementById('dash-expenses');
   const elTrans = document.getElementById('dash-transfers');
 
-  if (elInflow) elInflow.textContent = `Ksh ${inflow.toLocaleString('en-KE', { minimumFractionDigits: 2 })}`;
+  if (elMpesa) elMpesa.textContent = `Ksh ${Number(mpesaBal).toLocaleString('en-KE', { minimumFractionDigits: 2 })}`;
   if (elExp) elExp.textContent = `Ksh ${expenses.toLocaleString('en-KE', { minimumFractionDigits: 2 })}`;
   if (elTrans) elTrans.textContent = `Ksh ${transfers.toLocaleString('en-KE', { minimumFractionDigits: 2 })}`;
 }
@@ -906,16 +907,20 @@ async function fetchDashboardData() {
     if (json.success) {
       dashboardLoading = false;
       const periodData = json.month || json.dashboard || json;
+      state.savingsData = json.savings;
       state.dashboardData = periodData;
       state.accountsData = json.accounts;
       dashboardCache.monthly = {
         data: periodData,
         accounts: json.accounts,
+        savings: json.savings,
         timestamp: Date.now()
       };
       renderDashboardData();
       renderAccountsAndBudgets();
       renderAccountsBalanceTable();
+      renderSavingsProgressTable();
+      updateDashboardMetrics();
       console.log(`✓ Synchronized live monthly budget and account balances from Google Sheets:`, json);
     }
   } catch (err) {
@@ -931,22 +936,58 @@ async function fetchDashboardData() {
         if (json.success) {
           dashboardLoading = false;
           const periodData = json.month || json.dashboard || json;
+          state.savingsData = json.savings;
           state.dashboardData = periodData;
           state.accountsData = json.accounts;
           dashboardCache.monthly = {
             data: periodData,
             accounts: json.accounts,
+            savings: json.savings,
             timestamp: Date.now()
           };
           renderDashboardData();
           renderAccountsAndBudgets();
           renderAccountsBalanceTable();
+          renderSavingsProgressTable();
         }
       }
     } catch (fbErr) {
       console.warn('Dashboard fallback error:', fbErr.message);
     }
   }
+}
+
+function renderSavingsProgressTable() {
+  const tbody = document.getElementById('savings-progress-tbody');
+  if (!tbody) return;
+
+  const savingsObj = state.savingsData || (dashboardCache.monthly && dashboardCache.monthly.savings);
+  const goals = (savingsObj && savingsObj.goals) || [];
+
+  if (goals.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted">No savings targets found.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = goals.map(item => {
+    const pct = Math.round((Number(item.progress) || 0) * 100);
+    return `
+      <tr>
+        <td><strong>${item.category}</strong></td>
+        <td>Ksh ${Number(item.goal).toLocaleString('en-KE', { minimumFractionDigits: 2 })}</td>
+        <td class="text-green">Ksh ${Number(item.saved).toLocaleString('en-KE', { minimumFractionDigits: 2 })}</td>
+        <td>Ksh ${Number(item.remaining).toLocaleString('en-KE', { minimumFractionDigits: 2 })}</td>
+        <td>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="flex: 1; height: 6px; background: var(--surface); border-radius: 3px; overflow: hidden; border: 1px solid var(--border);">
+              <div style="width: ${Math.min(100, Math.max(0, pct))}%; height: 100%; background: var(--mpesa-green);"></div>
+            </div>
+            <span style="font-size: 11px; font-weight: bold;">${pct}%</span>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
 }
 
 function renderDashboardData() {
