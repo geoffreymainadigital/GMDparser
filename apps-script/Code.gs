@@ -16,8 +16,8 @@ const COL_AMOUNT = 10;          // J (Amount)
 const COL_ACCOUNT = 11;         // K (Account)
 const COL_NOTES = 12;           // L (Notes)
 
-const SCRIPT_VERSION = '2026.09.12.v24_summary_tile_goals_row1_fix';
-const SCRIPT_BUILD_ID = 'GMD_GAS_20260912_PROD_24';
+const SCRIPT_VERSION = '2026.09.12.v25_section_boundary_fix';
+const SCRIPT_BUILD_ID = 'GMD_GAS_20260912_PROD_25';
 
 let VALID_TYPES = ['Income', 'Expenses', 'Bills', 'Debt', 'Savings', 'Balance'];
 
@@ -1508,7 +1508,8 @@ function getMonthlyDashboardData(ss) {
         break;
       }
       consecutiveBlanks = 0;
-      if (rawCat.indexOf('THIS SPREADSHEET') !== -1 || rawCat.indexOf('Total') !== -1) break;
+      const upperCat = rawCat.toUpperCase();
+      if (upperCat.indexOf('THIS SPREADSHEET') !== -1 || upperCat.indexOf('TOTAL') !== -1 || upperCat.indexOf('RECURRING BILL') !== -1 || upperCat === 'BILLS' || upperCat === 'DEBT' || upperCat === 'EXPENSES' || upperCat === 'SAVINGS') break;
 
       // In the sheet, currency symbols ("Ksh") are at goalCol, actualCol, diffCol, and values are at +1
       const gVal = goalCol !== -1 ? parseAmount(values[dataR][goalCol + 1] !== undefined && values[dataR][goalCol + 1] !== '' ? values[dataR][goalCol + 1] : values[dataR][goalCol]) : 0;
