@@ -661,7 +661,7 @@ const valZeroResult = validateTransactionPayload(zeroAmountTx);
 assert.strictEqual(valZeroResult.isValid, false, 'Zero amount must be REJECTED');
 console.log('✓ Test 27: Negative amounts are allowed for Savings withdrawals and rejected for other types/zero');
 
-// --- Test 28: Annual Dashboard table extraction handles leading spacer/blank rows beneath Category header ---
+// --- Test 28: Monthly Dashboard table extraction handles leading/interior spacer/blank rows beneath Category header ---
 function parseAmountMock(val) {
   if (typeof val === 'number') return val;
   if (!val) return 0;
@@ -669,17 +669,21 @@ function parseAmountMock(val) {
   return parseFloat(clean) || 0;
 }
 
-function mockExtractAnnualCategories(values, headerPos, goalCol, actualCol, diffCol) {
+function mockExtractMonthlyCategories(values, headerPos, goalCol, actualCol, diffCol) {
   const items = [];
-  const catValCol = headerPos.col + 1;
   let consecutiveBlanks = 0;
   for (let dataR = headerPos.row + 1; dataR < values.length; dataR++) {
-    const rawCat = String(values[dataR][catValCol] || values[dataR][headerPos.col] || '').trim();
+    let rawCat = '';
+    for (let c = headerPos.col; c <= headerPos.col + 1; c++) {
+      const v = String(values[dataR][c] || '').trim();
+      if (v && !v.startsWith('Total') && !v.includes('SUMMARY') && !v.includes('BUDGET') && !v.includes('DIFF') && !v.includes('GOAL') && !v.includes('ACTUAL') && v !== 'Category') {
+        rawCat = v;
+        break;
+      }
+    }
     if (!rawCat) {
       consecutiveBlanks++;
-      if (items.length === 0 && consecutiveBlanks <= 3) {
-        continue;
-      }
+      if (consecutiveBlanks <= 15) continue;
       break;
     }
     consecutiveBlanks = 0;
@@ -694,31 +698,29 @@ function mockExtractAnnualCategories(values, headerPos, goalCol, actualCol, diff
   return items;
 }
 
-// Sample sheet slice where Income header has spacer/empty row directly below Category header
-const mockAnnualIncomeSheet = [
-  ['', 'INCOME', '', '', '', ''],
-  ['', '', 'Category', '', 'Goal', '', 'Actual', '', 'Diff'],
-  ['', '', '', '', '', '', '', '', ''], // Spacer row 1 (leading blank row)
-  ['', '', '', 'Rollover from Previous Month (+)', '', '0', '', '0', '', '0'],
-  ['', '', '', 'Salary', '', '300000', '', '280000', '', '-20000'],
-  ['', '', '', 'Livestream/Photo/Video', '', '150000', '', '120000', '', '-30000'],
-  ['', '', '', 'Total Income', '', '450000', '', '400000', '', '-50000']
+const mockMonthlyExpensesSheet = [
+  ['', 'EXPENSES', '', '', '', ''],
+  ['', 'Category', '', 'Goal', '', 'Actual', '', 'Diff'],
+  ['', '', '', '', '', '', '', '', ''],
+  ['', 'Mama Mboga', '', '5000', '', '3869', '', '-1131'],
+  ['', '', '', '', '', '', '', '', ''], // interior spacer row
+  ['', 'Fare', '', '2000', '', '1500', '', '-500'],
+  ['', 'Total Expenses', '', '7000', '', '5369', '', '-1631']
 ];
 
-const annualIncomeItems = mockExtractAnnualCategories(
-  mockAnnualIncomeSheet,
-  { row: 1, col: 2 },
-  4,
-  6,
-  8
+const monthlyExpenseItems = mockExtractMonthlyCategories(
+  mockMonthlyExpensesSheet,
+  { row: 1, col: 1 },
+  3,
+  5,
+  7
 );
 
-assert.ok(annualIncomeItems.length > 0, 'Annual Income table row count MUST be greater than 0');
-assert.strictEqual(annualIncomeItems.length, 3, 'Must extract 3 categories before Total Income');
-assert.strictEqual(annualIncomeItems[0].category, 'Rollover from Previous Month (+)');
-assert.strictEqual(annualIncomeItems[1].category, 'Salary');
-assert.strictEqual(annualIncomeItems[2].category, 'Livestream/Photo/Video');
-console.log('✓ Test 28: Annual Dashboard table extraction handles leading spacer/blank rows and asserts row count > 0');
+assert.ok(monthlyExpenseItems.length > 0, 'Monthly Expenses table row count MUST be greater than 0');
+assert.strictEqual(monthlyExpenseItems.length, 2, 'Must extract 2 categories across interior spacer row before Total Expenses');
+assert.strictEqual(monthlyExpenseItems[0].category, 'Mama Mboga');
+assert.strictEqual(monthlyExpenseItems[1].category, 'Fare');
+console.log('✓ Test 28: Monthly Dashboard table extraction handles leading/interior spacer/blank rows and asserts category count');
 
 console.log('\n========================================================================');
 console.log('ALL 28 CRITICAL INVARIANT TESTS PASSED WITH 100% SPECIFICATION FIDELITY!');

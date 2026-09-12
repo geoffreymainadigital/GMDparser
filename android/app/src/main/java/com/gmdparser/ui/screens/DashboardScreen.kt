@@ -27,8 +27,7 @@ import com.gmdparser.ui.theme.*
 fun DashboardScreen(
     onNavigateToReview: () -> Unit,
     onNavigateToHistory: () -> Unit,
-    onNavigateToAccounts: () -> Unit,
-    onNavigateToSavings: () -> Unit
+    onNavigateToAccounts: () -> Unit
 ) {
     val pendingList by TransactionRepository.pendingTransactions.collectAsState()
     val confirmedList by TransactionRepository.confirmedTransactions.collectAsState()
@@ -95,14 +94,11 @@ fun DashboardScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Monthly/Annual Budget Sheet — data is prefetched at startup for instant toggle.
-        var selectedPeriod by remember { mutableStateOf("monthly") }
-
+        // Monthly Budget Sheet — data is prefetched at startup.
         val monthlyData by TransactionRepository.monthlyDashboard.collectAsState()
-        val annualData by TransactionRepository.annualDashboard.collectAsState()
 
         // Active data: instantly switches between the two independently cached flows.
-        val activeData = if (selectedPeriod == "annual") annualData else monthlyData
+        val activeData = monthlyData
         val showLoading = activeData == null
 
         Card(
@@ -119,10 +115,7 @@ fun DashboardScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     val titleText = if (showLoading) {
-                        if (selectedPeriod == "annual") "Annual Dashboard (Loading...)" else "Monthly Budget (Loading...)"
-                    } else if (selectedPeriod == "annual") {
-                        val tabName = activeData?.tab ?: "Annual"
-                        "Annual Dashboard ($tabName)"
+                        "Monthly Budget (Loading...)"
                     } else {
                         val monthName = activeData?.month ?: activeData?.tab ?: "Current"
                         "Monthly Budget ($monthName)"
@@ -144,51 +137,6 @@ fun DashboardScreen(
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(10.dp))
-                
-                // Period Toggle
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.background, RoundedCornerShape(8.dp))
-                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
-                        .padding(4.dp),
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    val isMonthly = selectedPeriod == "monthly"
-                    Surface(
-                        color = if (isMonthly) MaterialTheme.colorScheme.primary else Color.Transparent,
-                        shape = RoundedCornerShape(6.dp),
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { selectedPeriod = "monthly" }
-                    ) {
-                        Text(
-                            text = "Monthly",
-                            color = if (isMonthly) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(vertical = 6.dp),
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                        )
-                    }
-                    Surface(
-                        color = if (!isMonthly) MaterialTheme.colorScheme.primary else Color.Transparent,
-                        shape = RoundedCornerShape(6.dp),
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { selectedPeriod = "annual" }
-                    ) {
-                        Text(
-                            text = "Annual",
-                            color = if (!isMonthly) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(vertical = 6.dp),
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
                     }
                 }
@@ -252,27 +200,14 @@ fun DashboardScreen(
         }
 
         // Quick Feature Metric Cards
-        Row(
+        MetricQuickCard(
+            title = "Accounts",
+            value = "M-PESA / Banks",
+            icon = Icons.Default.AccountBalance,
+            color = AccentCyan,
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            MetricQuickCard(
-                title = "Accounts",
-                value = "M-PESA / Banks",
-                icon = Icons.Default.AccountBalance,
-                color = AccentCyan,
-                modifier = Modifier.weight(1f),
-                onClick = onNavigateToAccounts
-            )
-            MetricQuickCard(
-                title = "Savings Goals",
-                value = "Progress & Goals",
-                icon = Icons.Default.Savings, // Assuming Savings icon exists or use AccountBalanceWallet
-                color = AccentPurple,
-                modifier = Modifier.weight(1f),
-                onClick = onNavigateToSavings
-            )
-        }
+            onClick = onNavigateToAccounts
+        )
 
     }
 }

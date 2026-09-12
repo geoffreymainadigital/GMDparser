@@ -16,8 +16,8 @@ const COL_AMOUNT = 10;          // J (Amount)
 const COL_ACCOUNT = 11;         // K (Account)
 const COL_NOTES = 12;           // L (Notes)
 
-const SCRIPT_VERSION = '2026.09.11.v20_annual_income_fix';
-const SCRIPT_BUILD_ID = 'GMD_GAS_20260911_PROD_20';
+const SCRIPT_VERSION = '2026.09.12.v21_monthly_expenses_fix';
+const SCRIPT_BUILD_ID = 'GMD_GAS_20260912_PROD_21';
 
 let VALID_TYPES = ['Income', 'Expenses', 'Bills', 'Debt', 'Savings', 'Balance'];
 
@@ -49,7 +49,37 @@ function getCategoriesForType(type) {
  * When GMD_AUTH_SECRET is set, all protected GET/POST endpoints require valid key (401 UNAUTHORIZED if invalid).
  */
 function verifyAuthSecret(e, payload, isWriteOperation) {
-  // Authentication requirement removed as requested
+  const scriptProperties = PropertiesService.getScriptProperties();
+  const configuredSecret = scriptProperties.getProperty('GMD_AUTH_SECRET');
+
+  // Fail closed for write operations if GMD_AUTH_SECRET is not configured
+  if (!configuredSecret) {
+    if (isWriteOperation) {
+      return createJsonResponse({
+        success: false,
+        status: 'SERVER_MISCONFIGURED',
+        error: 'Server misconfigured: GMD_AUTH_SECRET is not set in Script Properties.'
+      }, 500);
+    }
+    return null;
+  }
+
+  // Extract provided key from request header or payload
+  let providedKey = null;
+  if (e && e.parameter && e.parameter.authKey) {
+    providedKey = e.parameter.authKey;
+  } else if (payload && payload.authKey) {
+    providedKey = payload.authKey;
+  }
+
+  if (providedKey !== configuredSecret) {
+    return createJsonResponse({
+      success: false,
+      status: 'UNAUTHORIZED',
+      error: 'Invalid authentication key provided.'
+    }, 401);
+  }
+
   return null;
 }
 
@@ -108,45 +138,24 @@ function doGet(e) {
     if (action === 'dashboard') {
       const targetSs = (e && e.parameter && e.parameter.spreadsheetId) ?
         SpreadsheetApp.openById(e.parameter.spreadsheetId) : ss;
-      const period = (e && e.parameter && e.parameter.period) || 'monthly';
 
       const tStart = Date.now();
-      if (period === 'annual') {
-        const annualData = getAnnualDashboardData(targetSs);
-        const tAnnual = Date.now();
-        const accountsData = getAccountsData(targetSs);
-        const tAccounts = Date.now();
-        return createJsonResponse({
-          success: true,
-          period: 'annual',
-          annual: annualData,
-          accounts: accountsData,
-          timingReport: {
-            annualDataMs: tAnnual - tStart,
-            accountsDataMs: tAccounts - tAnnual,
-            totalServerMs: tAccounts - tStart
-          },
-          timestamp: new Date().toISOString()
-        }, 200);
-      } else {
-        // Default: monthly
-        const monthData = getMonthlyDashboardData(targetSs);
-        const tMonth = Date.now();
-        const accountsData = getAccountsData(targetSs);
-        const tAccounts = Date.now();
-        return createJsonResponse({
-          success: true,
-          period: 'monthly',
-          month: monthData,
-          accounts: accountsData,
-          timingReport: {
-            monthDataMs: tMonth - tStart,
-            accountsDataMs: tAccounts - tMonth,
-            totalServerMs: tAccounts - tStart
-          },
-          timestamp: new Date().toISOString()
-        }, 200);
-      }
+      const monthData = getMonthlyDashboardData(targetSs);
+      const tMonth = Date.now();
+      const accountsData = getAccountsData(targetSs);
+      const tAccounts = Date.now();
+      return createJsonResponse({
+        success: true,
+        period: 'monthly',
+        month: monthData,
+        accounts: accountsData,
+        timingReport: {
+          monthDataMs: tMonth - tStart,
+          accountsDataMs: tAccounts - tMonth,
+          totalServerMs: tAccounts - tStart
+        },
+        timestamp: new Date().toISOString()
+      }, 200);
     }
 
     if (action === 'savings') {
@@ -176,6 +185,17 @@ function doGet(e) {
         spreadsheetId: targetId,
         sheets: sheetNames,
         taxonomy: taxonomy,
+        timestamp: new Date().toISOString()
+      }, 200);
+    }
+
+    if (action === 'test_dump') {
+      const targetSs = (e && e.parameter && e.parameter.spreadsheetId) ? SpreadsheetApp.openById(e.parameter.spreadsheetId) : ss;
+      const sheet = targetSs.getSheetByName("SEP");
+      const values = sheet.getRange(1, 1, 100, 20).getDisplayValues();
+      return createJsonResponse({
+        success: true,
+        data: values,
         timestamp: new Date().toISOString()
       }, 200);
     }
@@ -1327,41 +1347,37 @@ function getMonthlyDashboardData(ss) {
   }
 
   function findTileValue(pos) {
-    // Check directly below (up to 3 rows down in the same column)
-    for (let dr = 1; dr <= 3; dr++) {
-      let r = pos.row + dr;
-      if (r < values.length) {
-         let val = values[r][pos.col];
-         if (val !== '' && val !== null) {
-            let num = parseAmount(val);
-            if (typeof val === 'number' || (typeof val === 'string' && val.match(/[0-9]/))) {
-               return num;
+    for (let radius = 1; radius <= 5; radius++) {
+      let bestVal = null;
+      for (let dr = -radius; dr <= radius; dr++) {
+        for (let dc = -radius; dc <= radius; dc++) {
+          if (Math.abs(dr) !== radius && Math.abs(dc) !== radius) continue;
+          let r = pos.row + dr;
+          let c = pos.col + dc;
+          if (r >= 0 && r < values.length && c >= 0 && c < values[r].length) {
+            let val = values[r][c];
+            if (val !== '' && val !== null) {
+              let num = parseAmount(val);
+              if (num !== 0 && Math.abs(num) > 2 && (typeof val === 'number' || (typeof val === 'string' && val.match(/[0-9]/)))) {
+                 if (bestVal === null || Math.abs(num) > Math.abs(bestVal)) {
+                    bestVal = num;
+                 }
+              }
             }
-         }
+          }
+        }
       }
-    }
-    // Check directly right (up to 3 cols right in the same row)
-    for (let dc = 1; dc <= 3; dc++) {
-      let c = pos.col + dc;
-      if (c < values[pos.row].length) {
-         let val = values[pos.row][c];
-         if (val !== '' && val !== null) {
-            let num = parseAmount(val);
-            if (typeof val === 'number' || (typeof val === 'string' && val.match(/[0-9]/))) {
-               return num;
-            }
-         }
-      }
+      if (bestVal !== null) return bestVal;
     }
     return null;
   }
 
-  // 1. Discover Category Tables by searching for "Category" headers
+  // 1. Discover Category Tables by searching for "Category" or "Savings" headers
   const categoryHeaders = [];
   for (let r = 0; r < values.length; r++) {
     for (let c = 0; c < Math.min(10, values[r].length); c++) {
-      const val = String(values[r][c] || '').trim();
-      if (val === 'Category') {
+      const val = String(values[r][c] || '').trim().toUpperCase();
+      if (val === 'CATEGORY' || val === 'SAVINGS' || val === 'SAVINGS GOAL') {
         categoryHeaders.push({ row: r, col: c });
       }
     }
@@ -1395,7 +1411,7 @@ function getMonthlyDashboardData(ss) {
       const cellText = String(headerRowValues[c] || '').toLowerCase().trim();
       if (cellText === 'goal' || cellText === 'budget') {
         goalCol = c;
-      } else if (cellText === 'actual') {
+      } else if (cellText === 'actual' || cellText === 'saved') {
         actualCol = c;
       } else if (cellText === 'diff' || cellText === 'diff.') {
         diffCol = c;
@@ -1406,10 +1422,10 @@ function getMonthlyDashboardData(ss) {
       return; // Not a standard category table
     }
 
-    // Determine section name by looking backwards for section title
+    // Determine section name by looking backwards for section title across all columns in preceding rows
     let detectedSection = sectionNames[idx] || 'Expenses';
     for (let checkR = r - 1; checkR >= Math.max(0, r - 5); checkR--) {
-      const checkText = String(values[checkR][1] || values[checkR][0] || '').toUpperCase();
+      const checkText = values[checkR].join(' ').toUpperCase();
       if (checkText.indexOf('INCOME') !== -1) { detectedSection = 'Income'; break; }
       if (checkText.indexOf('BILL') !== -1) { detectedSection = 'Bills'; break; }
       if (checkText.indexOf('DEBT') !== -1) { detectedSection = 'Debt'; break; }
@@ -1418,11 +1434,31 @@ function getMonthlyDashboardData(ss) {
     }
 
     const items = [];
-    // Category values are located in col index 3 (Column D) right under Category (Column C, index 2)
-    const catValCol = h.col + 1;
+    let consecutiveBlanks = 0;
     for (let dataR = r + 1; dataR < values.length; dataR++) {
-      const rawCat = String(values[dataR][catValCol] || values[dataR][h.col] || '').trim();
-      if (!rawCat) break;
+      let rawCat = '';
+      for (let cIdx = 0; cIdx < Math.min(10, values[dataR].length); cIdx++) {
+        const cellVal = values[dataR][cIdx];
+        if (cellVal && typeof cellVal === 'string' && cellVal.trim().length > 0) {
+          const trimmed = cellVal.trim();
+          if (trimmed.indexOf('THIS SPREADSHEET') === -1 && trimmed.indexOf('Total') === -1 && trimmed !== 'Category' && trimmed !== 'Savings') {
+            rawCat = trimmed;
+            break;
+          }
+        }
+      }
+
+      if (!rawCat) {
+        consecutiveBlanks++;
+        if (items.length === 0) {
+          continue;
+        }
+        if (consecutiveBlanks <= 15) {
+          continue;
+        }
+        break;
+      }
+      consecutiveBlanks = 0;
       if (rawCat.indexOf('THIS SPREADSHEET') !== -1 || rawCat.indexOf('Total') !== -1) break;
 
       // In the sheet, currency symbols ("Ksh") are at goalCol, actualCol, diffCol, and values are at +1
@@ -1475,26 +1511,6 @@ function getMonthlyDashboardData(ss) {
   const unallocatedActual = incomeTile.actual - totalAllocatedActual;
   const unallocatedFallback = { actual: unallocatedActual, statusText: 'Remaining balance' };
 
-  // Discover the six summary tiles by their label text directly from the sheet
-  const TILE_LABELS = [
-    { key: 'totalIncome',       label: 'Total Income', obj: incomeTile },
-    { key: 'totalBills',        label: 'Total Bills', obj: billsTile },
-    { key: 'totalDebtPayoff',   label: 'Total Debt', obj: debtTile },
-    { key: 'totalExpenses',     label: 'Total Expenses', obj: expensesTile },
-    { key: 'totalSavings',      label: 'Total Savings', obj: savingsTile },
-    { key: 'unallocatedIncome', label: 'Unallocated', obj: unallocatedFallback }
-  ];
-
-  TILE_LABELS.forEach(function (tile) {
-    let pos = findCell(tile.label);
-    if (pos) {
-       let val = findTileValue(pos);
-       if (val !== null && val !== undefined) {
-           tile.obj.actual = val;
-       }
-    }
-  });
-
   return {
     month: targetSheetName,
     summaryTiles: {
@@ -1503,223 +1519,13 @@ function getMonthlyDashboardData(ss) {
       totalDebtPayoff: debtTile,
       totalExpenses: expensesTile,
       totalSavings: savingsTile,
-      unallocatedIncome: TILE_LABELS[5].obj
+      unallocatedIncome: unallocatedFallback
     },
     tables: tables
   };
 }
 
-/**
- * PART E: Reads the Annual Dashboard tab (Read-Only).
- * Uses header-text discovery — no hardcoded cell coordinates — to survive
- * future spreadsheet clones. Discovers the tab name by searching sheetNames.
- * Extracts six summary tiles and five category breakdown tables.
- * Explicitly defers the "Annual Income by Month" trend section (not implemented).
- */
-function getAnnualDashboardData(ss) {
-  const t0 = Date.now();
-  const sheetNames = ss.getSheets().map(function (s) { return s.getName(); });
 
-  // Discover the Annual tab by prioritizing exact 'Annual Dashboard', then 'Annual Budget', then any containing 'annual'
-  let annualTabName = sheetNames.find(function (n) { return n.toLowerCase() === 'annual dashboard'; });
-  if (!annualTabName) {
-    annualTabName = sheetNames.find(function (n) { return n.toLowerCase() === 'annual budget'; });
-  }
-  if (!annualTabName) {
-    annualTabName = sheetNames.find(function (n) { return n.toLowerCase().indexOf('annual') !== -1; });
-  }
-  if (!annualTabName) {
-    throw new Error('ANNUAL_TAB_NOT_FOUND. Available sheets: [' + sheetNames.join(', ') + '].');
-  }
-
-  const sheet = ss.getSheetByName(annualTabName);
-  if (!sheet) {
-    throw new Error('Sheet "' + annualTabName + '" not found after discovery.');
-  }
-
-  const tTab = Date.now();
-  const maxRows = Math.min(sheet.getMaxRows ? sheet.getMaxRows() : 120, 150);
-  const maxCols = Math.min(sheet.getMaxColumns ? sheet.getMaxColumns() : 60, 80);
-  const dataRange = sheet.getRange(1, 1, maxRows, maxCols);
-  const values = dataRange.getValues();
-  const tRead = Date.now();
-
-  // Helper: find cell by label (contains, case-insensitive)
-  function findCell(targetLabel) {
-    const target = String(targetLabel).toLowerCase().replace(/\s+/g, '');
-    for (var r = 0; r < values.length; r++) {
-      for (var c = 0; c < values[r].length; c++) {
-        const val = String(values[r][c] || '').toLowerCase().replace(/\s+/g, '');
-        if (val.indexOf(target) !== -1) {
-          return { row: r, col: c };
-        }
-      }
-    }
-    return null;
-  }
-
-  function parseAmount(val) {
-    if (typeof val === 'number') return val;
-    if (!val) return 0;
-    const clean = String(val).replace(/[^0-9.\-]/g, '');
-    return parseFloat(clean) || 0;
-  }
-
-  function findTileValue(pos) {
-    for (let radius = 1; radius <= 5; radius++) {
-      let bestVal = null;
-      for (let dr = -radius; dr <= radius; dr++) {
-        for (let dc = -radius; dc <= radius; dc++) {
-          if (Math.abs(dr) !== radius && Math.abs(dc) !== radius) continue;
-          let r = pos.row + dr;
-          let c = pos.col + dc;
-          if (r >= 0 && r < values.length && c >= 0 && c < values[r].length) {
-            let val = values[r][c];
-            if (val !== '' && val !== null) {
-              let num = parseAmount(val);
-              if (num !== 0 && Math.abs(num) > 2 && (typeof val === 'number' || (typeof val === 'string' && val.match(/[0-9]/)))) {
-                 if (bestVal === null || Math.abs(num) > Math.abs(bestVal)) {
-                    bestVal = num;
-                 }
-              }
-            }
-          }
-        }
-      }
-      if (bestVal !== null) return bestVal;
-    }
-    return null;
-  }
-
-  // Discover the six summary tiles by their label text.
-  // For each label, the numeric value is in nearby cells (above, below, or offset by 1-2 columns/rows)
-  const TILE_LABELS = [
-    { key: 'totalIncome',       label: 'Total Income' },
-    { key: 'totalBills',        label: 'Total Bills' },
-    { key: 'totalDebtPayoff',   label: 'Total Debt' },
-    { key: 'totalExpenses',     label: 'Total Expenses' },
-    { key: 'totalSavings',      label: 'Total Savings' },
-    { key: 'unallocatedIncome', label: 'Unallocated' }
-  ];
-
-  var summaryTiles = {};
-  TILE_LABELS.forEach(function (tile) {
-    var pos = findCell(tile.label);
-    if (!pos) {
-      summaryTiles[tile.key] = { actual: 0, goal: 0, diff: 0, statusText: 'NOT FOUND: ' + tile.label };
-      return;
-    }
-    
-    var actualVal = findTileValue(pos) || 0;
-    summaryTiles[tile.key] = { actual: actualVal, statusText: tile.label + ' (Annual)' };
-  });
-
-  // Discover category breakdown tables using "Category" header scan (same as monthly)
-  var categoryHeaders = [];
-  for (var r = 5; r < Math.min(300, values.length); r++) {
-    for (var c = 0; c < Math.min(10, values[r].length); c++) {
-      var headerText = String(values[r][c] || '').trim().toUpperCase();
-      if (headerText === 'CATEGORY' || headerText === 'SAVINGS' || headerText === 'SAVINGS GOAL') {
-        categoryHeaders.push({ row: r, col: c });
-      }
-    }
-  }
-
-  var tables = {
-    Income: [],
-    Bills: [],
-    Debt: [],
-    Expenses: [],
-    Savings: []
-  };
-  var tableDiscoveryReport = {};
-  var sectionNames = ['Income', 'Bills', 'Debt', 'Expenses', 'Savings'];
-
-  categoryHeaders.forEach(function (h, idx) {
-    var r = h.row;
-    var headerRowValues = values[r];
-    const checkText = headerRowValues.join(' ').toUpperCase();
-    // Savings table might use "SAVINGS" instead of "CATEGORY" and "SAVED" instead of "ACTUAL"
-    const hasCategory = checkText.indexOf('CATEGORY') !== -1 || checkText.indexOf('SAVINGS') !== -1;
-    const hasActual = checkText.indexOf('ACTUAL') !== -1 || checkText.indexOf('SAVED') !== -1;
-
-    var goalCol = -1, actualCol = -1, diffCol = -1;
-
-    for (var c = h.col + 1; c < Math.min(h.col + 35, headerRowValues.length); c++) {
-      var ct = String(headerRowValues[c] || '').toLowerCase().trim();
-      if (ct === 'goal' || ct === 'budget') goalCol = c;
-      else if (ct === 'actual' || ct === 'saved') actualCol = c;
-      else if (ct === 'diff' || ct === 'diff.') diffCol = c;
-    }
-
-    if (actualCol === -1) return;
-
-    var detectedSection = sectionNames[idx] || 'Expenses';
-    for (var checkR = r - 1; checkR >= Math.max(0, r - 5); checkR--) {
-      var secCheckText = String(values[checkR][1] || values[checkR][0] || '').toUpperCase();
-      if (secCheckText.indexOf('INCOME') !== -1)  { detectedSection = 'Income'; break; }
-      if (secCheckText.indexOf('BILL') !== -1)    { detectedSection = 'Bills'; break; }
-      if (secCheckText.indexOf('DEBT') !== -1)    { detectedSection = 'Debt'; break; }
-      if (secCheckText.indexOf('EXPENSE') !== -1) { detectedSection = 'Expenses'; break; }
-      if (secCheckText.indexOf('SAVING') !== -1)  { detectedSection = 'Savings'; break; }
-    }
-
-    var items = [];
-    var catValCol = h.col + 1;
-    var consecutiveBlanks = 0;
-    for (var dataR = r + 1; dataR < values.length; dataR++) {
-      var rawCat = String(values[dataR][catValCol] || values[dataR][h.col] || '').trim();
-      if (!rawCat) {
-        consecutiveBlanks++;
-        // If no items collected yet, allow up to 3 leading spacer/blank rows beneath header
-        if (items.length === 0 && consecutiveBlanks <= 5) {
-          continue;
-        }
-        // If items already found or excessive blank rows reached, terminate table
-        break;
-      }
-      consecutiveBlanks = 0;
-      if (rawCat.indexOf('THIS SPREADSHEET') !== -1 || rawCat.indexOf('Total') !== -1) break;
-
-      var gVal = goalCol !== -1 ? parseAmount(values[dataR][goalCol + 1] !== undefined && values[dataR][goalCol + 1] !== '' ? values[dataR][goalCol + 1] : values[dataR][goalCol]) : 0;
-      var aVal = actualCol !== -1 ? parseAmount(values[dataR][actualCol + 1] !== undefined && values[dataR][actualCol + 1] !== '' ? values[dataR][actualCol + 1] : values[dataR][actualCol]) : 0;
-      var dVal = diffCol !== -1 ? parseAmount(values[dataR][diffCol + 1] !== undefined && values[dataR][diffCol + 1] !== '' ? values[dataR][diffCol + 1] : values[dataR][diffCol]) : (aVal - gVal);
-
-      items.push({ category: rawCat, goal: gVal, actual: aVal, diff: dVal });
-    }
-
-    tables[detectedSection] = items;
-    tableDiscoveryReport[detectedSection] = { found: true, rowCount: items.length };
-  });
-
-  // Report missing tables explicitly
-  sectionNames.forEach(function (sec) {
-    if (!tableDiscoveryReport[sec]) {
-      tableDiscoveryReport[sec] = { found: false, rowCount: 0 };
-    }
-  });
-
-  // NOTE (Part E scope decision): The "Annual Income by Month" trend section exists around row 40
-  // of the Annual Dashboard tab. It contains monthly breakdown data (12-point series) structured
-  // as a chart-feed table — different from the point-in-time snapshot returned here.
-  // This trend chart has been intentionally deferred to a future dedicated implementation.
-
-  const tDone = Date.now();
-
-  return {
-    tab: annualTabName,
-    debugValues: values.slice(0, 50).map(r => r.slice(0, 15)),
-    summaryTiles: summaryTiles,
-    tables: tables,
-    tableDiscoveryReport: tableDiscoveryReport,
-    metrics: {
-      tabDiscoveryMs: tTab - t0,
-      dataReadMs: tRead - tTab,
-      discoveryAndParseMs: tDone - tRead,
-      totalAnnualMs: tDone - t0
-    }
-  };
-}
 
 /**
  * Programmatically discovers and parses the Accounts tab (Read-Only)

@@ -33,7 +33,6 @@ enum class Screen(val title: String, val icon: ImageVector) {
     HISTORY("History", Icons.Default.ReceiptLong),
     ACCOUNTS("Accounts", Icons.Default.AccountBalance),
     CATEGORIES("Categories", Icons.Default.Category),
-    SAVINGS("Savings", Icons.Default.Savings),
     DEBTS("Debts", Icons.Default.Payment),
     GOALS("Goals", Icons.Default.TrackChanges),
     SETTINGS("Settings", Icons.Default.Settings)
@@ -118,12 +117,9 @@ fun MainAppHost(initialScreen: Screen = Screen.DASHBOARD) {
         TaxonomyRepository.refreshTaxonomy()
     }
 
-    // Prefetch BOTH dashboard periods in parallel so the toggle is instant.
-    // Each coroutine writes to its own dedicated StateFlow in the repository,
-    // so they never overwrite each other's data.
+    // Prefetch monthly dashboard at startup.
     LaunchedEffect(Unit) {
         scope.launch { TransactionRepository.fetchDashboard("monthly") }
-        scope.launch { TransactionRepository.fetchDashboard("annual") }
     }
 
     Scaffold(
@@ -190,14 +186,12 @@ fun MainAppHost(initialScreen: Screen = Screen.DASHBOARD) {
                 Screen.DASHBOARD -> DashboardScreen(
                     onNavigateToReview = { currentScreen = Screen.REVIEW },
                     onNavigateToHistory = { currentScreen = Screen.HISTORY },
-                    onNavigateToAccounts = { currentScreen = Screen.ACCOUNTS },
-                    onNavigateToSavings = { currentScreen = Screen.SAVINGS }
+                    onNavigateToAccounts = { currentScreen = Screen.ACCOUNTS }
                 )
                 Screen.REVIEW    -> ReviewConfirmScreen()
                 Screen.HISTORY   -> HistoryScreen()
                 Screen.ACCOUNTS  -> AccountsScreen()
                 Screen.CATEGORIES -> CategoriesScreen()
-                Screen.SAVINGS   -> SavingsScreen()
                 Screen.DEBTS     -> DebtsScreen()
                 Screen.GOALS     -> GoalsScreen()
                 Screen.SETTINGS  -> SettingsScreen()

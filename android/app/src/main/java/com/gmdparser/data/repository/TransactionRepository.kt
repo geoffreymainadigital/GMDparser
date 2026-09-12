@@ -33,7 +33,6 @@ object TransactionRepository {
     private const val KEY_PENDING = "pending_transactions"
     private const val KEY_CONFIRMED = "confirmed_transactions"
     private const val KEY_MONTHLY_DASHBOARD = "cached_monthly_dashboard"
-    private const val KEY_ANNUAL_DASHBOARD = "cached_annual_dashboard"
     /** Max transactions per batchCreateTransactions call — must match Apps Script MAX_BATCH. */
     private const val BATCH_MAX_SIZE = 50
 
@@ -52,9 +51,6 @@ object TransactionRepository {
     private val _monthlyDashboard = MutableStateFlow<com.gmdparser.data.model.MonthlyDashboardData?>(null)
     val monthlyDashboard: StateFlow<com.gmdparser.data.model.MonthlyDashboardData?> = _monthlyDashboard.asStateFlow()
 
-    private val _annualDashboard = MutableStateFlow<com.gmdparser.data.model.MonthlyDashboardData?>(null)
-    val annualDashboard: StateFlow<com.gmdparser.data.model.MonthlyDashboardData?> = _annualDashboard.asStateFlow()
-
     @Volatile
     private var dashboardFetchRequestId: Long = 0
 
@@ -63,12 +59,10 @@ object TransactionRepository {
     private fun handleDashboardSuccess(data: com.gmdparser.data.model.DashboardResponse, reqId: Long) {
         if (reqId == dashboardFetchRequestId) {
             _dashboardData.value = data
-            if (data.period == "annual" && data.annual != null) {
-                _annualDashboard.value = data.annual
-                prefs?.edit()?.putString(KEY_ANNUAL_DASHBOARD, gson.toJson(data.annual))?.apply()
-            } else if (data.month != null) {
-                _monthlyDashboard.value = data.month
-                prefs?.edit()?.putString(KEY_MONTHLY_DASHBOARD, gson.toJson(data.month))?.apply()
+            val monthData = data.month ?: data.dashboard
+            if (monthData != null) {
+                _monthlyDashboard.value = monthData
+                prefs?.edit()?.putString(KEY_MONTHLY_DASHBOARD, gson.toJson(monthData))?.apply()
             }
         }
     }
@@ -147,14 +141,6 @@ object TransactionRepository {
                 _monthlyDashboard.value = loaded
             } catch (e: Exception) { e.printStackTrace() }
         }
-
-        val annualJson = sp.getString(KEY_ANNUAL_DASHBOARD, null)
-        if (!annualJson.isNullOrBlank()) {
-            try {
-                val loaded = gson.fromJson(annualJson, com.gmdparser.data.model.MonthlyDashboardData::class.java)
-                _annualDashboard.value = loaded
-            } catch (e: Exception) { e.printStackTrace() }
-        }
     }
 
     private fun persistPending(list: List<Transaction>) {
@@ -209,8 +195,7 @@ object TransactionRepository {
      * Single-transaction confirmed write pipeline (unchanged behaviour).
      */
     suspend fun confirmAndSubmitTransaction(
-        tx: Transaction,
-        authKey: String? = null
+        tx: Transaction
     ): Result<ApiResponse> {
         if (tx.amount == 0.0)
             return Result.failure(IllegalArgumentException("Amount must be a non-zero number."))
@@ -230,15 +215,15 @@ object TransactionRepository {
 
         return try {
             val response = try {
-                val vercelRes = NetworkClient.apiService.recordTransaction(request, authKey)
+                val vercelRes = NetworkClient.apiService.recordTransaction(request)
                 val directUrl = BuildConfig.APPS_SCRIPT_URL
                 if (!vercelRes.isSuccessful && vercelRes.code() >= 500 && directUrl.isNotBlank()) {
-                    try { NetworkClient.apiService.recordTransactionDirect(directUrl, request, authKey) }
+                    try { NetworkClient.apiService.recordTransactionDirect(directUrl, request) }
                     catch (_: Exception) { vercelRes }
                 } else vercelRes
             } catch (netErr: Exception) {
                 val directUrl = BuildConfig.APPS_SCRIPT_URL
-                if (directUrl.isNotBlank()) NetworkClient.apiService.recordTransactionDirect(directUrl, request, authKey)
+                if (directUrl.isNotBlank()) NetworkClient.apiService.recordTransactionDirect(directUrl, request)
                 else throw netErr
             }
 
@@ -306,8 +291,7 @@ object TransactionRepository {
      * - Uses a 120-second read timeout OkHttpClient to handle large flush recalculations.
      */
     suspend fun confirmAndSubmitBatch(
-        transactions: List<Transaction>,
-        authKey: String? = null
+        transactions: List<Transaction>
     ): List<BatchTransactionResult> {
         if (transactions.isEmpty()) return emptyList()
 
@@ -347,16 +331,16 @@ object TransactionRepository {
             val request = BatchCreateTransactionRequest(transactions = payloads)
 
             val batchResponse: BatchApiResponse? = try {
-                val vercelRes = vercelService.recordBatchTransactions(request, authKey)
+                val vercelRes = vercelService.recordBatchTransactions(request)
                 if (!vercelRes.isSuccessful && vercelRes.code() >= 500 && gasService != null) {
-                    try { gasService.recordBatchTransactionsDirect(directAppsScriptUrl, request, authKey).body() }
+                    try { gasService.recordBatchTransactionsDirect(directAppsScriptUrl, request).body() }
                     catch (_: Exception) { vercelRes.body() }
                 } else {
                     vercelRes.body()
                 }
             } catch (netErr: Exception) {
                 if (gasService != null) {
-                    try { gasService.recordBatchTransactionsDirect(directAppsScriptUrl, request, authKey).body() }
+                    try { gasService.recordBatchTransactionsDirect(directAppsScriptUrl, request).body() }
                     catch (_: Exception) { null }
                 } else null
             }

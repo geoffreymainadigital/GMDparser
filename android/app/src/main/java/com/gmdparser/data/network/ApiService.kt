@@ -20,9 +20,7 @@ interface ApiService {
     suspend fun getHealth(): Response<HealthResponse>
 
     @GET("/api/auth-check")
-    suspend fun authCheck(
-        @Header("X-GMD-Auth-Key") authKey: String? = null
-    ): Response<AuthCheckResponse>
+    suspend fun authCheck(): Response<AuthCheckResponse>
 
     @GET("/api/taxonomy")
     suspend fun getTaxonomy(): Response<TaxonomyResponse>
@@ -34,40 +32,34 @@ interface ApiService {
 
     @POST("/api/transaction")
     suspend fun recordTransaction(
-        @Body request: CreateTransactionRequest,
-        @Header("X-GMD-Auth-Key") authKey: String? = null
+        @Body request: CreateTransactionRequest
     ): Response<ApiResponse>
 
     @POST
     suspend fun recordTransactionDirect(
         @Url url: String,
-        @Body request: CreateTransactionRequest,
-        @Header("X-GMD-Auth-Key") authKey: String? = null
+        @Body request: CreateTransactionRequest
     ): Response<ApiResponse>
 
     @POST("/api/transaction")
     suspend fun recordBatchTransactions(
-        @Body request: BatchCreateTransactionRequest,
-        @Header("X-GMD-Auth-Key") authKey: String? = null
+        @Body request: BatchCreateTransactionRequest
     ): Response<BatchApiResponse>
 
     @POST
     suspend fun recordBatchTransactionsDirect(
         @Url url: String,
-        @Body request: BatchCreateTransactionRequest,
-        @Header("X-GMD-Auth-Key") authKey: String? = null
+        @Body request: BatchCreateTransactionRequest
     ): Response<BatchApiResponse>
 
     @POST("/api/log-transaction")
     suspend fun logTransaction(
-        @Body request: CreateTransactionRequest,
-        @Header("X-GMD-Auth-Key") authKey: String? = null
+        @Body request: CreateTransactionRequest
     ): Response<ApiResponse>
 
     @POST("/api/auto-sync-sms")
     suspend fun autoSyncSms(
-        @Body request: Map<String, Any>,
-        @Header("X-GMD-Auth-Key") authKey: String? = null
+        @Body request: Map<String, Any>
     ): Response<ApiResponse>
 }
 

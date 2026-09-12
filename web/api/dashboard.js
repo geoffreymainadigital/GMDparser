@@ -15,10 +15,9 @@ export default async function handler(req, res) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-    const periodParam = req.query.period ? `&period=${req.query.period}` : '';
     const authParam = authSecret ? `&authKey=${encodeURIComponent(authSecret)}` : '';
 
-    const upstreamRes = await fetch(appsScriptUrl + '?action=dashboard' + periodParam + authParam, {
+    const upstreamRes = await fetch(appsScriptUrl + '?action=dashboard' + authParam, {
       method: 'GET',
       headers: {
         'X-GMD-Auth-Key': authSecret

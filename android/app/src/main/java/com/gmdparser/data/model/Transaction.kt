@@ -183,7 +183,7 @@ data class DashboardResponse(
     @SerializedName("success") val success: Boolean,
     @SerializedName("period") val period: String? = null,
     @SerializedName("month") val month: MonthlyDashboardData? = null,
-    @SerializedName("annual") val annual: MonthlyDashboardData? = null,
+    @SerializedName("dashboard") val dashboard: MonthlyDashboardData? = null,
     @SerializedName("accounts") val accounts: List<AccountBalanceItem>? = null,
     @SerializedName("timestamp") val timestamp: String? = null,
     @SerializedName("error") val error: String? = null
