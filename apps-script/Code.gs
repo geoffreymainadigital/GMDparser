@@ -16,8 +16,8 @@ const COL_AMOUNT = 10;          // J (Amount)
 const COL_ACCOUNT = 11;         // K (Account)
 const COL_NOTES = 12;           // L (Notes)
 
-const SCRIPT_VERSION = '2026.09.12.v23_font23_row2_tiles_fix';
-const SCRIPT_BUILD_ID = 'GMD_GAS_20260912_PROD_23';
+const SCRIPT_VERSION = '2026.09.12.v24_summary_tile_goals_row1_fix';
+const SCRIPT_BUILD_ID = 'GMD_GAS_20260912_PROD_24';
 
 let VALID_TYPES = ['Income', 'Expenses', 'Bills', 'Debt', 'Savings', 'Balance'];
 
@@ -175,31 +175,22 @@ function doGet(e) {
       const monthIndex = parseInt(Utilities.formatDate(now, 'Africa/Nairobi', 'M'), 10) - 1;
       const currentMonthCode = monthNames[monthIndex];
       const sheet = ss.getSheetByName(currentMonthCode);
-      const range = sheet.getRange(1, 1, 15, 120);
+      const range = sheet.getRange(1, 1, 10, 75);
       const values = range.getValues();
       const displayValues = range.getDisplayValues();
       const fontSizes = range.getFontSizes();
 
-      const headersFound = [];
-      const font23Cells = [];
-
-      for (let r = 0; r < values.length; r++) {
-        for (let c = 0; c < values[r].length; c++) {
-          const v = String(values[r][c] || '').trim();
-          if (v.toLowerCase().includes('total') || v.toLowerCase().includes('unallocated') || v.toLowerCase().includes('savings')) {
-            headersFound.push({ r: r + 1, c: c + 1, text: v, size: fontSizes[r][c] });
-          }
-          if (fontSizes[r][c] >= 18) {
-            font23Cells.push({ r: r + 1, c: c + 1, val: values[r][c], disp: displayValues[r][c], size: fontSizes[r][c] });
-          }
-        }
-      }
-
-      const unallocArea = [];
-      for (let r = 0; r < 6; r++) {
-        for (let c = 75; c < 85; c++) {
+      const tileAreaDump = [];
+      for (let r = 0; r < 10; r++) {
+        for (let c = 20; c < 75; c++) {
           if (values[r][c] !== '' && values[r][c] !== null) {
-            unallocArea.push({ r: r + 1, c: c + 1, val: values[r][c], disp: displayValues[r][c], size: fontSizes[r][c] });
+            tileAreaDump.push({
+              r: r + 1,
+              c: c + 1,
+              val: values[r][c],
+              disp: displayValues[r][c],
+              size: fontSizes[r][c]
+            });
           }
         }
       }
@@ -207,9 +198,7 @@ function doGet(e) {
       return createJsonResponse({
         success: true,
         month: currentMonthCode,
-        headersFound,
-        font23Cells,
-        unallocArea,
+        tileAreaDump,
         timestamp: new Date().toISOString()
       }, 200);
     }
@@ -1541,11 +1530,20 @@ function getMonthlyDashboardData(ss) {
   function buildTile(headerLabel, tableItems, sectionType) {
     const headerPos = findCell(headerLabel);
     let a = null;
+    let g = null;
+    
     if (headerPos) {
       a = findTileValue(headerPos);
+      // Goal value sits on Row 1 (index 0) at the tile header's column index
+      if (headerPos.col < values[0].length) {
+        const valRow1 = values[0][headerPos.col];
+        if (valRow1 !== '' && valRow1 !== null && valRow1 !== undefined) {
+          g = parseAmount(valRow1);
+        }
+      }
     }
     
-    // Fallback to table sum only if tile position is not found in sheet
+    // Fallback to table sums only if tile position is not found in sheet
     let gSum = 0;
     let aSum = 0;
     (tableItems || []).forEach(function (it) {
@@ -1554,9 +1552,9 @@ function getMonthlyDashboardData(ss) {
     });
 
     const actualVal = (a !== null && a !== undefined) ? a : aSum;
-    const goalVal = gSum;
+    const goalVal = (g !== null && g !== undefined) ? g : gSum;
     const diffVal = actualVal - goalVal;
-    const pct = goalVal > 0 ? Math.round((actualVal / goalVal) * 100) : 0;
+    const pct = goalVal > 0 ? Math.round((actualVal / goalVal) * 100) : (goalVal < 0 ? Math.round((actualVal / goalVal) * 100) : 0);
     
     let st = '';
     if (sectionType === 'Income') {
