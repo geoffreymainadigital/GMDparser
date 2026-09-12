@@ -16,8 +16,8 @@ const COL_AMOUNT = 10;          // J (Amount)
 const COL_ACCOUNT = 11;         // K (Account)
 const COL_NOTES = 12;           // L (Notes)
 
-const SCRIPT_VERSION = '2026.09.12.v21_monthly_expenses_fix';
-const SCRIPT_BUILD_ID = 'GMD_GAS_20260912_PROD_21';
+const SCRIPT_VERSION = '2026.09.12.v22_summary_tiles_direct_read';
+const SCRIPT_BUILD_ID = 'GMD_GAS_20260912_PROD_22';
 
 let VALID_TYPES = ['Income', 'Expenses', 'Bills', 'Debt', 'Savings', 'Balance'];
 
@@ -1477,39 +1477,54 @@ function getMonthlyDashboardData(ss) {
     tables[detectedSection] = items;
   });
 
-  // Helper to aggregate summary totals directly from parsed table categories
-  function aggregateSection(items, sectionType) {
-    let g = 0;
-    let a = 0;
-    (items || []).forEach(function (it) {
-      g += (Number(it.goal) || 0);
-      a += (Number(it.actual) || 0);
+  // Helper to construct tile response from direct sheet cell values (or fallback to table aggregate)
+  function buildTile(headerLabel, tableItems, sectionType) {
+    const headerPos = findCell(headerLabel);
+    let a = null;
+    if (headerPos) {
+      a = findTileValue(headerPos);
+    }
+    
+    // Fallback to table sum only if tile position is not found in sheet
+    let gSum = 0;
+    let aSum = 0;
+    (tableItems || []).forEach(function (it) {
+      gSum += (Number(it.goal) || 0);
+      aSum += (Number(it.actual) || 0);
     });
-    const d = a - g;
-    const pct = g > 0 ? Math.round((a / g) * 100) : 0;
+
+    const actualVal = (a !== null && a !== undefined) ? a : aSum;
+    const goalVal = gSum;
+    const diffVal = actualVal - goalVal;
+    const pct = goalVal > 0 ? Math.round((actualVal / goalVal) * 100) : 0;
+    
     let st = '';
     if (sectionType === 'Income') {
       st = pct + '% of goal';
     } else if (sectionType === 'Bills' || sectionType === 'Expenses') {
-      const underOver = d <= 0 ? 'under budget' : 'over budget';
-      st = pct + '% • Ksh ' + Math.abs(d).toLocaleString('en-US') + ' ' + underOver;
+      const underOver = diffVal <= 0 ? 'under budget' : 'over budget';
+      st = pct + '% • Ksh ' + Math.abs(diffVal).toLocaleString('en-US') + ' ' + underOver;
     } else {
-      const underOver = d <= 0 ? 'under goal' : 'over goal';
-      st = pct + '% • Ksh ' + Math.abs(d).toLocaleString('en-US') + ' ' + underOver;
+      const underOver = diffVal <= 0 ? 'under goal' : 'over goal';
+      st = pct + '% • Ksh ' + Math.abs(diffVal).toLocaleString('en-US') + ' ' + underOver;
     }
-    return { actual: a, goal: g, diff: d, statusText: st };
+    return { actual: actualVal, goal: goalVal, diff: diffVal, statusText: st };
   }
 
-  const incomeTile = aggregateSection(tables.Income, 'Income');
-  const billsTile = aggregateSection(tables.Bills, 'Bills');
-  const debtTile = aggregateSection(tables.Debt, 'Debt');
-  const expensesTile = aggregateSection(tables.Expenses, 'Expenses');
-  const savingsTile = aggregateSection(tables.Savings, 'Savings');
+  const incomeTile = buildTile('Total Income', tables.Income, 'Income');
+  const billsTile = buildTile('Total Bills', tables.Bills, 'Bills');
+  const debtTile = buildTile('Total Debt Payoff', tables.Debt, 'Debt');
+  const expensesTile = buildTile('Total Expenses', tables.Expenses, 'Expenses');
+  const savingsTile = buildTile('Total Savings', tables.Savings, 'Savings');
 
-  // Unallocated Income fallback
-  const totalAllocatedActual = billsTile.actual + debtTile.actual + expensesTile.actual + savingsTile.actual;
-  const unallocatedActual = incomeTile.actual - totalAllocatedActual;
-  const unallocatedFallback = { actual: unallocatedActual, statusText: 'Remaining balance' };
+  // Direct read for Unallocated Income tile
+  const unallocHeaderPos = findCell('Unallocated Income');
+  let unallocVal = unallocHeaderPos ? findTileValue(unallocHeaderPos) : null;
+  if (unallocVal === null || unallocVal === undefined) {
+    const totalAllocatedActual = billsTile.actual + debtTile.actual + expensesTile.actual + savingsTile.actual;
+    unallocVal = incomeTile.actual - totalAllocatedActual;
+  }
+  const unallocatedTile = { actual: unallocVal, statusText: 'Remaining balance' };
 
   return {
     month: targetSheetName,
@@ -1519,7 +1534,7 @@ function getMonthlyDashboardData(ss) {
       totalDebtPayoff: debtTile,
       totalExpenses: expensesTile,
       totalSavings: savingsTile,
-      unallocatedIncome: unallocatedFallback
+      unallocatedIncome: unallocatedTile
     },
     tables: tables
   };
