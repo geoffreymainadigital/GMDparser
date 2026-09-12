@@ -227,7 +227,7 @@ fun DashboardScreen(
                                     val pctInt = (item.progress * 100).toInt()
                                     Text(
                                         text = "$pctInt%",
-                                        color = AccentMpesaGreen,
+                                        color = MpesaGreen,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 12.sp
                                     )
@@ -235,7 +235,7 @@ fun DashboardScreen(
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
                                     text = "Ksh ${String.format("%,.2f", item.saved)}",
-                                    color = AccentMpesaGreen,
+                                    color = MpesaGreen,
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.ExtraBold
                                 )
@@ -249,7 +249,7 @@ fun DashboardScreen(
                                 LinearProgressIndicator(
                                     progress = { Math.min(1.0f, Math.max(0.0f, item.progress.toFloat())) },
                                     modifier = Modifier.fillMaxWidth().height(6.dp),
-                                    color = AccentMpesaGreen,
+                                    color = MpesaGreen,
                                     trackColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
                                 )
                             }
