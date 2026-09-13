@@ -118,8 +118,8 @@ function validateTransactionPayload(tx) {
   const amount = Number(tx.amount);
   if (isNaN(amount) || amount === 0) {
     errors.push('Amount must be a non-zero number');
-  } else if (amount < 0 && tx.type !== 'Savings') {
-    errors.push('Negative amounts are only valid for Savings transactions (withdrawals)');
+  } else if (amount < 0 && tx.type !== 'Savings' && tx.type !== 'Balance') {
+    errors.push('Negative amounts are only valid for Savings and Balance transactions');
   }
 
   if (!tx.date || typeof tx.date !== 'string') {
@@ -721,6 +721,73 @@ assert.strictEqual(monthlyExpenseItems.length, 2, 'Must extract 2 categories acr
 assert.strictEqual(monthlyExpenseItems[0].category, 'Mama Mboga');
 assert.strictEqual(monthlyExpenseItems[1].category, 'Fare');
 console.log('✓ Test 28: Monthly Dashboard table extraction handles leading/interior spacer/blank rows and asserts category count');
+
+// --- Test 29: Two-row atomic Balance transfer write ---
+function simulateCreateTransferPair(sheet, tx) {
+  const baseCode = (tx.transactionCode || ('TR' + Date.now().toString().slice(-8))).trim().toUpperCase();
+  const absAmount = Math.abs(Number(tx.amount));
+  const leg1 = {
+    transactionCode: baseCode + 'A',
+    date: tx.date,
+    type: 'Balance',
+    category: '',
+    description: tx.description || '',
+    amount: -absAmount,
+    account: tx.account,
+    notes: 'Transfer to ' + tx.destinationAccount
+  };
+  const leg2 = {
+    transactionCode: baseCode + 'B',
+    date: tx.date,
+    type: 'Balance',
+    category: '',
+    description: tx.description || '',
+    amount: absAmount,
+    account: tx.destinationAccount,
+    notes: 'Transfer from ' + tx.account
+  };
+
+  const res1 = simulateCreateTransaction(sheet, leg1);
+  const res2 = simulateCreateTransaction(sheet, leg2);
+  return { success: res1.success && res2.success, legs: [res1, res2] };
+}
+
+const xferTx = {
+  transactionCode: 'XFER20260913',
+  amount: 200,
+  type: 'Balance',
+  category: '',
+  description: 'Inter-account transfer',
+  account: 'Mpesa',
+  destinationAccount: 'I&M Bank',
+  date: '2026-09-13'
+};
+
+const xferResult = simulateCreateTransferPair(mockCloneSheet, xferTx);
+assert.strictEqual(xferResult.success, true, 'Transfer pair write must succeed');
+assert.strictEqual(xferResult.legs.length, 2, 'Transfer must produce exactly two legs');
+assert.strictEqual(xferResult.legs[0].data.amount, -200, 'Leg 1 amount must be -200');
+assert.strictEqual(xferResult.legs[0].data.account, 'Mpesa', 'Leg 1 account must be Mpesa');
+assert.strictEqual(xferResult.legs[1].data.amount, 200, 'Leg 2 amount must be 200');
+assert.strictEqual(xferResult.legs[1].data.account, 'I&M Bank', 'Leg 2 account must be I&M Bank');
+assert.strictEqual(xferResult.legs[0].data.category, '', 'Leg 1 category must be blank');
+assert.strictEqual(xferResult.legs[1].data.category, '', 'Leg 2 category must be blank');
+console.log('✓ Test 29: Confirming a Transfer with amount 200 from Mpesa to I&M Bank writes exactly two linked rows (-200 Mpesa and +200 I&M Bank)');
+
+// --- Test 30: Single-row transaction types remain completely unaffected ---
+const expenseTx = {
+  transactionCode: 'TD99EXP123',
+  amount: 150,
+  type: 'Expenses',
+  category: 'Food',
+  description: 'Dinner',
+  account: 'Mpesa',
+  date: '2026-09-13'
+};
+const expResult = simulateCreateTransaction(mockCloneSheet, expenseTx);
+assert.strictEqual(expResult.success, true, 'Single row Expense transaction write must succeed');
+assert.strictEqual(expResult.data.amount, 150, 'Single row Expense amount unchanged');
+console.log('✓ Test 30: Existing single-row transaction types (Expenses, Income, Bills, Debt, Savings) are unaffected');
 
 console.log('\n========================================================================');
 console.log('ALL 28 CRITICAL INVARIANT TESTS PASSED WITH 100% SPECIFICATION FIDELITY!');

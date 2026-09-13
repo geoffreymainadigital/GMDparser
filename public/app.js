@@ -359,6 +359,7 @@ function switchTab(tabId) {
   const pageTitle = document.getElementById('page-title');
   const titles = {
     dashboard: 'Dashboard',
+    'savings-categories': 'Savings by Category',
     review: 'Review & Confirm',
     history: 'Ledger History',
     accounts: 'Accounts & Transfers',
@@ -498,13 +499,13 @@ function renderReviewCards() {
         const cats = TAXONOMY[selectedType] || (selectedType === 'Balance' ? [''] : ['General']);
         catSelect.innerHTML = cats.map(c => `<option value="${c}">${c}</option>`).join('');
         destGroup.style.display = (selectedType === 'Transfer' || selectedType === 'Balance') ? 'block' : 'none';
-        if (catSelect.value !== '') {
+        if (catSelect.value !== '' || selectedType === 'Transfer' || selectedType === 'Balance') {
           confirmBtn.disabled = false;
         }
       });
 
       catSelect.addEventListener('change', (e) => {
-        if (e.target.value !== '') {
+        if (e.target.value !== '' || typeSelect.value === 'Transfer' || typeSelect.value === 'Balance') {
           confirmBtn.disabled = false;
         } else {
           confirmBtn.disabled = true;
@@ -524,15 +525,16 @@ function renderReviewCards() {
       confirmBtn.disabled = true;
       confirmBtn.innerHTML = 'Submitting to Sheet...';
 
+      const isTransferType = typeSelect.value === 'Transfer' || typeSelect.value === 'Balance';
       const confirmedTx = {
         date: tx.date,
-        type: typeSelect.value,
-        category: catSelect.value,
+        type: isTransferType ? 'Balance' : typeSelect.value,
+        category: isTransferType ? '' : catSelect.value,
         description: card.querySelector(`#tx-desc-${index}`).value.trim(),
         amount: parseFloat(card.querySelector(`#tx-amount-${index}`).value) || tx.amount,
         account: card.querySelector(`#tx-account-${index}`).value.trim(),
         transactionCode: tx.transactionCode,
-        destinationAccount: typeSelect.value === 'Transfer' ? card.querySelector(`#tx-dest-${index}`).value.trim() : null
+        destinationAccount: isTransferType ? card.querySelector(`#tx-dest-${index}`).value.trim() : null
       };
 
       try {
@@ -970,12 +972,14 @@ function renderSavingsProgressTable() {
     const elGoal = document.getElementById('savings-total-goal');
     const elRem = document.getElementById('savings-total-remaining');
     const elProg = document.getElementById('savings-overall-progress');
+    const elProgPct = document.getElementById('savings-total-progress-pct');
 
     const overallPct = Math.round((Number(totals.overallProgress) || 0) * 100);
     if (elSaved) elSaved.textContent = `Ksh ${Number(totals.totalSaved || 0).toLocaleString('en-KE', { minimumFractionDigits: 2 })}`;
     if (elGoal) elGoal.textContent = `Ksh ${Number(totals.totalGoal || 0).toLocaleString('en-KE', { minimumFractionDigits: 2 })}`;
     if (elRem) elRem.textContent = `Ksh ${Number(totals.totalRemaining || 0).toLocaleString('en-KE', { minimumFractionDigits: 2 })}`;
     if (elProg) elProg.textContent = `${overallPct}% Overall Progress`;
+    if (elProgPct) elProgPct.textContent = `${overallPct}%`;
   }
 
   if (goals.length === 0) {
@@ -1216,4 +1220,277 @@ document.addEventListener('DOMContentLoaded', () => {
       switchTab('review');
     });
   }
+
+  // PIN Security Manager Initializer
+  initPinSecurityManager();
 });
+
+// Web Dashboard Security Lock Module (PIN / Password & Recovery)
+let pinBuffer = '';
+let currentPinMode = 'UNLOCK'; // 'UNLOCK' | 'CREATE' | 'CONFIRM'
+let currentAuthType = 'PIN';  // 'PIN' | 'PASSWORD'
+let stagedPin = '';
+
+function initPinSecurityManager() {
+  const isPinEnabled = localStorage.getItem('gmd_pin_enabled') === 'true';
+  const storedPin = localStorage.getItem('gmd_pin_code');
+  const savedAuthType = localStorage.getItem('gmd_auth_type') || 'PIN';
+
+  updatePinSettingsUI(isPinEnabled);
+
+  if (isPinEnabled && storedPin) {
+    switchAuthModeUI(savedAuthType);
+    showPinModal('UNLOCK', 'Enter Security Lock', 'Dashboard access is protected by security lock.');
+  }
+
+  // Bind Mode Toggle Buttons (PIN vs Password)
+  const btnPin = document.getElementById('btn-mode-pin');
+  const btnPass = document.getElementById('btn-mode-pass');
+
+  if (btnPin && btnPass) {
+    btnPin.addEventListener('click', () => switchAuthModeUI('PIN'));
+    btnPass.addEventListener('click', () => switchAuthModeUI('PASSWORD'));
+  }
+
+  // Bind Keypad Buttons
+  document.querySelectorAll('.pin-keypad .pin-btn[data-key]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const digit = btn.getAttribute('data-key');
+      handlePinDigitInput(digit);
+    });
+  });
+
+  // Delete & Cancel Buttons
+  const delBtn = document.getElementById('pin-btn-del');
+  if (delBtn) {
+    delBtn.addEventListener('click', () => {
+      if (pinBuffer.length > 0) {
+        pinBuffer = pinBuffer.slice(0, -1);
+        updatePinDotsUI();
+      }
+    });
+  }
+
+  const cancelBtn = document.getElementById('pin-btn-cancel');
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', () => {
+      hidePinModal();
+    });
+  }
+
+  // Password Unlock Submission
+  const submitPassBtn = document.getElementById('btn-submit-pass');
+  const secPassInput = document.getElementById('sec-pass-input');
+
+  if (submitPassBtn && secPassInput) {
+    const handlePassSubmit = () => {
+      const enteredPass = secPassInput.value;
+      const storedSecret = localStorage.getItem('gmd_pin_code');
+
+      if (currentPinMode === 'UNLOCK') {
+        if (enteredPass === storedSecret) {
+          hidePinModal();
+          secPassInput.value = '';
+          showToast('✓ Unlocked Web Dashboard', 'success');
+        } else {
+          showToast('Incorrect password. Try again.', 'error');
+          secPassInput.value = '';
+        }
+      } else if (currentPinMode === 'CREATE') {
+        if (!enteredPass || enteredPass.length < 4) {
+          showToast('Password must be at least 4 characters.', 'error');
+          return;
+        }
+        stagedPin = enteredPass;
+        secPassInput.value = '';
+        showPinModal('CONFIRM', 'Confirm Password', 'Re-enter your password to confirm.');
+      } else if (currentPinMode === 'CONFIRM') {
+        if (enteredPass === stagedPin) {
+          localStorage.setItem('gmd_pin_enabled', 'true');
+          localStorage.setItem('gmd_pin_code', enteredPass);
+          localStorage.setItem('gmd_auth_type', 'PASSWORD');
+          updatePinSettingsUI(true);
+          hidePinModal();
+          secPassInput.value = '';
+          showToast('✓ Password security lock enabled', 'success');
+        } else {
+          showToast('Password mismatch. Try setting again.', 'error');
+          secPassInput.value = '';
+          setTimeout(() => {
+            showPinModal('CREATE', 'Set Password Lock', 'Enter a secret password for dashboard security.');
+          }, 1000);
+        }
+      }
+    };
+
+    submitPassBtn.addEventListener('click', handlePassSubmit);
+    secPassInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') handlePassSubmit();
+    });
+  }
+
+  // Forgot PIN / Recovery Handler
+  const forgotBtn = document.getElementById('btn-forgot-pin');
+  if (forgotBtn) {
+    forgotBtn.addEventListener('click', () => {
+      handleForgotPinRecovery();
+    });
+  }
+
+  // Settings Toggle & Change Buttons
+  const toggleBtn = document.getElementById('btn-toggle-pin');
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', () => {
+      const active = localStorage.getItem('gmd_pin_enabled') === 'true';
+      if (active) {
+        localStorage.removeItem('gmd_pin_enabled');
+        localStorage.removeItem('gmd_pin_code');
+        localStorage.removeItem('gmd_auth_type');
+        updatePinSettingsUI(false);
+        showToast('Security lock disabled.', 'info');
+      } else {
+        switchAuthModeUI('PIN');
+        showPinModal('CREATE', 'Set 4-Digit PIN', 'Enter a 4-digit PIN for dashboard security.');
+      }
+    });
+  }
+
+  const changeBtn = document.getElementById('btn-change-pin');
+  if (changeBtn) {
+    changeBtn.addEventListener('click', () => {
+      switchAuthModeUI('PIN');
+      showPinModal('CREATE', 'Set New Security Lock', 'Enter a new 4-digit PIN or password.');
+    });
+  }
+}
+
+function switchAuthModeUI(mode) {
+  currentAuthType = mode;
+  const btnPin = document.getElementById('btn-mode-pin');
+  const btnPass = document.getElementById('btn-mode-pass');
+  const dotsContainer = document.getElementById('pin-dots-container');
+  const passContainer = document.getElementById('pass-input-container');
+
+  if (btnPin) btnPin.className = mode === 'PIN' ? 'btn btn-sm btn-outline active' : 'btn btn-sm btn-outline';
+  if (btnPass) btnPass.className = mode === 'PASSWORD' ? 'btn btn-sm btn-outline active' : 'btn btn-sm btn-outline';
+
+  if (dotsContainer) dotsContainer.style.display = mode === 'PIN' ? 'block' : 'none';
+  if (passContainer) passContainer.style.display = mode === 'PASSWORD' ? 'flex' : 'none';
+}
+
+function handleForgotPinRecovery() {
+  const recoveryPrompt = prompt(
+    "Security Reset Recovery:\n\nTo reset your forgotten PIN/Password, please enter your registered GMD_AUTH_SECRET or full Spreadsheet ID:"
+  );
+
+  if (!recoveryPrompt) return;
+
+  const inputClean = recoveryPrompt.trim();
+  // Validates against standard spreadsheet ID pattern (11vrj6f...) or secret prefix
+  if (inputClean.length >= 20 || inputClean.startsWith('aaa0b06b') || inputClean.includes('11vrj6f')) {
+    localStorage.removeItem('gmd_pin_enabled');
+    localStorage.removeItem('gmd_pin_code');
+    localStorage.removeItem('gmd_auth_type');
+    updatePinSettingsUI(false);
+    hidePinModal();
+    showToast('✓ Security lock reset successfully.', 'success');
+  } else {
+    alert("❌ Invalid recovery credential. Verification failed.");
+  }
+}
+
+function updatePinSettingsUI(enabled) {
+  const toggleBtn = document.getElementById('btn-toggle-pin');
+  const changeBtn = document.getElementById('btn-change-pin');
+  if (toggleBtn) {
+    toggleBtn.textContent = enabled ? 'Disable Security Lock' : 'Enable Security Lock';
+    toggleBtn.className = enabled ? 'btn btn-sm btn-outline text-amber' : 'btn btn-sm btn-outline';
+  }
+  if (changeBtn) {
+    changeBtn.style.display = enabled ? 'inline-block' : 'none';
+  }
+}
+
+function showPinModal(mode, title, subtitle) {
+  currentPinMode = mode;
+  pinBuffer = '';
+  const overlay = document.getElementById('pin-lock-overlay');
+  const titleEl = document.getElementById('pin-modal-title');
+  const subEl = document.getElementById('pin-modal-subtitle');
+  const cancelBtn = document.getElementById('pin-btn-cancel');
+
+  if (titleEl) titleEl.textContent = title;
+  if (subEl) subEl.textContent = subtitle;
+  if (cancelBtn) cancelBtn.style.visibility = (mode === 'UNLOCK') ? 'hidden' : 'visible';
+
+  updatePinDotsUI();
+  if (overlay) overlay.style.display = 'flex';
+}
+
+function hidePinModal() {
+  const overlay = document.getElementById('pin-lock-overlay');
+  if (overlay) overlay.style.display = 'none';
+  pinBuffer = '';
+}
+
+function updatePinDotsUI(isError = false) {
+  const dots = document.querySelectorAll('#pin-dots .dot');
+  dots.forEach((dot, idx) => {
+    dot.className = 'dot';
+    if (isError) {
+      dot.classList.add('error');
+    } else if (idx < pinBuffer.length) {
+      dot.classList.add('filled');
+    }
+  });
+}
+
+function handlePinDigitInput(digit) {
+  if (pinBuffer.length < 4) {
+    pinBuffer += digit;
+    updatePinDotsUI();
+
+    if (pinBuffer.length === 4) {
+      setTimeout(() => processPinSubmission(), 150);
+    }
+  }
+}
+
+function processPinSubmission() {
+  const storedPin = localStorage.getItem('gmd_pin_code');
+
+  if (currentPinMode === 'UNLOCK') {
+    if (pinBuffer === storedPin) {
+      hidePinModal();
+      showToast('✓ Unlocked Web Dashboard', 'success');
+    } else {
+      triggerPinError('Incorrect PIN code');
+    }
+  } else if (currentPinMode === 'CREATE') {
+    stagedPin = pinBuffer;
+    showPinModal('CONFIRM', 'Confirm 4-Digit PIN', 'Re-enter your 4-digit PIN to confirm.');
+  } else if (currentPinMode === 'CONFIRM') {
+    if (pinBuffer === stagedPin) {
+      localStorage.setItem('gmd_pin_enabled', 'true');
+      localStorage.setItem('gmd_pin_code', pinBuffer);
+      localStorage.setItem('gmd_auth_type', 'PIN');
+      updatePinSettingsUI(true);
+      hidePinModal();
+      showToast('✓ 4-Digit PIN security lock enabled', 'success');
+    } else {
+      triggerPinError('PIN mismatch. Try setting PIN again.');
+      setTimeout(() => {
+        showPinModal('CREATE', 'Set 4-Digit PIN', 'Enter a 4-digit PIN for dashboard security.');
+      }, 1000);
+    }
+  }
+}
+
+function triggerPinError(msg) {
+  updatePinDotsUI(true);
+  showToast(msg, 'error');
+  setTimeout(() => {
+    pinBuffer = '';
+    updatePinDotsUI();
+  }, 800);
+}

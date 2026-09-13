@@ -348,6 +348,9 @@ function doPost(e) {
  * Validates and records a confirmed transaction into Google Sheets
  */
 function handleCreateTransaction(tx) {
+  if (tx && (tx.type === 'Balance' || tx.type === 'Transfer') && tx.destinationAccount) {
+    return handleCreateTransferPair(tx);
+  }
   const validation = validateTransactionPayload(tx);
   if (!validation.isValid) {
     return createJsonResponse({
@@ -472,6 +475,69 @@ function handleCreateTransaction(tx) {
       timestamp: new Date().toISOString()
     }
   }, 201);
+}
+
+/**
+ * Handles automatic creation of linked two-row Balance transfer transactions
+ */
+function handleCreateTransferPair(tx) {
+  const baseCode = (tx.transactionCode || ('TR' + Date.now().toString().slice(-8))).trim().toUpperCase();
+  const absAmount = Math.abs(Number(tx.amount));
+  if (isNaN(absAmount) || absAmount === 0) {
+    return createJsonResponse({
+      success: false,
+      status: 'VALIDATION_ERROR',
+      error: 'Transfer amount must be a non-zero number'
+    }, 400);
+  }
+
+  const srcAccount = (tx.account || '').trim();
+  const destAccount = (tx.destinationAccount || '').trim();
+  if (!srcAccount || !destAccount) {
+    return createJsonResponse({
+      success: false,
+      status: 'VALIDATION_ERROR',
+      error: 'Both source account and destination account are required for transfers'
+    }, 400);
+  }
+
+  if (srcAccount.toLowerCase() === destAccount.toLowerCase()) {
+    return createJsonResponse({
+      success: false,
+      status: 'VALIDATION_ERROR',
+      error: 'Source and destination accounts must be different'
+    }, 400);
+  }
+
+  const dateStr = tx.date || Utilities.formatDate(new Date(), 'Africa/Nairobi', 'yyyy-MM-dd');
+  const userNotes = (tx.notes || '').trim();
+
+  // Row 1: Negative amount from source account
+  const leg1 = {
+    transactionCode: baseCode + 'A',
+    date: dateStr,
+    type: 'Balance',
+    category: '',
+    description: tx.description || '',
+    amount: -absAmount,
+    account: srcAccount,
+    notes: userNotes ? (userNotes + ' | Transfer to ' + destAccount) : ('Transfer to ' + destAccount)
+  };
+
+  // Row 2: Positive amount to destination account
+  const leg2 = {
+    transactionCode: baseCode + 'B',
+    date: dateStr,
+    type: 'Balance',
+    category: '',
+    description: tx.description || '',
+    amount: absAmount,
+    account: destAccount,
+    notes: userNotes ? (userNotes + ' | Transfer from ' + srcAccount) : ('Transfer from ' + srcAccount)
+  };
+
+  const batchResult = handleBatchCreateTransactions([leg1, leg2]);
+  return batchResult;
 }
 
 /**
@@ -760,8 +826,8 @@ function validateTransactionPayload(tx) {
   const amount = Number(tx.amount);
   if (isNaN(amount) || amount === 0) {
     errors.push('Amount must be a non-zero number');
-  } else if (amount < 0 && tx.type !== 'Savings') {
-    errors.push('Negative amounts are only valid for Savings transactions (withdrawals)');
+  } else if (amount < 0 && tx.type !== 'Savings' && tx.type !== 'Balance') {
+    errors.push('Negative amounts are only valid for Savings and Balance transactions');
   }
 
   if (!tx.date || typeof tx.date !== 'string') {
