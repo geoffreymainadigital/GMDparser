@@ -687,6 +687,28 @@ fun BatchTransactionItemCard(
                         singleLine = true
                     )
 
+                    if (liveAccounts.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            liveAccounts.forEach { acc ->
+                                AssistChip(
+                                    onClick = { selectedAccount = acc },
+                                    label = { Text(acc, fontSize = 11.sp) },
+                                    colors = AssistChipDefaults.assistChipColors(
+                                        containerColor = if (selectedAccount == acc) MaterialTheme.colorScheme.primary.copy(alpha = 0.25f) else MaterialTheme.colorScheme.surfaceVariant,
+                                        labelColor = if (selectedAccount == acc) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    ),
+                                    border = null
+                                )
+                            }
+                        }
+                    }
+
                     if (selectedType == "Balance" || selectedType == "Transfer") {
                         Spacer(modifier = Modifier.height(10.dp))
                         OutlinedTextField(
@@ -702,6 +724,28 @@ fun BatchTransactionItemCard(
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true
                         )
+
+                        if (liveAccounts.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                liveAccounts.forEach { acc ->
+                                    AssistChip(
+                                        onClick = { destinationAccountText = acc },
+                                        label = { Text(acc, fontSize = 11.sp) },
+                                        colors = AssistChipDefaults.assistChipColors(
+                                            containerColor = if (destinationAccountText == acc) AccentCyan.copy(alpha = 0.25f) else MaterialTheme.colorScheme.surfaceVariant,
+                                            labelColor = if (destinationAccountText == acc) AccentCyan else MaterialTheme.colorScheme.onSurfaceVariant
+                                        ),
+                                        border = null
+                                    )
+                                }
+                            }
+                        }
                     }
 
                     // Fee Toggle in Expanded
