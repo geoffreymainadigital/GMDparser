@@ -24,9 +24,9 @@ object MpesaParser {
         RegexOption.IGNORE_CASE
     )
 
-    // 3. Received from
+    // 3. Received from (including C2B / Bank transfers)
     private val RECEIVED_REGEX = Regex(
-        "You have received\\s+(?:Ksh|KES)\\.?\\s*([\\d,]+\\.?\\d*)\\s+from\\s+(.+?)\\s+on\\s+(\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4})\\s+at\\s+(\\d{1,2}:\\d{2}\\s*(?:AM|PM)?)",
+        "(?:You have received|received)\\s+(?:Ksh|KES)\\.?\\s*([\\d,]+\\.?\\d*)\\s+from\\s+(.+?)\\s+on\\s+(\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4})\\s+at\\s+(\\d{1,2}:\\d{2}\\s*(?:AM|PM)?)",
         RegexOption.IGNORE_CASE
     )
 
@@ -146,21 +146,29 @@ object MpesaParser {
                 sLower.contains("aib") ||
                 sLower.contains("mmf")
 
-            val (finalType, finalCat, finalAmt, finalDesc) = if (isSavingsWithdrawal) {
-                val cat = when {
-                    sLower.contains("sanlam") -> "Sanlam MMF"
-                    sLower.contains("britam") -> "Britam EQ and MMF"
-                    sLower.contains("etica") -> "Etica MMF"
-                    sLower.contains("ziidi") -> "Ziidi MMF"
-                    sLower.contains("faida") -> "Faida Stocks"
-                    sLower.contains("aib") -> "AIB Stocks"
-                    sLower.contains("arvocap") -> "Arvocap"
-                    else -> "Sanlam MMF"
+            val isBankTransfer = sLower.contains("i&m") || sLower.contains("i and m") || sLower.contains("equity") || sLower.contains("im bank")
+            
+            val (finalType, finalCat, finalAmt, finalDesc, srcAccount, destAccount) = when {
+                isSavingsWithdrawal -> {
+                    val cat = when {
+                        sLower.contains("sanlam") -> "Sanlam MMF"
+                        sLower.contains("britam") -> "Britam EQ and MMF"
+                        sLower.contains("etica") -> "Etica MMF"
+                        sLower.contains("ziidi") -> "Ziidi MMF"
+                        sLower.contains("faida") -> "Faida Stocks"
+                        sLower.contains("aib") -> "AIB Stocks"
+                        sLower.contains("arvocap") -> "Arvocap"
+                        else -> "Sanlam MMF"
+                    }
+                    listOf("Savings", cat, -Math.abs(amount), "Withdrawal from $sender", "Mpesa", null)
                 }
-                // Savings withdrawal is recorded as a negative amount
-                listOf("Savings", cat, -Math.abs(amount), "Withdrawal from $sender")
-            } else {
-                listOf("Income", "Salary", amount, "Received from $sender")
+                isBankTransfer -> {
+                    val sourceBank = if (sLower.contains("equity")) "Equity Bank" else "I&M Bank"
+                    listOf("Balance", "", amount, "Transfer from $sender to Mpesa", sourceBank, "Mpesa")
+                }
+                else -> {
+                    listOf("Income", "Salary", amount, "Received from $sender", "Mpesa", null)
+                }
             }
 
             return Transaction(
@@ -169,10 +177,10 @@ object MpesaParser {
                 type = finalType as String,
                 category = finalCat as String,
                 description = finalDesc as String,
-                account = "Mpesa",
+                account = srcAccount as String,
                 date = formatIsoDate(dateStr),
                 time = timeStr,
-                destinationAccount = null,
+                destinationAccount = destAccount as? String,
                 balance = balance,
                 cost = 0.0,
                 senderOrRecipient = sender,
