@@ -230,7 +230,7 @@ fun ReviewConfirmScreen(
             ManualTransactionDialog(
                 onDismiss = { showManualTxDialog = false },
                 onStage = { stagedTx ->
-                    TransactionRepository.stageTransaction(stagedTx)
+                    TransactionRepository.addPendingTransaction(stagedTx)
                     showManualTxDialog = false
                     feedbackStyle = FeedbackStyle.SUCCESS
                     feedbackMessage = "✓ Staged ${stagedTx.transactionCode} (${stagedTx.type} - Ksh ${stagedTx.amount}) to Review Queue"
@@ -1017,7 +1017,7 @@ fun ManualTransactionDialog(
                         amount = amt,
                         account = selectedAccount,
                         destinationAccount = if (selectedType == "Balance" || selectedType == "Transfer") destinationAccountText else null,
-                        status = TransactionStatus.UNREVIEWED,
+                        status = TransactionStatus.PENDING_REVIEW,
                         rawText = "Manual transaction entry: Ksh $amt ($selectedType)"
                     )
                     onStage(tx)
