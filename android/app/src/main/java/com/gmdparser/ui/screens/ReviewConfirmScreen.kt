@@ -187,27 +187,55 @@ fun ReviewConfirmScreen(
             .verticalScroll(rememberScrollState())
     ) {
         // Top Action & Status Bar
+        var showManualTxDialog by remember { mutableStateOf(false) }
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text("Review Queue", color = MaterialTheme.colorScheme.onSurface, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 Text("Verify and confirm before writing to spreadsheet", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
             }
 
-            OutlinedButton(
-                onClick = { showScanDialog = true },
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
-                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)),
-                shape = RoundedCornerShape(10.dp),
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
-            ) {
-                Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Scan Inbox", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                OutlinedButton(
+                    onClick = { showManualTxDialog = true },
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("+ Manual Tx", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                }
+
+                OutlinedButton(
+                    onClick = { showScanDialog = true },
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                ) {
+                    Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Scan Inbox", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                }
             }
+        }
+
+        if (showManualTxDialog) {
+            ManualTransactionDialog(
+                onDismiss = { showManualTxDialog = false },
+                onStage = { stagedTx ->
+                    TransactionRepository.stageTransaction(stagedTx)
+                    showManualTxDialog = false
+                    feedbackStyle = FeedbackStyle.SUCCESS
+                    feedbackMessage = "✓ Staged ${stagedTx.transactionCode} (${stagedTx.type} - Ksh ${stagedTx.amount}) to Review Queue"
+                }
+            )
         }
 
         Spacer(modifier = Modifier.height(14.dp))
@@ -950,4 +978,221 @@ fun SmsManualSimulatorCard(
             }
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ManualTransactionDialog(
+    onDismiss: () -> Unit,
+    onStage: (Transaction) -> Unit
+) {
+    val liveTypes by TaxonomyRepository.types.collectAsState()
+    val liveCategoriesByType by TaxonomyRepository.categoriesByType.collectAsState()
+    val liveAccounts by TaxonomyRepository.accounts.collectAsState()
+
+    var amountText by remember { mutableStateOf("") }
+    var selectedType by remember { mutableStateOf("Income") }
+    var selectedCategory by remember { mutableStateOf("Salary") }
+    var descriptionText by remember { mutableStateOf("") }
+    var selectedAccount by remember { mutableStateOf(liveAccounts.firstOrNull { it.contains("Equity", true) } ?: liveAccounts.firstOrNull() ?: "Equity Bank") }
+    var destinationAccountText by remember { mutableStateOf(liveAccounts.firstOrNull { it.contains("I&M", true) } ?: "I&M Bank") }
+    var dateText by remember { mutableStateOf(java.time.LocalDate.now().toString()) }
+
+    val availableCategories = liveCategoriesByType[selectedType] ?: emptyList()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            Button(
+                onClick = {
+                    val amt = amountText.toDoubleOrNull() ?: 0.0
+                    val code = "MN" + System.currentTimeMillis().toString().takeLast(8)
+                    val tx = Transaction(
+                        transactionCode = code,
+                        date = dateText.ifBlank { java.time.LocalDate.now().toString() },
+                        time = java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("hh:mm a")),
+                        type = selectedType,
+                        category = if (selectedType == "Balance" || selectedType == "Transfer") "" else selectedCategory,
+                        description = descriptionText.ifBlank { if (selectedType == "Income") "Direct deposit to $selectedAccount" else "Manual transaction" },
+                        amount = amt,
+                        account = selectedAccount,
+                        destinationAccount = if (selectedType == "Balance" || selectedType == "Transfer") destinationAccountText else null,
+                        status = TransactionStatus.UNREVIEWED,
+                        rawText = "Manual transaction entry: Ksh $amt ($selectedType)"
+                    )
+                    onStage(tx)
+                },
+                enabled = amountText.toDoubleOrNull() != null && (amountText.toDoubleOrNull() ?: 0.0) > 0.0,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+            ) {
+                Text("Stage Transaction")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+        title = {
+            Text("Add Manual / Bank Transaction", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text("Record non-SMS salary, side-hustle inflows, or balance transfers.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+                // Type selector chips
+                Text("Transaction Type", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    liveTypes.forEach { t ->
+                        FilterChip(
+                            selected = selectedType == t,
+                            onClick = {
+                                selectedType = t
+                                if (t == "Balance") selectedCategory = ""
+                                else if (selectedCategory.isBlank()) selectedCategory = availableCategories.firstOrNull() ?: "General"
+                            },
+                            label = { Text(t, fontSize = 11.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                            )
+                        )
+                    }
+                }
+
+                // Amount Input
+                OutlinedTextField(
+                    value = amountText,
+                    onValueChange = { amountText = it },
+                    label = { Text("Amount (Ksh)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                // Category selector dropdown / input (if not Balance)
+                if (selectedType != "Balance" && selectedType != "Transfer") {
+                    var catExpanded by remember { mutableStateOf(false) }
+                    ExposedDropdownMenuBox(
+                        expanded = catExpanded,
+                        onExpandedChange = { catExpanded = !catExpanded }
+                    ) {
+                        OutlinedTextField(
+                            value = selectedCategory,
+                            onValueChange = { selectedCategory = it },
+                            label = { Text("Category") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = catExpanded) },
+                            modifier = Modifier.fillMaxWidth().menuAnchor(),
+                            singleLine = true
+                        )
+                        ExposedDropdownMenu(
+                            expanded = catExpanded,
+                            onDismissRequest = { catExpanded = false }
+                        ) {
+                            availableCategories.forEach { cat ->
+                                DropdownMenuItem(
+                                    text = { Text(cat) },
+                                    onClick = {
+                                        selectedCategory = cat
+                                        catExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Source Account Dropdown
+                var accExpanded by remember { mutableStateOf(false) }
+                ExposedDropdownMenuBox(
+                    expanded = accExpanded,
+                    onExpandedChange = { accExpanded = !accExpanded }
+                ) {
+                    OutlinedTextField(
+                        value = selectedAccount,
+                        onValueChange = { selectedAccount = it },
+                        readOnly = true,
+                        label = { Text("Account") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = accExpanded) },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                        singleLine = true
+                    )
+                    ExposedDropdownMenu(
+                        expanded = accExpanded,
+                        onDismissRequest = { accExpanded = false }
+                    ) {
+                        liveAccounts.forEach { acc ->
+                            DropdownMenuItem(
+                                text = { Text(acc) },
+                                onClick = {
+                                    selectedAccount = acc
+                                    accExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                // Destination Account Dropdown (if Balance/Transfer)
+                if (selectedType == "Balance" || selectedType == "Transfer") {
+                    var destExpanded by remember { mutableStateOf(false) }
+                    ExposedDropdownMenuBox(
+                        expanded = destExpanded,
+                        onExpandedChange = { destExpanded = !destExpanded }
+                    ) {
+                        OutlinedTextField(
+                            value = destinationAccountText,
+                            onValueChange = { destinationAccountText = it },
+                            readOnly = true,
+                            label = { Text("Destination Account") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = destExpanded) },
+                            modifier = Modifier.fillMaxWidth().menuAnchor(),
+                            singleLine = true
+                        )
+                        ExposedDropdownMenu(
+                            expanded = destExpanded,
+                            onDismissRequest = { destExpanded = false }
+                        ) {
+                            liveAccounts.forEach { acc ->
+                                DropdownMenuItem(
+                                    text = { Text(acc) },
+                                    onClick = {
+                                        destinationAccountText = acc
+                                        destExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Description
+                OutlinedTextField(
+                    value = descriptionText,
+                    onValueChange = { descriptionText = it },
+                    label = { Text("Description / Payee") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                // Date
+                OutlinedTextField(
+                    value = dateText,
+                    onValueChange = { dateText = it },
+                    label = { Text("Date (yyyy-MM-dd)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    )
 }
