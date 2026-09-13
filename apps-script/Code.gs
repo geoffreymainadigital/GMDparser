@@ -254,46 +254,33 @@ function doGet(e) {
         return createJsonResponse({ success: false, error: 'Transactions sheet not found' }, 500);
       }
 
-      // Exact rows requested by user: 1638, 1637, 1636, 1631, 1629, 1628, 1627, 1625, 1624
-      // Deleting in descending order prevents row shift distortion during execution
-      const rowsToDelete = [1638, 1637, 1636, 1631, 1629, 1628, 1627, 1625, 1624];
-      const deletedInfo = [];
-
-      for (let i = 0; i < rowsToDelete.length; i++) {
-        const rowNum = rowsToDelete[i];
-        const rowValues = sheet.getRange(rowNum, 1, 1, 15).getValues()[0];
-        const dateVal = rowValues[COL_DATE - 1];
-        const typeVal = rowValues[COL_TYPE - 1];
-        const catVal = rowValues[COL_CATEGORY - 1];
-        const descVal = rowValues[COL_DESCRIPTION - 1];
-        const amtVal = rowValues[COL_AMOUNT - 1];
-        const accVal = rowValues[COL_ACCOUNT - 1];
-        const notesVal = rowValues[COL_NOTES - 1];
-
-        deletedInfo.push({
-          row: rowNum,
-          verifiedContent: {
-            date: dateVal,
-            type: typeVal,
-            category: catVal,
-            description: descVal,
-            amount: amtVal,
-            account: accVal,
-            notes: notesVal
-          }
-        });
-
-        // Delete the exact row from sheet
-        sheet.deleteRow(rowNum);
+      const dupCheck = checkDuplicateTransactionCode(sheet, 'MN27297877');
+      if (!dupCheck.isDuplicate || !dupCheck.row) {
+        return createJsonResponse({ success: false, error: 'Row with code MN27297877 not found' }, 444);
       }
 
+      const rowNum = dupCheck.row;
+      const rowValues = sheet.getRange(rowNum, 1, 1, 15).getValues()[0];
+      const deletedInfo = {
+        row: rowNum,
+        verifiedContent: {
+          date: rowValues[COL_DATE - 1],
+          type: rowValues[COL_TYPE - 1],
+          category: rowValues[COL_CATEGORY - 1],
+          description: rowValues[COL_DESCRIPTION - 1],
+          amount: rowValues[COL_AMOUNT - 1],
+          account: rowValues[COL_ACCOUNT - 1],
+          notes: rowValues[COL_NOTES - 1]
+        }
+      };
+
+      sheet.deleteRow(rowNum);
       const nextScanRow = findNextTransactionRow(sheet);
 
       return createJsonResponse({
         success: true,
         status: 'CLEANUP_COMPLETE',
-        deletedCount: deletedInfo.length,
-        deletedRows: deletedInfo,
+        deletedRows: [deletedInfo],
         nextTransactionRowAllocation: nextScanRow,
         timestamp: new Date().toISOString()
       }, 200);
@@ -367,6 +354,43 @@ function doPost(e) {
       return handleBatchCreateTransactions(payload.transactions);
     } else if (action === 'validateTransaction') {
       return handleValidateOnly(payload.transaction);
+    } else if (action === 'deleteSingleRowByCode') {
+      const codeToDelete = (payload.code || (payload.transaction && payload.transaction.transactionCode) || '').trim().toUpperCase();
+      if (!codeToDelete) {
+        return createJsonResponse({ success: false, error: 'code parameter is required' }, 400);
+      }
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      const sheet = ss.getSheetByName(SHEET_NAME_TRANSACTIONS);
+      if (!sheet) {
+        return createJsonResponse({ success: false, error: 'Transactions sheet not found' }, 500);
+      }
+      const dupCheck = checkDuplicateTransactionCode(sheet, codeToDelete);
+      if (!dupCheck.isDuplicate || !dupCheck.row) {
+        return createJsonResponse({ success: false, error: 'Row with code ' + codeToDelete + ' not found' }, 444);
+      }
+      const rowNum = dupCheck.row;
+      const rowValues = sheet.getRange(rowNum, 1, 1, 15).getValues()[0];
+      const deletedInfo = {
+        row: rowNum,
+        verifiedContent: {
+          date: rowValues[COL_DATE - 1],
+          type: rowValues[COL_TYPE - 1],
+          category: rowValues[COL_CATEGORY - 1],
+          description: rowValues[COL_DESCRIPTION - 1],
+          amount: rowValues[COL_AMOUNT - 1],
+          account: rowValues[COL_ACCOUNT - 1],
+          notes: rowValues[COL_NOTES - 1]
+        }
+      };
+      sheet.deleteRow(rowNum);
+      return createJsonResponse({
+        success: true,
+        status: 'DELETED',
+        code: codeToDelete,
+        deletedRow: deletedInfo,
+        nextTransactionRowAllocation: findNextTransactionRow(sheet),
+        timestamp: new Date().toISOString()
+      }, 200);
     } else {
       return createJsonResponse({
         success: false,

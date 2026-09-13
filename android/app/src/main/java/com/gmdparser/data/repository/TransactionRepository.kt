@@ -207,12 +207,16 @@ object TransactionRepository {
             // Transfer payload with destination account is valid
         }
 
+        val isTransferAction = (tx.type == "Transfer" || tx.type == "Balance") && !tx.destinationAccount.isNullOrBlank()
         val payload = TransactionPayload(
             date = tx.date, type = tx.type, category = tx.category,
             description = tx.description, amount = tx.amount, account = tx.account,
             transactionCode = tx.transactionCode, destinationAccount = tx.destinationAccount
         )
-        val request = CreateTransactionRequest(action = "createTransaction", transaction = payload)
+        val request = CreateTransactionRequest(
+            action = if (isTransferAction) "createTransferPair" else "createTransaction", 
+            transaction = payload
+        )
 
         return try {
             val response = try {

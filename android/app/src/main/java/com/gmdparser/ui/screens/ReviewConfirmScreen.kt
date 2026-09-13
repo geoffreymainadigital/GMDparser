@@ -68,64 +68,92 @@ fun ReviewConfirmScreen(
     }
 
     fun submitTransaction(tx: Transaction, shouldRecordFee: Boolean) {
+        if ((tx.type == "Balance" || tx.type == "Transfer") && tx.destinationAccount.isNullOrBlank()) {
+            feedbackStyle = FeedbackStyle.ERROR
+            feedbackMessage = "✗ Destination Account is required for Balance transfers."
+            return
+        }
         scope.launch {
             submittingTxCode = tx.transactionCode
             feedbackMessage = null
             feedbackStyle = FeedbackStyle.NONE
 
-            val result = TransactionRepository.confirmAndSubmitTransaction(tx)
-            result.fold(
-                onSuccess = { res ->
-                    val mainRow = res.data?.row
-                    val isDupOk = res.status == "DUPLICATE_OK"
-                    val mainLabel = if (isDupOk) {
-                        "✓ ${tx.transactionCode} already in sheet (row ${mainRow ?: "?"})"
-                    } else {
-                        "✓ ${tx.transactionCode} recorded (row ${mainRow ?: "sheet"})"
-                    }
-                    if (shouldRecordFee && tx.cost != null && tx.cost > 0.0) {
-                        kotlinx.coroutines.delay(1000)
-                        val feeTx = Transaction(
-                            transactionCode = "${tx.transactionCode}-FEE",
-                            amount = tx.cost,
-                            type = "Expenses",
-                            category = "Transaction Cost",
-                            description = "Transaction Cost: ${tx.description}",
-                            account = "Mpesa",
-                            date = tx.date,
-                            time = tx.time,
-                            status = TransactionStatus.CONFIRMED
-                        )
-                        val feeResult = TransactionRepository.confirmAndSubmitTransaction(feeTx)
+            val isTransfer = (tx.type == "Balance" || tx.type == "Transfer") && !tx.destinationAccount.isNullOrBlank()
+            if (isTransfer) {
+                // Submit main transaction (which triggers handleCreateTransferPair in Apps Script to write both legs)
+                val result = TransactionRepository.confirmAndSubmitTransaction(tx)
+                result.fold(
+                    onSuccess = { res ->
                         submittingTxCode = null
-                        feeResult.fold(
-                            onSuccess = { feeRes ->
-                                val feeRow = feeRes.data?.row
-                                val feeDupOk = feeRes.status == "DUPLICATE_OK"
-                                feedbackStyle = FeedbackStyle.SUCCESS
-                                feedbackMessage = if (feeDupOk) {
-                                    "$mainLabel + Fee already in sheet (row ${feeRow ?: "?"})"
-                                } else {
-                                    "$mainLabel + Fee recorded (row ${feeRow ?: "sheet"})"
-                                }
-                            },
-                            onFailure = { feeErr ->
-                                feedbackStyle = FeedbackStyle.ERROR
-                                feedbackMessage = "$mainLabel, but Fee failed: ${feeErr.message ?: "Unknown error"}"
-                            }
-                        )
-                    } else {
-                        submittingTxCode = null
+                        val isDupOk = res.status == "DUPLICATE_OK"
                         feedbackStyle = FeedbackStyle.SUCCESS
-                        feedbackMessage = mainLabel
+                        feedbackMessage = if (isDupOk) {
+                            "✓ Transfer ${tx.transactionCode} (-OUT & -IN) already in sheet."
+                        } else {
+                            "✓ Transfer recorded: -Ksh ${tx.amount} (${tx.account}) and +Ksh ${tx.amount} (${tx.destinationAccount})."
+                        }
+                    },
+                    onFailure = { err ->
+                        submittingTxCode = null
+                        feedbackStyle = FeedbackStyle.ERROR
+                        feedbackMessage = "✗ Transfer failed: ${err.message ?: "Unknown error"}"
                     }
-                },
-                onFailure = { err ->
-                    submittingTxCode = null
-                    feedbackStyle = FeedbackStyle.ERROR
-                    feedbackMessage = "✗ Failed to record transaction: ${err.message ?: "Unknown error"}"
-                }
-            )
+                )
+            } else {
+                val result = TransactionRepository.confirmAndSubmitTransaction(tx)
+                result.fold(
+                    onSuccess = { res ->
+                        val mainRow = res.data?.row
+                        val isDupOk = res.status == "DUPLICATE_OK"
+                        val mainLabel = if (isDupOk) {
+                            "✓ ${tx.transactionCode} already in sheet (row ${mainRow ?: "?"})"
+                        } else {
+                            "✓ ${tx.transactionCode} recorded (row ${mainRow ?: "sheet"})"
+                        }
+                        if (shouldRecordFee && tx.cost != null && tx.cost > 0.0) {
+                            kotlinx.coroutines.delay(1000)
+                            val feeTx = Transaction(
+                                transactionCode = "${tx.transactionCode}-FEE",
+                                amount = tx.cost,
+                                type = "Expenses",
+                                category = "Transaction Cost",
+                                description = "Transaction Cost: ${tx.description}",
+                                account = "Mpesa",
+                                date = tx.date,
+                                time = tx.time,
+                                status = TransactionStatus.CONFIRMED
+                            )
+                            val feeResult = TransactionRepository.confirmAndSubmitTransaction(feeTx)
+                            submittingTxCode = null
+                            feeResult.fold(
+                                onSuccess = { feeRes ->
+                                    val feeRow = feeRes.data?.row
+                                    val feeDupOk = feeRes.status == "DUPLICATE_OK"
+                                    feedbackStyle = FeedbackStyle.SUCCESS
+                                    feedbackMessage = if (feeDupOk) {
+                                        "$mainLabel + Fee already in sheet (row ${feeRow ?: "?"})"
+                                    } else {
+                                        "$mainLabel + Fee recorded (row ${feeRow ?: "sheet"})"
+                                    }
+                                },
+                                onFailure = { feeErr ->
+                                    feedbackStyle = FeedbackStyle.ERROR
+                                    feedbackMessage = "$mainLabel, but Fee failed: ${feeErr.message ?: "Unknown error"}"
+                                }
+                            )
+                        } else {
+                            submittingTxCode = null
+                            feedbackStyle = FeedbackStyle.SUCCESS
+                            feedbackMessage = mainLabel
+                        }
+                    },
+                    onFailure = { err ->
+                        submittingTxCode = null
+                        feedbackStyle = FeedbackStyle.ERROR
+                        feedbackMessage = "✗ Failed to record transaction: ${err.message ?: "Unknown error"}"
+                    }
+                )
+            }
         }
     }
 
@@ -606,8 +634,12 @@ fun BatchTransactionItemCard(
                                 selected = selectedType == t,
                                 onClick = {
                                     selectedType = t
-                                    if (t == "Balance" && destinationAccountText.isBlank()) destinationAccountText = "Mpesa"
-                                    if (t == "Balance") selectedCategory = ""
+                                    if (t == "Balance" || t == "Transfer") {
+                                        selectedCategory = ""
+                                        if (destinationAccountText.isBlank()) destinationAccountText = "Mpesa"
+                                    } else if (selectedCategory.isBlank()) {
+                                        selectedCategory = availableCategories.firstOrNull() ?: "General"
+                                    }
                                 },
                                 label = { Text(t, fontSize = 11.sp) },
                                 colors = FilterChipDefaults.filterChipColors(
@@ -629,8 +661,12 @@ fun BatchTransactionItemCard(
                                     selected = selectedType == t,
                                     onClick = {
                                         selectedType = t
-                                        if (t == "Balance" && destinationAccountText.isBlank()) destinationAccountText = "Mpesa"
-                                        if (t == "Balance") selectedCategory = ""
+                                        if (t == "Balance" || t == "Transfer") {
+                                            selectedCategory = ""
+                                            if (destinationAccountText.isBlank()) destinationAccountText = "Mpesa"
+                                        } else if (selectedCategory.isBlank()) {
+                                            selectedCategory = availableCategories.firstOrNull() ?: "General"
+                                        }
                                     },
                                     label = { Text(t, fontSize = 11.sp) },
                                     colors = FilterChipDefaults.filterChipColors(
@@ -644,39 +680,41 @@ fun BatchTransactionItemCard(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    if (selectedType != "Balance" && selectedType != "Transfer") {
+                        Spacer(modifier = Modifier.height(10.dp))
 
-                    // Category Input & Suggestions
-                    OutlinedTextField(
-                        value = selectedCategory,
-                        onValueChange = { selectedCategory = it },
-                        label = { Text("Category") },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-                        ),
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
+                        // Category Input & Suggestions
+                        OutlinedTextField(
+                            value = selectedCategory,
+                            onValueChange = { selectedCategory = it },
+                            label = { Text("Category") },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                            ),
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
 
-                    if (availableCategories.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            availableCategories.forEach { cat ->
-                                AssistChip(
-                                    onClick = { selectedCategory = cat },
-                                    label = { Text(cat, fontSize = 10.sp) },
-                                    colors = AssistChipDefaults.assistChipColors(
-                                        containerColor = if (selectedCategory == cat) MaterialTheme.colorScheme.primary.copy(alpha = 0.3f) else MaterialTheme.colorScheme.surfaceVariant
+                        if (availableCategories.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                availableCategories.forEach { cat ->
+                                    AssistChip(
+                                        onClick = { selectedCategory = cat },
+                                        label = { Text(cat, fontSize = 10.sp) },
+                                        colors = AssistChipDefaults.assistChipColors(
+                                            containerColor = if (selectedCategory == cat) MaterialTheme.colorScheme.primary.copy(alpha = 0.3f) else MaterialTheme.colorScheme.surfaceVariant
+                                        )
                                     )
-                                )
+                                }
                             }
                         }
                     }
@@ -817,8 +855,9 @@ fun BatchTransactionItemCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-                // Part C restriction logic: warning displayed cleanly above the action buttons
-                val isUncategorized = (if (isExpanded) selectedCategory else transaction.category).isBlank()
+                // Part C restriction logic: Balance and Transfer types intentionally have empty category
+                val currentType = if (isExpanded) selectedType else transaction.type
+                val isUncategorized = currentType != "Balance" && currentType != "Transfer" && (if (isExpanded) selectedCategory else transaction.category).isBlank()
 
                 if (isUncategorized && !isExpanded) {
                     Text(
@@ -1022,10 +1061,12 @@ fun ManualTransactionDialog(
                     )
                     onStage(tx)
                 },
-                enabled = amountText.toDoubleOrNull() != null && (amountText.toDoubleOrNull() ?: 0.0) > 0.0,
+                enabled = amountText.toDoubleOrNull() != null && (amountText.toDoubleOrNull() ?: 0.0) > 0.0 &&
+                        (selectedType != "Balance" && selectedType != "Transfer" || 
+                         (selectedAccount.isNotBlank() && destinationAccountText.isNotBlank() && !selectedAccount.equals(destinationAccountText, ignoreCase = true))),
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
-                Text("Stage Transaction")
+                Text(if (selectedType == "Balance" || selectedType == "Transfer") "Stage Transfer (2 Rows)" else "Stage Transaction")
             }
         },
         dismissButton = {
@@ -1058,8 +1099,11 @@ fun ManualTransactionDialog(
                             selected = selectedType == t,
                             onClick = {
                                 selectedType = t
-                                if (t == "Balance") selectedCategory = ""
-                                else if (selectedCategory.isBlank()) selectedCategory = availableCategories.firstOrNull() ?: "General"
+                                if (t == "Balance" || t == "Transfer") {
+                                    selectedCategory = ""
+                                } else if (selectedCategory.isBlank()) {
+                                    selectedCategory = availableCategories.firstOrNull() ?: "General"
+                                }
                             },
                             label = { Text(t, fontSize = 11.sp) },
                             colors = FilterChipDefaults.filterChipColors(
@@ -1121,7 +1165,7 @@ fun ManualTransactionDialog(
                         value = selectedAccount,
                         onValueChange = { selectedAccount = it },
                         readOnly = true,
-                        label = { Text("Account") },
+                        label = { Text(if (selectedType == "Balance" || selectedType == "Transfer") "Source Account" else "Account") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = accExpanded) },
                         modifier = Modifier.fillMaxWidth().menuAnchor(),
                         singleLine = true
