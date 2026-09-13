@@ -672,38 +672,38 @@ fun BatchTransactionItemCard(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // Account Override
-                    OutlinedTextField(
-                        value = selectedAccount,
-                        onValueChange = { selectedAccount = it },
-                        label = { Text("Account") },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-                        ),
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-
-                    if (liveAccounts.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    // Account Override Dropdown
+                    var accountExpanded by remember { mutableStateOf(false) }
+                    ExposedDropdownMenuBox(
+                        expanded = accountExpanded,
+                        onExpandedChange = { accountExpanded = !accountExpanded }
+                    ) {
+                        OutlinedTextField(
+                            value = selectedAccount,
+                            onValueChange = { selectedAccount = it },
+                            readOnly = true,
+                            label = { Text("Account") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = accountExpanded) },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                            ),
+                            modifier = Modifier.fillMaxWidth().menuAnchor(),
+                            singleLine = true
+                        )
+                        ExposedDropdownMenu(
+                            expanded = accountExpanded,
+                            onDismissRequest = { accountExpanded = false }
                         ) {
                             liveAccounts.forEach { acc ->
-                                AssistChip(
-                                    onClick = { selectedAccount = acc },
-                                    label = { Text(acc, fontSize = 11.sp) },
-                                    colors = AssistChipDefaults.assistChipColors(
-                                        containerColor = if (selectedAccount == acc) MaterialTheme.colorScheme.primary.copy(alpha = 0.25f) else MaterialTheme.colorScheme.surfaceVariant,
-                                        labelColor = if (selectedAccount == acc) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                                    ),
-                                    border = null
+                                DropdownMenuItem(
+                                    text = { Text(acc) },
+                                    onClick = {
+                                        selectedAccount = acc
+                                        accountExpanded = false
+                                    }
                                 )
                             }
                         }
@@ -711,37 +711,37 @@ fun BatchTransactionItemCard(
 
                     if (selectedType == "Balance" || selectedType == "Transfer") {
                         Spacer(modifier = Modifier.height(10.dp))
-                        OutlinedTextField(
-                            value = destinationAccountText,
-                            onValueChange = { destinationAccountText = it },
-                            label = { Text("Destination Account") },
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = AccentCyan,
-                                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-                            ),
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true
-                        )
-
-                        if (liveAccounts.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        var destAccountExpanded by remember { mutableStateOf(false) }
+                        ExposedDropdownMenuBox(
+                            expanded = destAccountExpanded,
+                            onExpandedChange = { destAccountExpanded = !destAccountExpanded }
+                        ) {
+                            OutlinedTextField(
+                                value = destinationAccountText,
+                                onValueChange = { destinationAccountText = it },
+                                readOnly = true,
+                                label = { Text("Destination Account") },
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = destAccountExpanded) },
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = AccentCyan,
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                                ),
+                                modifier = Modifier.fillMaxWidth().menuAnchor(),
+                                singleLine = true
+                            )
+                            ExposedDropdownMenu(
+                                expanded = destAccountExpanded,
+                                onDismissRequest = { destAccountExpanded = false }
                             ) {
                                 liveAccounts.forEach { acc ->
-                                    AssistChip(
-                                        onClick = { destinationAccountText = acc },
-                                        label = { Text(acc, fontSize = 11.sp) },
-                                        colors = AssistChipDefaults.assistChipColors(
-                                            containerColor = if (destinationAccountText == acc) AccentCyan.copy(alpha = 0.25f) else MaterialTheme.colorScheme.surfaceVariant,
-                                            labelColor = if (destinationAccountText == acc) AccentCyan else MaterialTheme.colorScheme.onSurfaceVariant
-                                        ),
-                                        border = null
+                                    DropdownMenuItem(
+                                        text = { Text(acc) },
+                                        onClick = {
+                                            destinationAccountText = acc
+                                            destAccountExpanded = false
+                                        }
                                     )
                                 }
                             }
