@@ -199,12 +199,13 @@ object TransactionRepository {
     ): Result<ApiResponse> {
         if (tx.amount == 0.0)
             return Result.failure(IllegalArgumentException("Amount must be a non-zero number."))
-        if (tx.amount < 0.0 && tx.type != "Savings")
-            return Result.failure(IllegalArgumentException("Negative amounts are only valid for Savings transactions (withdrawals)."))
+        if (tx.amount < 0.0 && tx.type != "Savings" && tx.type != "Balance")
+            return Result.failure(IllegalArgumentException("Negative amounts are only valid for Savings and Balance transactions."))
         if (tx.transactionCode.isBlank())
             return Result.failure(IllegalArgumentException("Transaction code cannot be blank."))
-        if (tx.type == "Transfer" && tx.destinationAccount.isNullOrBlank())
-            return Result.failure(IllegalArgumentException("Transfers require a destination account."))
+        if ((tx.type == "Transfer" || tx.type == "Balance") && !tx.destinationAccount.isNullOrBlank()) {
+            // Transfer payload with destination account is valid
+        }
 
         val payload = TransactionPayload(
             date = tx.date, type = tx.type, category = tx.category,
