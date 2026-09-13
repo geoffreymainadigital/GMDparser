@@ -148,7 +148,16 @@ object MpesaParser {
 
             val isBankTransfer = sLower.contains("i&m") || sLower.contains("i and m") || sLower.contains("equity") || sLower.contains("im bank")
             
-            val (finalType, finalCat, finalAmt, finalDesc, srcAccount, destAccount) = when {
+            data class ParsedReceived(
+                val type: String,
+                val cat: String,
+                val amt: Double,
+                val desc: String,
+                val srcAcc: String,
+                val destAcc: String?
+            )
+
+            val parsed = when {
                 isSavingsWithdrawal -> {
                     val cat = when {
                         sLower.contains("sanlam") -> "Sanlam MMF"
@@ -160,27 +169,27 @@ object MpesaParser {
                         sLower.contains("arvocap") -> "Arvocap"
                         else -> "Sanlam MMF"
                     }
-                    listOf("Savings", cat, -Math.abs(amount), "Withdrawal from $sender", "Mpesa", null)
+                    ParsedReceived("Savings", cat, -Math.abs(amount), "Withdrawal from $sender", "Mpesa", null)
                 }
                 isBankTransfer -> {
                     val sourceBank = if (sLower.contains("equity")) "Equity Bank" else "I&M Bank"
-                    listOf("Balance", "", amount, "Transfer from $sender to Mpesa", sourceBank, "Mpesa")
+                    ParsedReceived("Balance", "", amount, "Transfer from $sender to Mpesa", sourceBank, "Mpesa")
                 }
                 else -> {
-                    listOf("Income", "Salary", amount, "Received from $sender", "Mpesa", null)
+                    ParsedReceived("Income", "Salary", amount, "Received from $sender", "Mpesa", null)
                 }
             }
 
             return Transaction(
                 transactionCode = txCode,
-                amount = finalAmt as Double,
-                type = finalType as String,
-                category = finalCat as String,
-                description = finalDesc as String,
-                account = srcAccount as String,
+                amount = parsed.amt,
+                type = parsed.type,
+                category = parsed.cat,
+                description = parsed.desc,
+                account = parsed.srcAcc,
                 date = formatIsoDate(dateStr),
                 time = timeStr,
-                destinationAccount = destAccount as? String,
+                destinationAccount = parsed.destAcc,
                 balance = balance,
                 cost = 0.0,
                 senderOrRecipient = sender,
