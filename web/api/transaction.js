@@ -50,6 +50,8 @@ export default async function handler(req, res) {
     const backendPayload = {
       action: payload.action || 'createTransaction',
       authKey: authSecret,
+      code: payload.code,
+      rows: payload.rows,
       transaction: transaction
     };
 
