@@ -27,8 +27,11 @@ import com.gmdparser.ui.theme.ThemeManager
 import com.gmdparser.util.AppPreferences
 import kotlinx.coroutines.launch
 
+import androidx.fragment.app.FragmentActivity
+
 enum class Screen(val title: String, val icon: ImageVector) {
     DASHBOARD("Dashboard", Icons.Default.Dashboard),
+    SAVINGS_CATEGORIES("Savings by Category", Icons.Default.AccountBalance),
     REVIEW("Review", Icons.Default.FactCheck),
     HISTORY("History", Icons.Default.ReceiptLong),
     ACCOUNTS("Accounts", Icons.Default.AccountBalance),
@@ -38,13 +41,7 @@ enum class Screen(val title: String, val icon: ImageVector) {
     SETTINGS("Settings", Icons.Default.Settings)
 }
 
-class MainActivity : ComponentActivity() {
-
-    private val requestPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { _ ->
-        // Permissions handled
-    }
+class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -83,7 +80,7 @@ class MainActivity : ComponentActivity() {
         }
 
         if (missing.isNotEmpty()) {
-            requestPermissionLauncher.launch(missing.toTypedArray())
+            androidx.core.app.ActivityCompat.requestPermissions(this, missing.toTypedArray(), 101)
         }
     }
 }
@@ -186,7 +183,11 @@ fun MainAppHost(initialScreen: Screen = Screen.DASHBOARD) {
                 Screen.DASHBOARD -> DashboardScreen(
                     onNavigateToReview = { currentScreen = Screen.REVIEW },
                     onNavigateToHistory = { currentScreen = Screen.HISTORY },
-                    onNavigateToAccounts = { currentScreen = Screen.ACCOUNTS }
+                    onNavigateToAccounts = { currentScreen = Screen.ACCOUNTS },
+                    onNavigateToSavingsCategories = { currentScreen = Screen.SAVINGS_CATEGORIES }
+                )
+                Screen.SAVINGS_CATEGORIES -> SavingsCategoriesScreen(
+                    onNavigateBack = { currentScreen = Screen.DASHBOARD }
                 )
                 Screen.REVIEW    -> ReviewConfirmScreen()
                 Screen.HISTORY   -> HistoryScreen()

@@ -95,7 +95,8 @@ fun SettingsScreen() {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // ── PIN Lock ────────────────────────────────────────────────────
+        // ── PIN & Biometric Lock ──────────────────────────────────────────
+        var biometricEnabled by remember { mutableStateOf(AppPreferences.isBiometricEnabled) }
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             shape = RoundedCornerShape(14.dp),
@@ -105,11 +106,11 @@ fun SettingsScreen() {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Lock, contentDescription = null, tint = AccentPurple, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("PIN Lock", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text("Security Lock & Biometrics", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 }
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    "Require a 6-digit PIN each time the app is opened.",
+                    "Require a 4-digit PIN, secret password, or biometric authentication.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 11.sp
                 )
@@ -124,6 +125,8 @@ fun SettingsScreen() {
                             onClick = {
                                 AppPreferences.clearPin()
                                 pinEnabled = false
+                                biometricEnabled = false
+                                AppPreferences.isBiometricEnabled = false
                             },
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentRed),
                             border = androidx.compose.foundation.BorderStroke(1.dp, AccentRed.copy(alpha = 0.6f)),
@@ -132,7 +135,7 @@ fun SettingsScreen() {
                         ) {
                             Icon(Icons.Default.LockOpen, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Disable PIN", fontWeight = FontWeight.SemiBold)
+                            Text("Disable Lock", fontWeight = FontWeight.SemiBold)
                         }
                         OutlinedButton(
                             onClick = { pinScreenMode = PinScreenMode.SET },
@@ -159,9 +162,37 @@ fun SettingsScreen() {
                     }
                 }
 
+                if (pinEnabled) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Fingerprint, contentDescription = null, tint = MpesaGreen, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text("Biometric Authentication", color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                Text("Use fingerprint or face unlock", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+                            }
+                        }
+                        Switch(
+                            checked = biometricEnabled,
+                            onCheckedChange = { checked ->
+                                biometricEnabled = checked
+                                AppPreferences.isBiometricEnabled = checked
+                            },
+                            colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = MpesaGreen)
+                        )
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = if (pinEnabled) "✓ PIN lock is active" else "PIN lock is disabled",
+                    text = if (pinEnabled) "✓ Security lock is active" else "Security lock is disabled",
                     color = if (pinEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.SemiBold

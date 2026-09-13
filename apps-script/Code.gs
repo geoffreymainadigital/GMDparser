@@ -245,16 +245,56 @@ function doGet(e) {
 
 
 
-    if (action === 'findOrphanedRows') {
+    if (action === 'deleteSpecificTestRows') {
+      const authError = verifyAuthSecret(e, null, true);
+      if (authError) return authError;
+
       const sheet = ss.getSheetByName(SHEET_NAME_TRANSACTIONS);
       if (!sheet) {
         return createJsonResponse({ success: false, error: 'Transactions sheet not found' }, 500);
       }
-      const orphans = findOrphanedRows(sheet);
+
+      // Exact rows requested by user: 1638, 1637, 1636, 1631, 1629, 1628, 1627, 1625, 1624
+      // Deleting in descending order prevents row shift distortion during execution
+      const rowsToDelete = [1638, 1637, 1636, 1631, 1629, 1628, 1627, 1625, 1624];
+      const deletedInfo = [];
+
+      for (let i = 0; i < rowsToDelete.length; i++) {
+        const rowNum = rowsToDelete[i];
+        const rowValues = sheet.getRange(rowNum, 1, 1, 15).getValues()[0];
+        const dateVal = rowValues[COL_DATE - 1];
+        const typeVal = rowValues[COL_TYPE - 1];
+        const catVal = rowValues[COL_CATEGORY - 1];
+        const descVal = rowValues[COL_DESCRIPTION - 1];
+        const amtVal = rowValues[COL_AMOUNT - 1];
+        const accVal = rowValues[COL_ACCOUNT - 1];
+        const notesVal = rowValues[COL_NOTES - 1];
+
+        deletedInfo.push({
+          row: rowNum,
+          verifiedContent: {
+            date: dateVal,
+            type: typeVal,
+            category: catVal,
+            description: descVal,
+            amount: amtVal,
+            account: accVal,
+            notes: notesVal
+          }
+        });
+
+        // Delete the exact row from sheet
+        sheet.deleteRow(rowNum);
+      }
+
+      const nextScanRow = findNextTransactionRow(sheet);
+
       return createJsonResponse({
         success: true,
-        count: orphans.length,
-        orphanedRows: orphans,
+        status: 'CLEANUP_COMPLETE',
+        deletedCount: deletedInfo.length,
+        deletedRows: deletedInfo,
+        nextTransactionRowAllocation: nextScanRow,
         timestamp: new Date().toISOString()
       }, 200);
     }
@@ -320,6 +360,9 @@ function doPost(e) {
 
     if (action === 'createTransaction') {
       return handleCreateTransaction(payload.transaction);
+    } else if (action === 'createTransferPair') {
+      const tx = payload.transaction || payload;
+      return handleCreateTransferPair(tx);
     } else if (action === 'batchCreateTransactions') {
       return handleBatchCreateTransactions(payload.transactions);
     } else if (action === 'validateTransaction') {
@@ -477,9 +520,6 @@ function handleCreateTransaction(tx) {
   }, 201);
 }
 
-/**
- * Handles automatic creation of linked two-row Balance transfer transactions
- */
 function handleCreateTransferPair(tx) {
   const baseCode = (tx.transactionCode || ('TR' + Date.now().toString().slice(-8))).trim().toUpperCase();
   const absAmount = Math.abs(Number(tx.amount));
@@ -512,31 +552,120 @@ function handleCreateTransferPair(tx) {
   const dateStr = tx.date || Utilities.formatDate(new Date(), 'Africa/Nairobi', 'yyyy-MM-dd');
   const userNotes = (tx.notes || '').trim();
 
-  // Row 1: Negative amount from source account
+  // Distinct transaction codes for each leg (suffix scheme: -OUT and -IN)
+  const codeLeg1 = baseCode + '-OUT';
+  const codeLeg2 = baseCode + '-IN';
+
+  // Leg 1: Negative amount from source account
   const leg1 = {
-    transactionCode: baseCode + 'A',
+    transactionCode: codeLeg1,
     date: dateStr,
     type: 'Balance',
     category: '',
-    description: tx.description || '',
+    description: tx.description || ('Transfer to ' + destAccount),
     amount: -absAmount,
     account: srcAccount,
     notes: userNotes ? (userNotes + ' | Transfer to ' + destAccount) : ('Transfer to ' + destAccount)
   };
 
-  // Row 2: Positive amount to destination account
+  // Leg 2: Positive amount to destination account
+  // Check for deliberate test error flag
   const leg2 = {
-    transactionCode: baseCode + 'B',
+    transactionCode: tx.simulateLeg2Failure ? 'INVALID' : codeLeg2, // Bad code length (< 8) triggers Phase-1 leg-2 failure
     date: dateStr,
     type: 'Balance',
     category: '',
-    description: tx.description || '',
+    description: tx.description || ('Transfer from ' + srcAccount),
     amount: absAmount,
     account: destAccount,
     notes: userNotes ? (userNotes + ' | Transfer from ' + srcAccount) : ('Transfer from ' + srcAccount)
   };
 
+  // Pre-validate both legs before starting write
+  const val1 = validateTransactionPayload(leg1);
+  const val2 = validateTransactionPayload(leg2);
+
+  if (!val1.isValid || !val2.isValid) {
+    const failedLeg = !val1.isValid ? 'Leg 1 (Source)' : 'Leg 2 (Destination)';
+    const errors = !val1.isValid ? val1.errors : val2.errors;
+    return createJsonResponse({
+      success: false,
+      status: 'PARTIAL_SUCCESS_PREVENTED',
+      error: 'Transfer cancelled: ' + failedLeg + ' failed validation (' + errors.join('; ') + '). No rows were written to sheet.',
+      results: [
+        { index: 0, transactionCode: codeLeg1, status: val1.isValid ? 'VALID' : 'VALIDATION_ERROR', success: val1.isValid, errors: val1.errors },
+        { index: 1, transactionCode: codeLeg2, status: val2.isValid ? 'VALID' : 'VALIDATION_ERROR', success: val2.isValid, errors: val2.errors }
+      ]
+    }, 400);
+  }
+
+  // If simulatePostWriteLeg2Failure is true, execute leg1 individually, then force leg2 write failure
+  if (tx.simulatePostWriteLeg2Failure) {
+    const resLeg1 = handleCreateTransaction(leg1);
+    const objLeg1 = JSON.parse(resLeg1.getContent());
+    if (objLeg1.success && objLeg1.data && objLeg1.data.row) {
+      const leg1Row = objLeg1.data.row;
+      try {
+        const ss = SpreadsheetApp.getActiveSpreadsheet();
+        const sheet = ss.getSheetByName(SHEET_NAME_TRANSACTIONS);
+        if (sheet) {
+          // Rollback: clear Date (col C) and Type (col D) of Leg 1
+          sheet.getRange(leg1Row, COL_DATE).clearContent();
+          sheet.getRange(leg1Row, COL_TYPE).clearContent();
+        }
+      } catch (_) {}
+      return createJsonResponse({
+        success: false,
+        status: 'PARTIAL_SUCCESS_ROLLED_BACK',
+        error: 'Transfer failed: Leg 2 (' + destAccount + ') write error (Simulated Post-Write Storage Exception). Leg 1 (row ' + leg1Row + ') was rolled back/cleared.',
+        results: [
+          { index: 0, transactionCode: codeLeg1, status: 'CREATED', success: true, row: leg1Row, rolledBack: true },
+          { index: 1, transactionCode: codeLeg2, status: 'WRITE_ERROR', success: false, error: 'Simulated Post-Write Storage Exception' }
+        ]
+      }, 422);
+    }
+  }
+
   const batchResult = handleBatchCreateTransactions([leg1, leg2]);
+  
+  // Inspect batch result status
+  let responseObj;
+  try {
+    responseObj = JSON.parse(batchResult.getContent());
+  } catch (_) {
+    return batchResult;
+  }
+
+  if (responseObj.written === 2) {
+    return batchResult; // Both legs succeeded
+  }
+
+  // Handle Leg-1 success / Leg-2 failure partial write scenario
+  const leg1Result = responseObj.results && responseObj.results[0];
+  const leg2Result = responseObj.results && responseObj.results[1];
+
+  if (leg1Result && leg1Result.success && leg2Result && !leg2Result.success) {
+    // Attempt rollback/cleanup of Leg 1 if row was allocated
+    if (leg1Result.row) {
+      try {
+        const ss = SpreadsheetApp.getActiveSpreadsheet();
+        const sheet = ss.getSheetByName(SHEET_NAME_TRANSACTIONS);
+        if (sheet) {
+          // Clear Date (col C) and Type (col D) of Leg 1 row so it is uncommitted and reused
+          sheet.getRange(leg1Result.row, COL_DATE).clearContent();
+          sheet.getRange(leg1Result.row, COL_TYPE).clearContent();
+        }
+      } catch (_) {}
+    }
+
+    return createJsonResponse({
+      success: false,
+      status: 'PARTIAL_SUCCESS_ROLLED_BACK',
+      error: 'Transfer failed: Leg 2 (' + destAccount + ') failed (' + (leg2Result.error || 'Write error') + '). Leg 1 (row ' + (leg1Result.row || '?') + ') was rolled back/cleared.',
+      results: responseObj.results
+    }, 422);
+  }
+
   return batchResult;
 }
 

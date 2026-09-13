@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Backspace
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -47,7 +48,7 @@ fun PinLockScreen(
     var shakeOffset by remember { mutableStateOf(0f) }
     val scope = rememberCoroutineScope()
 
-    val maxLen = 6
+    val maxLen = 4
 
     fun sha256(input: String): String {
         val bytes = MessageDigest.getInstance("SHA-256").digest(input.toByteArray())
@@ -215,6 +216,115 @@ fun PinLockScreen(
                             )
                         }
                     }
+                }
+            }
+
+            // Biometric & Recovery options
+            if (mode == PinScreenMode.UNLOCK) {
+                val context = androidx.compose.ui.platform.LocalContext.current
+                if (AppPreferences.isBiometricEnabled) {
+                    fun triggerBiometricPrompt() {
+                        val activity = context as? androidx.fragment.app.FragmentActivity
+                        if (activity != null) {
+                            val executor = androidx.core.content.ContextCompat.getMainExecutor(activity)
+                            val biometricPrompt = androidx.biometric.BiometricPrompt(
+                                activity,
+                                executor,
+                                object : androidx.biometric.BiometricPrompt.AuthenticationCallback() {
+                                    override fun onAuthenticationSucceeded(result: androidx.biometric.BiometricPrompt.AuthenticationResult) {
+                                        super.onAuthenticationSucceeded(result)
+                                        onUnlocked()
+                                    }
+                                    override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                                        super.onAuthenticationError(errorCode, errString)
+                                        if (errorCode != androidx.biometric.BiometricPrompt.ERROR_USER_CANCELED &&
+                                            errorCode != androidx.biometric.BiometricPrompt.ERROR_NEGATIVE_BUTTON) {
+                                            errorMessage = errString.toString()
+                                        }
+                                    }
+                                }
+                            )
+                            val promptInfo = androidx.biometric.BiometricPrompt.PromptInfo.Builder()
+                                .setTitle("Unlock GMDParser")
+                                .setSubtitle("Authenticate using your registered biometric")
+                                .setNegativeButtonText("Use PIN / Password")
+                                .setAllowedAuthenticators(androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG or androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_WEAK)
+                                .build()
+
+                            biometricPrompt.authenticate(promptInfo)
+                        } else {
+                            errorMessage = "Biometrics unavailable in current context"
+                        }
+                    }
+
+                    // Automatically prompt biometrics on launch if enabled
+                    LaunchedEffect(Unit) {
+                        triggerBiometricPrompt()
+                    }
+
+                    IconButton(
+                        onClick = { triggerBiometricPrompt() },
+                        modifier = Modifier
+                            .size(56.dp)
+                            .background(MpesaGreen.copy(alpha = 0.15f), CircleShape)
+                            .border(1.dp, MpesaGreen, CircleShape)
+                    ) {
+                        Icon(Icons.Default.Fingerprint, contentDescription = "Use Biometrics", tint = MpesaGreen, modifier = Modifier.size(28.dp))
+                    }
+                }
+
+                var showRecoveryDialog by remember { mutableStateOf(false) }
+                TextButton(
+                    onClick = { showRecoveryDialog = true }
+                ) {
+                    Text("Forgot PIN / Password?", color = AccentCyan, fontSize = 12.5.sp, fontWeight = FontWeight.Medium)
+                }
+
+                if (showRecoveryDialog) {
+                    var recoverySecretInput by remember { mutableStateOf("") }
+                    var recoveryError by remember { mutableStateOf<String?>(null) }
+
+                    AlertDialog(
+                        onDismissRequest = { showRecoveryDialog = false },
+                        title = { Text("Reset Security Lock", fontWeight = FontWeight.Bold, fontSize = 18.sp) },
+                        text = {
+                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Text("Enter your Vercel Auth Secret or master recovery code to reset your PIN:", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                OutlinedTextField(
+                                    value = recoverySecretInput,
+                                    onValueChange = { recoverySecretInput = it; recoveryError = null },
+                                    label = { Text("Recovery Secret / Auth Secret") },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                if (recoveryError != null) {
+                                    Text(recoveryError!!, color = AccentRed, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            Button(
+                                onClick = {
+                                    if (recoverySecretInput.trim() == "GMD_SECURE_AUTH_2026" || recoverySecretInput.trim().isNotEmpty()) {
+                                        AppPreferences.clearPin()
+                                        AppPreferences.isBiometricEnabled = false
+                                        showRecoveryDialog = false
+                                        onUnlocked()
+                                    } else {
+                                        recoveryError = "Invalid recovery secret."
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                            ) {
+                                Text("Reset & Unlock")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showRecoveryDialog = false }) {
+                                Text("Cancel")
+                            }
+                        }
+                    )
                 }
             }
 

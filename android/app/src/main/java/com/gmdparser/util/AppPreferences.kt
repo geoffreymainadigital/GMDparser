@@ -13,6 +13,8 @@ object AppPreferences {
     private const val KEY_PIN_HASH   = "pin_hash"
     private const val KEY_THEME      = "selected_theme"
     private const val KEY_PIN_ENABLED = "pin_enabled"
+    private const val KEY_BIOMETRIC_ENABLED = "biometric_enabled"
+    private const val KEY_AUTH_TYPE  = "auth_type"
 
     private var prefs: SharedPreferences? = null
 
@@ -23,20 +25,35 @@ object AppPreferences {
         }
     }
 
-    // ── PIN ──────────────────────────────────────────────────────────────
+    // ── PIN & Biometrics ──────────────────────────────────────────────────
 
-    /** Returns true when a PIN has been set and is enabled. */
+    /** Returns true when PIN/Password lock has been set and is enabled. */
     val isPinEnabled: Boolean
         get() = prefs?.getBoolean(KEY_PIN_ENABLED, false) ?: false
 
-    /** Returns the stored SHA-256 hash of the PIN, or null if not set. */
+    /** Returns true when Biometric authentication is enabled. */
+    var isBiometricEnabled: Boolean
+        get() = prefs?.getBoolean(KEY_BIOMETRIC_ENABLED, false) ?: false
+        set(value) {
+            prefs?.edit()?.putBoolean(KEY_BIOMETRIC_ENABLED, value)?.apply()
+        }
+
+    /** Returns 'PIN' or 'PASSWORD'. */
+    var authType: String
+        get() = prefs?.getString(KEY_AUTH_TYPE, "PIN") ?: "PIN"
+        set(value) {
+            prefs?.edit()?.putString(KEY_AUTH_TYPE, value)?.apply()
+        }
+
+    /** Returns the stored SHA-256 hash of the PIN/Password, or null if not set. */
     val storedPinHash: String?
         get() = prefs?.getString(KEY_PIN_HASH, null)
 
-    /** Saves the SHA-256 hash of a new PIN and enables the lock. */
-    fun savePin(pinHash: String) {
+    /** Saves the SHA-256 hash of a new PIN/Password and enables the lock. */
+    fun savePin(pinHash: String, type: String = "PIN") {
         prefs?.edit()
             ?.putString(KEY_PIN_HASH, pinHash)
+            ?.putString(KEY_AUTH_TYPE, type)
             ?.putBoolean(KEY_PIN_ENABLED, true)
             ?.commit()
     }

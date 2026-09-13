@@ -213,48 +213,45 @@
           <div class="card savings-progress-card" id="card-savings-progress" style="margin-top: 24px;">
             <div class="card-header" style="flex-wrap: wrap; gap: 12px;">
               <div>
-                <h3>Savings Progress</h3>
+                <h3>Savings Summary</h3>
                 <p class="card-desc">Target vehicle balances synced from Savings Dashboard.</p>
               </div>
               <span class="tag tag-cyan" id="savings-sheet-badge">SAVINGS DASHBOARD</span>
             </div>
 
-            <!-- Savings Totals Summary Row -->
-            <div class="metrics-grid" id="savings-totals-grid" style="margin-bottom: 20px;">
+            <!-- Savings Totals Summary Grid (4 Metrics Inline) -->
+            <div class="metrics-grid" id="savings-totals-grid" style="margin-bottom: 16px;">
               <div class="metric-card">
-                <span class="metric-label">Total Saved</span>
+                <span class="metric-label">Total to save</span>
+                <div class="metric-val text-cyan" id="savings-total-goal">Ksh 0.00</div>
+                <span class="metric-sub">Full sheet total goal</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Total saved</span>
                 <div class="metric-val text-green" id="savings-total-saved">Ksh 0.00</div>
                 <span class="metric-sub" id="savings-overall-progress">0% Overall</span>
               </div>
               <div class="metric-card">
-                <span class="metric-label">Total Goal</span>
-                <div class="metric-val text-cyan" id="savings-total-goal">Ksh 0.00</div>
-                <span class="metric-sub">Across 5 targets</span>
-              </div>
-              <div class="metric-card">
-                <span class="metric-label">Remaining to Save</span>
+                <span class="metric-label">Remaining to save</span>
                 <div class="metric-val text-amber" id="savings-total-remaining">Ksh 0.00</div>
                 <span class="metric-sub">Target balance remaining</span>
               </div>
+              <div class="metric-card">
+                <span class="metric-label">Total Progress</span>
+                <div class="metric-val text-green" id="savings-total-progress-pct">0%</div>
+                <span class="metric-sub">Overall savings ratio</span>
+              </div>
             </div>
 
-            <div class="table-container">
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th>Category</th>
-                    <th>Already Saved (Goal)</th>
-                    <th>Goal</th>
-                    <th>Remaining</th>
-                    <th>Progress</th>
-                  </tr>
-                </thead>
-                <tbody id="savings-progress-tbody">
-                  <tr>
-                    <td colspan="5" class="text-center text-muted">Loading savings progress...</td>
-                  </tr>
-                </tbody>
-              </table>
+            <!-- Tap-Through Entry Point to Category List -->
+            <div class="card-action-row" style="border-top: 1px solid var(--border-color); padding-top: 14px; margin-top: 8px;">
+              <a href="#savings-categories" class="nav-item nav-jump" data-tab="savings-categories" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: var(--bg-hover); border-radius: var(--radius-md); text-decoration: none; color: var(--text-primary); font-weight: 500;">
+                <span style="display: flex; align-items: center; gap: 10px;">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M4 10h3v7H4zM10.5 10h3v7h-3zM2 19h20v3H2zM17 10h3v7h-3zM12 1L2 6v2h20V6z"/></svg>
+                  View by category
+                </span>
+                <span style="color: var(--text-muted); font-size: 18px;">›</span>
+              </a>
             </div>
           </div>
 
@@ -280,6 +277,41 @@
                 <tbody id="dashboard-recent-tbody">
                   <tr>
                     <td colspan="7" class="text-center text-muted">No transactions recorded in this session yet.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- 1.1 SAVINGS BY CATEGORY VIEW (Tap-Through Screen) -->
+        <section id="view-savings-categories" class="tab-view">
+          <div class="card">
+            <div class="card-header" style="flex-wrap: wrap; gap: 12px;">
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <a href="#dashboard" class="nav-jump" data-tab="dashboard" style="display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; background: var(--bg-hover); color: var(--text-primary); text-decoration: none; font-size: 18px; font-weight: bold;">‹</a>
+                <div>
+                  <h3>Savings by category</h3>
+                  <p class="card-desc">Individual target progress across investment vehicles.</p>
+                </div>
+              </div>
+              <span class="tag tag-cyan">SAVINGS DASHBOARD</span>
+            </div>
+
+            <div class="table-container" style="margin-top: 16px;">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Category</th>
+                    <th>Already Saved (Goal)</th>
+                    <th>Goal</th>
+                    <th>Remaining</th>
+                    <th>Progress</th>
+                  </tr>
+                </thead>
+                <tbody id="savings-progress-tbody">
+                  <tr>
+                    <td colspan="5" class="text-center text-muted">Loading savings progress...</td>
                   </tr>
                 </tbody>
               </table>
@@ -510,11 +542,76 @@
                   <code>Transaction Code (8-12 Alphanumeric)</code>
                 </div>
               </div>
+
+              <!-- PIN Protection Settings -->
+              <div class="settings-item">
+                <div class="settings-info">
+                  <strong>PIN Security Lock</strong>
+                  <span>Require a 4-digit PIN to access the web dashboard</span>
+                </div>
+                <div class="settings-value" style="display: flex; gap: 8px; align-items: center;">
+                  <button class="btn btn-sm btn-outline" id="btn-toggle-pin">Enable PIN</button>
+                  <button class="btn btn-sm btn-outline" id="btn-change-pin" style="display: none;">Change PIN</button>
+                </div>
+              </div>
             </div>
           </div>
         </section>
       </div>
     </main>
+  </div>
+
+  <!-- Security Lock Overlay Modal (PIN / Password & Recovery) -->
+  <div id="pin-lock-overlay" class="pin-overlay" style="display: none;">
+    <div class="pin-card">
+      <div class="pin-icon" id="pin-modal-icon">🔒</div>
+      <h2 id="pin-modal-title">Enter Security Lock</h2>
+      <p id="pin-modal-subtitle">Dashboard access is protected by security lock.</p>
+
+      <!-- Auth Mode Switch (PIN vs Password) -->
+      <div class="auth-mode-toggle" id="auth-mode-toggle-wrapper" style="display: flex; justify-content: center; gap: 8px; margin-bottom: 20px;">
+        <button class="btn btn-sm btn-outline active" id="btn-mode-pin">4-Digit PIN</button>
+        <button class="btn btn-sm btn-outline" id="btn-mode-pass">Password</button>
+      </div>
+
+      <!-- 4-Digit PIN Dots View -->
+      <div id="pin-dots-container">
+        <div class="pin-dots" id="pin-dots">
+          <span class="dot"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+        </div>
+
+        <div class="pin-keypad">
+          <button class="pin-btn" data-key="1">1</button>
+          <button class="pin-btn" data-key="2">2</button>
+          <button class="pin-btn" data-key="3">3</button>
+          <button class="pin-btn" data-key="4">4</button>
+          <button class="pin-btn" data-key="5">5</button>
+          <button class="pin-btn" data-key="6">6</button>
+          <button class="pin-btn" data-key="7">7</button>
+          <button class="pin-btn" data-key="8">8</button>
+          <button class="pin-btn" data-key="9">9</button>
+          <button class="pin-btn pin-action" id="pin-btn-cancel" style="visibility: hidden;">Cancel</button>
+          <button class="pin-btn" data-key="0">0</button>
+          <button class="pin-btn pin-action" id="pin-btn-del">⌫</button>
+        </div>
+      </div>
+
+      <!-- Password Input View -->
+      <div id="pass-input-container" style="display: none; flex-direction: column; gap: 14px;">
+        <div class="form-group">
+          <input type="password" id="sec-pass-input" placeholder="Enter your secret password" style="width: 100%; padding: 12px; font-size: 15px; border-radius: var(--radius-md); border: 1px solid var(--border-color); background: var(--bg-main); color: var(--text-primary);" />
+        </div>
+        <button class="btn btn-primary" id="btn-submit-pass" style="width: 100%; padding: 12px;">Unlock Dashboard</button>
+      </div>
+
+      <!-- Forgot PIN / Reset Link -->
+      <div style="margin-top: 20px; border-top: 1px solid var(--border-subtle); padding-top: 14px;">
+        <button class="btn-link" id="btn-forgot-pin" style="background: none; border: none; color: var(--color-cyan); font-size: 12.5px; cursor: pointer; text-decoration: underline;">Forgot PIN / Password?</button>
+      </div>
+    </div>
   </div>
 
   <!-- Toast Notification Container -->

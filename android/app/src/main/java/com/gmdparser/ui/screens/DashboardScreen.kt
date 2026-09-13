@@ -13,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -27,7 +28,8 @@ import com.gmdparser.ui.theme.*
 fun DashboardScreen(
     onNavigateToReview: () -> Unit,
     onNavigateToHistory: () -> Unit,
-    onNavigateToAccounts: () -> Unit
+    onNavigateToAccounts: () -> Unit,
+    onNavigateToSavingsCategories: () -> Unit = {}
 ) {
     val pendingList by TransactionRepository.pendingTransactions.collectAsState()
     val confirmedList by TransactionRepository.confirmedTransactions.collectAsState()
@@ -161,9 +163,8 @@ fun DashboardScreen(
         }
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Savings Progress Card
+        // Savings Progress Card (Summary Only on Dashboard)
         val savingsData = dashboardData?.savings
-        val savingsGoals = savingsData?.goals ?: emptyList()
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             shape = RoundedCornerShape(16.dp),
@@ -178,7 +179,7 @@ fun DashboardScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Savings Progress",
+                        text = "Savings Summary",
                         color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold,
                         fontSize = 15.sp
@@ -198,17 +199,31 @@ fun DashboardScreen(
                 }
                 val savingsTotals = savingsData?.totals
                 if (savingsTotals != null) {
+                    Spacer(modifier = Modifier.height(12.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         BudgetSummaryTile(
-                            label = "Total Saved",
+                            label = "Total to save",
+                            actual = savingsTotals.totalGoal,
+                            goal = null,
+                            color = AccentCyan,
+                            modifier = Modifier.weight(1f)
+                        )
+                        BudgetSummaryTile(
+                            label = "Total saved",
                             actual = savingsTotals.totalSaved,
                             goal = savingsTotals.totalGoal,
                             color = MpesaGreen,
                             modifier = Modifier.weight(1f)
                         )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         BudgetSummaryTile(
                             label = "Remaining",
                             actual = savingsTotals.totalRemaining,
@@ -216,67 +231,62 @@ fun DashboardScreen(
                             color = AccentAmber,
                             modifier = Modifier.weight(1f)
                         )
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
-
-                if (savingsGoals.isEmpty()) {
-                    Text(
-                        text = "Loading savings progress...",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 12.sp
-                    )
-                } else {
-                    savingsGoals.forEachIndexed { index, item ->
-                        if (index > 0) Spacer(modifier = Modifier.height(10.dp))
+                        val overallPct = (savingsTotals.overallProgress * 100).toInt()
                         Surface(
                             color = MaterialTheme.colorScheme.surfaceVariant,
                             shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.weight(1f)
                         ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = item.category,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 13.sp
-                                    )
-                                    val pctInt = (item.progress * 100).toInt()
-                                    Text(
-                                        text = "$pctInt%",
-                                        color = MpesaGreen,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 12.sp
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(4.dp))
+                            Column(modifier = Modifier.padding(10.dp)) {
                                 Text(
-                                    text = "Ksh ${String.format("%,.2f", item.saved)}",
-                                    color = MpesaGreen,
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.ExtraBold
-                                )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = "Goal: Ksh ${String.format("%,.2f", item.goal)} • Remaining: Ksh ${String.format("%,.2f", item.remaining)}",
+                                    text = "Progress",
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontSize = 11.sp
                                 )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                LinearProgressIndicator(
-                                    progress = { Math.min(1.0f, Math.max(0.0f, item.progress.toFloat())) },
-                                    modifier = Modifier.fillMaxWidth().height(6.dp),
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "$overallPct%",
                                     color = MpesaGreen,
-                                    trackColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold
                                 )
                             }
                         }
                     }
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+
+                // View by category entry point button
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { onNavigateToSavingsCategories() }
+                        .padding(vertical = 8.dp, horizontal = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(
+                            imageVector = Icons.Default.AccountBalance,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            text = "View by category",
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = "Navigate to savings categories",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
