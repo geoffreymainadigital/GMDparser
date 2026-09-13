@@ -17,19 +17,6 @@ export default async function handler(req, res) {
     });
   }
 
-  // Verify client token if configured
-  const requiredClientKey = process.env.CLIENT_API_KEY;
-  if (requiredClientKey) {
-    const providedKey = req.headers['x-gmd-auth-key'];
-    if (providedKey !== requiredClientKey) {
-      return res.status(401).json({
-        success: false,
-        status: 'UNAUTHORIZED',
-        error: 'Invalid or missing X-GMD-Auth-Key header'
-      });
-    }
-  }
-
   const payload = req.body;
   if (!payload) {
     return res.status(400).json({
