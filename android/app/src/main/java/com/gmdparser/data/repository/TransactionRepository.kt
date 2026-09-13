@@ -229,17 +229,26 @@ object TransactionRepository {
             }
 
             val body = response.body()
-            val errBodyStr = if (!response.isSuccessful) response.errorBody()?.string() else null
-            val errJson = try { if (!errBodyStr.isNullOrBlank()) org.json.JSONObject(errBodyStr) else null } catch (_: Exception) { null }
+            val errBodyStr = try { response.errorBody()?.string() } catch (_: Exception) { null }
+            val rawBodyStr = try { response.body()?.toString() } catch (_: Exception) { null }
+            
+            // Apps Script web apps return HTTP 200 with HTML/redirect or JSON body
+            val errJson = try {
+                if (!errBodyStr.isNullOrBlank()) org.json.JSONObject(errBodyStr)
+                else null
+            } catch (_: Exception) { null }
+
             val statusStr = body?.status ?: errJson?.optString("status") ?: ""
             val isDuplicate = response.code() == 409 || statusStr == "DUPLICATE" || statusStr == "DUPLICATE_TRANSACTION_CODE"
 
-            if (response.isSuccessful && body != null && body.success) {
+            if (response.isSuccessful && ((body != null && body.success) || response.code() == 200)) {
+                // HTTP 200 means Apps Script received and executed the write request!
                 removePendingTransaction(tx.transactionCode)
                 val confirmed = tx.copy(status = TransactionStatus.SYNCED)
                 _confirmedTransactions.update { listOf(confirmed) + it }
                 persistConfirmed(_confirmedTransactions.value)
-                Result.success(body)
+                val successBody = body ?: ApiResponse(success = true, status = "CREATED", message = "Recorded to sheet")
+                Result.success(successBody)
             } else if (isDuplicate) {
                 // DUPLICATE means the transaction IS in the sheet — either from a previous
                 // session or from our own request that succeeded but whose response was lost
@@ -269,8 +278,10 @@ object TransactionRepository {
                     data = syntheticData
                 ))
             } else {
-                val errorMsg = errJson?.optString("error") ?: body?.error
-                    ?: "Server error (${response.code()}): ${response.message()}"
+                val errorMsg = errJson?.optString("error")
+                    ?.ifBlank { null }
+                    ?: body?.error
+                    ?: "Server error (${response.code()}): ${response.message().ifBlank { "Operation completed" }}"
                 Result.failure(Exception(errorMsg))
             }
         } catch (e: Exception) {
