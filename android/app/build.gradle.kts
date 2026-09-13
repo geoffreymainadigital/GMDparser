@@ -20,7 +20,7 @@ android {
         }
 
         val appsScriptUrl = (project.findProperty("APPS_SCRIPT_URL") as String?)
-            ?: "https://script.google.com/macros/s/AKfycbzLo8NZHU3rmGIT6R-une9xrjUqwIdSbUG6to1O_ZwohEbvST1-3MjpNvCaNq2TOF4_Xw/exec"
+            ?: "https://script.google.com/macros/s/AKfycbx07weeYhMSRoCCBZLWTXUL3BWHBz-i9VLel7_Sx1VYGQWGcorHcHJFPYta4mxD5nfK9A/exec"
 
         buildConfigField("String", "BASE_URL", "\"https://gmdparser.vercel.app\"")
         buildConfigField("String", "APPS_SCRIPT_URL", "\"$appsScriptUrl\"")
@@ -66,6 +66,7 @@ dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.5")
     implementation("androidx.activity:activity-compose:1.9.2")
+    implementation("androidx.biometric:biometric:1.1.0")
 
     // Jetpack Compose
     implementation(platform("androidx.compose:compose-bom:2024.09.00"))
