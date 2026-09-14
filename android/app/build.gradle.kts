@@ -20,7 +20,7 @@ android {
         }
 
         val appsScriptUrl = (project.findProperty("APPS_SCRIPT_URL") as String?)
-            ?: "https://script.google.com/macros/s/AKfycbx07weeYhMSRoCCBZLWTXUL3BWHBz-i9VLel7_Sx1VYGQWGcorHcHJFPYta4mxD5nfK9A/exec"
+            ?: "https://script.google.com/macros/s/AKfycbyioAf_YVNfIumwe-BuESEK7gaswb7cm8Dhwo6eSl9Fjpm2fD28y_bW9vbSyphGvqNZfQ/exec"
 
         buildConfigField("String", "BASE_URL", "\"https://gmdparser.vercel.app\"")
         buildConfigField("String", "APPS_SCRIPT_URL", "\"$appsScriptUrl\"")

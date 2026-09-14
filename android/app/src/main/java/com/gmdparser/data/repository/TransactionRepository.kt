@@ -54,7 +54,7 @@ object TransactionRepository {
     @Volatile
     private var dashboardFetchRequestId: Long = 0
 
-    private const val FALLBACK_GAS_URL = "https://script.google.com/macros/s/AKfycbzLo8NZHU3rmGIT6R-une9xrjUqwIdSbUG6to1O_ZwohEbvST1-3MjpNvCaNq2TOF4_Xw/exec"
+    private const val FALLBACK_GAS_URL = "https://script.google.com/macros/s/AKfycbyioAf_YVNfIumwe-BuESEK7gaswb7cm8Dhwo6eSl9Fjpm2fD28y_bW9vbSyphGvqNZfQ/exec"
 
     private fun handleDashboardSuccess(data: com.gmdparser.data.model.DashboardResponse, reqId: Long) {
         if (reqId == dashboardFetchRequestId) {
