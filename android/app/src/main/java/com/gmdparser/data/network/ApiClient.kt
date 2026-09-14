@@ -47,6 +47,13 @@ object ApiClient {
             .readTimeout(90, TimeUnit.SECONDS)   // flush() + formula recalc can take 60-80s on large sheets
             .writeTimeout(30, TimeUnit.SECONDS)
             .retryOnConnectionFailure(false)      // Prevent silent re-sends that cause ghost duplicates
+            .addInterceptor { chain ->
+                val original = chain.request()
+                val requestBuilder = original.newBuilder()
+                    .header("X-GMD-Auth-Key", BuildConfig.AUTH_SECRET)
+                val request = requestBuilder.build()
+                chain.proceed(request)
+            }
             .addInterceptor(logging)
             .build()
     }

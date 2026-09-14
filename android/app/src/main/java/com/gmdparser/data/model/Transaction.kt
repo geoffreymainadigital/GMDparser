@@ -1,5 +1,6 @@
 package com.gmdparser.data.model
 
+import com.gmdparser.BuildConfig
 import com.google.gson.annotations.SerializedName
 
 enum class TransactionStatus {
@@ -40,12 +41,14 @@ data class TransactionPayload(
 
 data class CreateTransactionRequest(
     @SerializedName("action") val action: String = "createTransaction",
+    @SerializedName("authKey") val authKey: String = BuildConfig.AUTH_SECRET,
     @SerializedName("transaction") val transaction: TransactionPayload
 )
 
 /** Batch write request — sends N transactions in a single round-trip. */
 data class BatchCreateTransactionRequest(
     @SerializedName("action") val action: String = "batchCreateTransactions",
+    @SerializedName("authKey") val authKey: String = BuildConfig.AUTH_SECRET,
     @SerializedName("transactions") val transactions: List<TransactionPayload>
 )
 
