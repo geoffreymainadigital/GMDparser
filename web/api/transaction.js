@@ -17,12 +17,14 @@ export default async function handler(req, res) {
     });
   }
 
-  const payload = req.body;
-  if (!payload) {
-    return res.status(400).json({
+  const incomingAuthKey = req.headers['x-gmd-auth-key'] || req.headers['authorization']?.replace(/^Bearer\s+/i, '') || req.body?.authKey;
+  const expectedAuthSecret = process.env.GMD_AUTH_SECRET || process.env.GMD_API_SECRET || process.env.APPS_SCRIPT_AUTH_SECRET || '';
+
+  if (expectedAuthSecret && incomingAuthKey !== expectedAuthSecret) {
+    return res.status(401).json({
       success: false,
-      status: 'BAD_REQUEST',
-      error: 'Missing request body'
+      status: 'UNAUTHORIZED',
+      error: 'Invalid or missing client authentication key provided.'
     });
   }
 
