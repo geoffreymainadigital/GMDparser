@@ -415,7 +415,7 @@ function doPost(e) {
  * Validates and records a confirmed transaction into Google Sheets
  */
 function handleCreateTransaction(tx) {
-  if (tx && (tx.type === 'Balance' || tx.type === 'Transfer') && tx.destinationAccount) {
+  if (tx && !tx._isInternalLeg && (tx.type === 'Balance' || tx.type === 'Transfer') && tx.destinationAccount) {
     return handleCreateTransferPair(tx);
   }
   const validation = validateTransactionPayload(tx);
@@ -582,6 +582,7 @@ function handleCreateTransferPair(tx) {
 
   // Leg 1: Negative amount from source account
   const leg1 = {
+    _isInternalLeg: true,
     transactionCode: codeLeg1,
     date: dateStr,
     type: 'Balance',
@@ -595,6 +596,7 @@ function handleCreateTransferPair(tx) {
   // Leg 2: Positive amount to destination account
   // Check for deliberate test error flag
   const leg2 = {
+    _isInternalLeg: true,
     transactionCode: tx.simulateLeg2Failure ? 'INVALID' : codeLeg2, // Bad code length (< 8) triggers Phase-1 leg-2 failure
     date: dateStr,
     type: 'Balance',

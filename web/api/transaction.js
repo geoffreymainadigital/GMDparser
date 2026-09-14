@@ -20,7 +20,15 @@ export default async function handler(req, res) {
   const incomingAuthKey = req.headers['x-gmd-auth-key'] || req.headers['authorization']?.replace(/^Bearer\s+/i, '') || req.body?.authKey;
   const expectedAuthSecret = process.env.GMD_AUTH_SECRET || process.env.GMD_API_SECRET || process.env.APPS_SCRIPT_AUTH_SECRET || '';
 
-  if (expectedAuthSecret && incomingAuthKey !== expectedAuthSecret) {
+  if (!expectedAuthSecret) {
+    return res.status(500).json({
+      success: false,
+      status: 'SERVER_MISCONFIGURED',
+      error: 'Server misconfigured: GMD_AUTH_SECRET environment variable is not set on gateway.'
+    });
+  }
+
+  if (incomingAuthKey !== expectedAuthSecret) {
     return res.status(401).json({
       success: false,
       status: 'UNAUTHORIZED',
