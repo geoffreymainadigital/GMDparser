@@ -24,7 +24,7 @@ android {
 
         buildConfigField("String", "BASE_URL", "\"https://gmdparser.vercel.app\"")
         buildConfigField("String", "APPS_SCRIPT_URL", "\"$appsScriptUrl\"")
-        buildConfigField("String", "AUTH_SECRET", "\"gmd_sec_prod_994821a7b4f2c019\"")
+        buildConfigField("String", "AUTH_SECRET", "\"aaa0b06b4e6ff4611405b66de6357f0b474ce868d76091e61c4b7c8e89a5b813\"")
         buildConfigField("Boolean", "AUTO_SYNC_ENABLED", "false")
     }
 

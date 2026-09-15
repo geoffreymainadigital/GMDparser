@@ -3,6 +3,8 @@
  * Securely proxies confirmed M-PESA transactions to Google Apps Script
  */
 
+export const maxDuration = 60;
+
 export default async function handler(req, res) {
   // CORS Preflight
   if (req.method === 'OPTIONS') {
@@ -36,6 +38,7 @@ export default async function handler(req, res) {
     });
   }
 
+  const payload = req.body || {};
   const transaction = payload.transaction || payload;
   if (!transaction || typeof transaction !== 'object') {
     return res.status(400).json({
@@ -66,7 +69,7 @@ export default async function handler(req, res) {
     };
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 28000); // 28s timeout for spreadsheet write
+    const timeoutId = setTimeout(() => controller.abort(), 55000); // 55s timeout for spreadsheet write
 
     const upstreamRes = await fetch(appsScriptUrl, {
       method: 'POST',
