@@ -1871,18 +1871,15 @@ function getMonthlyDashboardData(ss) {
  * Programmatically discovers and parses the Accounts tab (Read-Only)
  */
 function getAccountsData(ss) {
-  if (_accountsDataCache) {
-    return _accountsDataCache;
-  }
   const sheet = ss.getSheetByName('Accounts');
   if (!sheet) {
     throw new Error('Sheet "Accounts" not found in spreadsheet.');
   }
 
-  const maxRows = Math.min(sheet.getMaxRows ? sheet.getMaxRows() : 30, 40);
-  const maxCols = Math.min(sheet.getMaxColumns ? sheet.getMaxColumns() : 50, 60);
+  const maxRows = 40;
+  const maxCols = 50;
   const dataRange = sheet.getRange(1, 1, maxRows, maxCols);
-  const values = dataRange.getValues();
+  const values = dataRange.getDisplayValues();
 
   // Search for the table header row
   let headerRow = -1;
@@ -1898,24 +1895,15 @@ function getAccountsData(ss) {
       if (val === 'account names') {
         headerRow = r;
         colAccountNames = c;
-      } else if (val === 'start balance') {
-        colStartBalance = c;
-      } else if (val === 'current balance' && headerRow === r) {
-        colCurrentBalance = c;
-      } else if (val.indexOf('deposits') !== -1 && headerRow === r) {
-        colDeposits = c;
-      } else if (val.indexOf('withdrawals') !== -1 && headerRow === r) {
-        colWithdrawals = c;
       }
     }
     if (colAccountNames !== -1) {
-      // Complete column discovery in this header row
       for (let c = 0; c < values[headerRow].length; c++) {
         const val = String(values[headerRow][c] || '').toLowerCase().trim();
         if (val === 'start balance') colStartBalance = c;
         if (val === 'current balance') colCurrentBalance = c;
         if (val.indexOf('deposits') !== -1) colDeposits = c;
-        if (val.indexOf('withdrawals') !== -1) colWithdrawals = c;
+        if (val.indexOf('withdrawal') !== -1) colWithdrawals = c;
       }
       break;
     }
@@ -1931,8 +1919,14 @@ function getAccountsData(ss) {
   function parseAmount(val) {
     if (typeof val === 'number') return val;
     if (!val) return 0;
-    const clean = String(val).replace(/[^0-9.\-]/g, '');
-    return parseFloat(clean) || 0;
+    let s = String(val).trim();
+    const isParenthesesNegative = /^\(.*\)$/.test(s);
+    let clean = s.replace(/[^0-9.\-]/g, '');
+    let num = parseFloat(clean) || 0;
+    if (isParenthesesNegative && num > 0) {
+      num = -num;
+    }
+    return num;
   }
 
   const accounts = [];
@@ -1940,13 +1934,25 @@ function getAccountsData(ss) {
   for (let r = headerRow + 1; r < values.length; r++) {
     const acctName = String(values[r][colAccountNames] || '').trim();
     if (!acctName) continue;
-    if (acctName.indexOf('Total') !== -1 || acctName.indexOf('THIS SPREADSHEET') !== -1) break;
+    if (acctName.indexOf('THIS SPREADSHEET') !== -1) break;
 
     // Numerical values are located in the column or column + 1 (if currency column is separate)
     const startVal = colStartBalance !== -1 ? parseAmount(values[r][colStartBalance + 1] !== undefined && values[r][colStartBalance + 1] !== '' ? values[r][colStartBalance + 1] : values[r][colStartBalance]) : 0;
     const currVal = colCurrentBalance !== -1 ? parseAmount(values[r][colCurrentBalance + 1] !== undefined && values[r][colCurrentBalance + 1] !== '' ? values[r][colCurrentBalance + 1] : values[r][colCurrentBalance]) : 0;
     const depVal = colDeposits !== -1 ? parseAmount(values[r][colDeposits + 1] !== undefined && values[r][colDeposits + 1] !== '' ? values[r][colDeposits + 1] : values[r][colDeposits]) : 0;
-    const withVal = colWithdrawals !== -1 ? parseAmount(values[r][colWithdrawals + 1] !== undefined && values[r][colWithdrawals + 1] !== '' ? values[r][colWithdrawals + 1] : values[r][colWithdrawals]) : 0;
+    let withVal = 0;
+    if (colWithdrawals !== -1) {
+      for (let offset = 0; offset <= 5; offset++) {
+        const rawCell = values[r][colWithdrawals + offset];
+        if (rawCell !== undefined && rawCell !== '' && rawCell !== null) {
+          const parsed = parseAmount(rawCell);
+          if (parsed !== 0) {
+            withVal = parsed;
+            break;
+          }
+        }
+      }
+    }
 
     accounts.push({
       accountName: acctName,
@@ -1957,7 +1963,6 @@ function getAccountsData(ss) {
     });
   }
 
-  _accountsDataCache = accounts;
   return accounts;
 }
 
