@@ -576,9 +576,24 @@ function handleCreateTransferPair(tx) {
   const dateStr = tx.date || Utilities.formatDate(new Date(), 'Africa/Nairobi', 'yyyy-MM-dd');
   const userNotes = (tx.notes || '').trim();
 
-  // Distinct transaction codes for each leg (suffix scheme: -OUT and -IN)
+  // Distinct transaction codes for each leg (suffix scheme: -OUT, -IN, -FEE)
   const codeLeg1 = baseCode + '-OUT';
   const codeLeg2 = baseCode + '-IN';
+  const codeFee = baseCode + '-FEE';
+
+  // Extract fee/cost if present
+  let fee = 0;
+  if (tx.cost !== undefined && tx.cost !== null && !isNaN(Number(tx.cost))) {
+    fee = Math.abs(Number(tx.cost));
+  } else if (tx.fee !== undefined && tx.fee !== null && !isNaN(Number(tx.fee))) {
+    fee = Math.abs(Number(tx.fee));
+  } else {
+    const textToSearch = (tx.rawText || tx.notes || tx.description || '');
+    const costMatch = textToSearch.match(/Transaction cost,?\s*(?:Ksh|KES)\.?\s*([\d,]+\.?\d*)/i);
+    if (costMatch) {
+      fee = Math.abs(parseFloat(costMatch[1].replace(/,/g, '')));
+    }
+  }
 
   // Leg 1: Negative amount from source account
   const leg1 = {
@@ -594,10 +609,9 @@ function handleCreateTransferPair(tx) {
   };
 
   // Leg 2: Positive amount to destination account
-  // Check for deliberate test error flag
   const leg2 = {
     _isInternalLeg: true,
-    transactionCode: tx.simulateLeg2Failure ? 'INVALID' : codeLeg2, // Bad code length (< 8) triggers Phase-1 leg-2 failure
+    transactionCode: tx.simulateLeg2Failure ? 'INVALID' : codeLeg2,
     date: dateStr,
     type: 'Balance',
     category: '',
@@ -607,21 +621,44 @@ function handleCreateTransferPair(tx) {
     notes: userNotes ? (userNotes + ' | Transfer from ' + srcAccount) : ('Transfer from ' + srcAccount)
   };
 
-  // Pre-validate both legs before starting write
-  const val1 = validateTransactionPayload(leg1);
-  const val2 = validateTransactionPayload(leg2);
+  const legs = [leg1, leg2];
 
-  if (!val1.isValid || !val2.isValid) {
-    const failedLeg = !val1.isValid ? 'Leg 1 (Source)' : 'Leg 2 (Destination)';
-    const errors = !val1.isValid ? val1.errors : val2.errors;
+  // Leg 3: Transaction Fee (if fee > 0)
+  if (fee > 0) {
+    const legFee = {
+      _isInternalLeg: true,
+      transactionCode: codeFee,
+      date: dateStr,
+      type: 'Expenses',
+      category: 'Transaction Cost',
+      description: 'Transaction Cost: ' + (tx.description || ('Transfer to ' + destAccount)),
+      amount: fee,
+      account: srcAccount,
+      notes: userNotes ? (userNotes + ' | Transaction Fee') : 'Transaction Fee'
+    };
+    legs.push(legFee);
+  }
+
+  // Pre-validate all legs before starting write
+  const valResults = legs.map(function(l) { return { leg: l, val: validateTransactionPayload(l) }; });
+  const invalidItem = valResults.find(function(r) { return !r.val.isValid; });
+
+  if (invalidItem) {
+    const idx = valResults.indexOf(invalidItem);
+    const legNames = ['Leg 1 (Source)', 'Leg 2 (Destination)', 'Leg 3 (Fee)'];
     return createJsonResponse({
       success: false,
       status: 'PARTIAL_SUCCESS_PREVENTED',
-      error: 'Transfer cancelled: ' + failedLeg + ' failed validation (' + errors.join('; ') + '). No rows were written to sheet.',
-      results: [
-        { index: 0, transactionCode: codeLeg1, status: val1.isValid ? 'VALID' : 'VALIDATION_ERROR', success: val1.isValid, errors: val1.errors },
-        { index: 1, transactionCode: codeLeg2, status: val2.isValid ? 'VALID' : 'VALIDATION_ERROR', success: val2.isValid, errors: val2.errors }
-      ]
+      error: 'Transfer cancelled: ' + legNames[idx] + ' failed validation (' + invalidItem.val.errors.join('; ') + '). No rows were written to sheet.',
+      results: valResults.map(function(r, i) {
+        return {
+          index: i,
+          transactionCode: r.leg.transactionCode,
+          status: r.val.isValid ? 'VALID' : 'VALIDATION_ERROR',
+          success: r.val.isValid,
+          errors: r.val.errors
+        };
+      })
     }, 400);
   }
 
@@ -652,7 +689,7 @@ function handleCreateTransferPair(tx) {
     }
   }
 
-  const batchResult = handleBatchCreateTransactions([leg1, leg2]);
+  const batchResult = handleBatchCreateTransactions(legs);
   
   // Inspect batch result status
   let responseObj;
@@ -662,8 +699,8 @@ function handleCreateTransferPair(tx) {
     return batchResult;
   }
 
-  if (responseObj.written === 2) {
-    return batchResult; // Both legs succeeded
+  if (responseObj.written === legs.length) {
+    return batchResult; // All legs succeeded
   }
 
   // Handle Leg-1 success / Leg-2 failure partial write scenario
@@ -683,7 +720,6 @@ function handleCreateTransferPair(tx) {
         }
       } catch (_) {}
     }
-
     return createJsonResponse({
       success: false,
       status: 'PARTIAL_SUCCESS_ROLLED_BACK',

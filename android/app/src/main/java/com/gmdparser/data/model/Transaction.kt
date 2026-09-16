@@ -36,7 +36,9 @@ data class TransactionPayload(
     @SerializedName("amount") val amount: Double,
     @SerializedName("account") val account: String,
     @SerializedName("transactionCode") val transactionCode: String,
-    @SerializedName("destinationAccount") val destinationAccount: String? = null
+    @SerializedName("destinationAccount") val destinationAccount: String? = null,
+    @SerializedName("cost") val cost: Double? = null,
+    @SerializedName("rawText") val rawText: String? = null
 )
 
 data class CreateTransactionRequest(

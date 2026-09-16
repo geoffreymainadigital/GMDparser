@@ -211,7 +211,8 @@ object TransactionRepository {
         val payload = TransactionPayload(
             date = tx.date, type = tx.type, category = tx.category,
             description = tx.description, amount = tx.amount, account = tx.account,
-            transactionCode = tx.transactionCode, destinationAccount = tx.destinationAccount
+            transactionCode = tx.transactionCode, destinationAccount = tx.destinationAccount,
+            cost = tx.cost, rawText = tx.rawText
         )
         val request = CreateTransactionRequest(
             action = if (isTransferAction) "createTransferPair" else "createTransaction", 
