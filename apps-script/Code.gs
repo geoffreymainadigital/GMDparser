@@ -1880,7 +1880,7 @@ function getAccountsData(ss) {
   }
 
   const maxRows = Math.min(sheet.getMaxRows ? sheet.getMaxRows() : 30, 40);
-  const maxCols = Math.min(sheet.getMaxColumns ? sheet.getMaxColumns() : 25, 30);
+  const maxCols = Math.min(sheet.getMaxColumns ? sheet.getMaxColumns() : 50, 60);
   const dataRange = sheet.getRange(1, 1, maxRows, maxCols);
   const values = dataRange.getValues();
 

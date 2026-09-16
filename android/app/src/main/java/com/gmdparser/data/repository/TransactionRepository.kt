@@ -33,6 +33,7 @@ object TransactionRepository {
     private const val KEY_PENDING = "pending_transactions"
     private const val KEY_CONFIRMED = "confirmed_transactions"
     private const val KEY_MONTHLY_DASHBOARD = "cached_monthly_dashboard"
+    private const val KEY_FULL_DASHBOARD = "cached_full_dashboard"
     /** Max transactions per batchCreateTransactions call — must match Apps Script MAX_BATCH. */
     private const val BATCH_MAX_SIZE = 50
 
@@ -59,6 +60,7 @@ object TransactionRepository {
     private fun handleDashboardSuccess(data: com.gmdparser.data.model.DashboardResponse, reqId: Long) {
         if (reqId == dashboardFetchRequestId) {
             _dashboardData.value = data
+            prefs?.edit()?.putString(KEY_FULL_DASHBOARD, gson.toJson(data))?.apply()
             val monthData = data.month ?: data.dashboard
             if (monthData != null) {
                 _monthlyDashboard.value = monthData
@@ -139,6 +141,14 @@ object TransactionRepository {
             try {
                 val loaded = gson.fromJson(monthlyJson, com.gmdparser.data.model.MonthlyDashboardData::class.java)
                 _monthlyDashboard.value = loaded
+            } catch (e: Exception) { e.printStackTrace() }
+        }
+
+        val fullDashJson = sp.getString(KEY_FULL_DASHBOARD, null)
+        if (!fullDashJson.isNullOrBlank()) {
+            try {
+                val loaded = gson.fromJson(fullDashJson, com.gmdparser.data.model.DashboardResponse::class.java)
+                _dashboardData.value = loaded
             } catch (e: Exception) { e.printStackTrace() }
         }
     }
