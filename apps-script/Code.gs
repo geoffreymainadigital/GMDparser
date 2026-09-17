@@ -212,6 +212,34 @@ function doGet(e) {
       }, 200);
     }
 
+    if (action === 'debug_accounts') {
+      const sheet = ss.getSheetByName('Accounts');
+      if (!sheet) {
+        return createJsonResponse({ success: false, error: 'Accounts sheet not found' }, 404);
+      }
+      const acctData = getAccountsData(ss);
+      const range = sheet.getRange(1, 1, 35, 50);
+      const values = range.getValues();
+      const displayValues = range.getDisplayValues();
+      const grid = [];
+      for (let r = 0; r < values.length; r++) {
+        const rowItems = [];
+        let hasContent = false;
+        for (let c = 0; c < values[r].length; c++) {
+          const v = values[r][c];
+          const d = displayValues[r][c];
+          if (v !== '' && v !== null) {
+            hasContent = true;
+            rowItems.push({ col: c + 1, val: v, disp: d });
+          }
+        }
+        if (hasContent) {
+          grid.push({ row: r + 1, items: rowItems });
+        }
+      }
+      return createJsonResponse({ success: true, acctData, grid }, 200);
+    }
+
     // Protected endpoints require mandatory authentication check (admin/diagnostic only)
     const authError = verifyAuthSecret(e, null, false);
     if (authError) {
@@ -1879,7 +1907,8 @@ function getAccountsData(ss) {
   const maxRows = 40;
   const maxCols = 50;
   const dataRange = sheet.getRange(1, 1, maxRows, maxCols);
-  const values = dataRange.getDisplayValues();
+  const displayValues = dataRange.getDisplayValues();
+  const rawValues = dataRange.getValues();
 
   // Search for the table header row
   let headerRow = -1;
@@ -1889,24 +1918,30 @@ function getAccountsData(ss) {
   let colDeposits = -1;
   let colWithdrawals = -1;
 
-  for (let r = 0; r < values.length; r++) {
-    for (let c = 0; c < values[r].length; c++) {
-      const val = String(values[r][c] || '').toLowerCase().trim();
+  // 1. Find the main table header row ("Account Names")
+  for (let r = 0; r < displayValues.length; r++) {
+    for (let c = 0; c < displayValues[r].length; c++) {
+      const val = String(displayValues[r][c] || '').toLowerCase().trim();
       if (val === 'account names') {
         headerRow = r;
         colAccountNames = c;
+        break;
       }
     }
-    if (colAccountNames !== -1) {
-      for (let c = 0; c < values[headerRow].length; c++) {
-        const val = String(values[headerRow][c] || '').toLowerCase().trim();
-        if (val === 'start balance') colStartBalance = c;
-        if (val === 'current balance') colCurrentBalance = c;
-        if (val.indexOf('deposits') !== -1) colDeposits = c;
-        if (val.indexOf('withdrawal') !== -1) colWithdrawals = c;
-      }
-      break;
-    }
+    if (headerRow !== -1) break;
+  }
+
+  if (headerRow === -1) {
+    throw new Error('Required header "Account Names" not found in Accounts tab.');
+  }
+
+  // 2. Discover column positions strictly within the table header row
+  for (let c = 0; c < displayValues[headerRow].length; c++) {
+    const val = String(displayValues[headerRow][c] || '').toLowerCase().trim();
+    if (val === 'start balance') colStartBalance = c;
+    if (val === 'current balance') colCurrentBalance = c;
+    if (val.indexOf('deposits') !== -1) colDeposits = c;
+    if (val.indexOf('withdraw') !== -1) colWithdrawals = c;
   }
 
   if (colAccountNames === -1) {
@@ -1929,28 +1964,45 @@ function getAccountsData(ss) {
     return num;
   }
 
+  function extractCellValue(r, c) {
+    if (c < 0 || c >= maxCols) return null;
+    const raw = rawValues[r][c];
+    if (typeof raw === 'number') return raw;
+    const disp = displayValues[r][c];
+    if (disp === '' || disp === null || disp === undefined || disp === 'Ksh') return null;
+    return parseAmount(disp);
+  }
+
   const accounts = [];
   // Standard Accounts list in this sheet
-  for (let r = headerRow + 1; r < values.length; r++) {
-    const acctName = String(values[r][colAccountNames] || '').trim();
+  for (let r = headerRow + 1; r < displayValues.length; r++) {
+    const acctName = String(displayValues[r][colAccountNames] || '').trim();
     if (!acctName) continue;
     if (acctName.indexOf('THIS SPREADSHEET') !== -1) break;
 
-    // Numerical values are located in the column or column + 1 (if currency column is separate)
-    const startVal = colStartBalance !== -1 ? parseAmount(values[r][colStartBalance + 1] !== undefined && values[r][colStartBalance + 1] !== '' ? values[r][colStartBalance + 1] : values[r][colStartBalance]) : 0;
-    const currVal = colCurrentBalance !== -1 ? parseAmount(values[r][colCurrentBalance + 1] !== undefined && values[r][colCurrentBalance + 1] !== '' ? values[r][colCurrentBalance + 1] : values[r][colCurrentBalance]) : 0;
-    const depVal = colDeposits !== -1 ? parseAmount(values[r][colDeposits + 1] !== undefined && values[r][colDeposits + 1] !== '' ? values[r][colDeposits + 1] : values[r][colDeposits]) : 0;
-    let withVal = 0;
+    let startVal = 0, currVal = 0, depVal = 0, withVal = 0;
+    if (colStartBalance !== -1) {
+      for (let offset = 1; offset <= 5; offset++) {
+        const v = extractCellValue(r, colStartBalance + offset);
+        if (v !== null) { startVal = v; break; }
+      }
+    }
+    if (colCurrentBalance !== -1) {
+      for (let offset = 1; offset <= 5; offset++) {
+        const v = extractCellValue(r, colCurrentBalance + offset);
+        if (v !== null) { currVal = v; break; }
+      }
+    }
+    if (colDeposits !== -1) {
+      for (let offset = 1; offset <= 5; offset++) {
+        const v = extractCellValue(r, colDeposits + offset);
+        if (v !== null) { depVal = v; break; }
+      }
+    }
     if (colWithdrawals !== -1) {
-      for (let offset = 0; offset <= 5; offset++) {
-        const rawCell = values[r][colWithdrawals + offset];
-        if (rawCell !== undefined && rawCell !== '' && rawCell !== null) {
-          const parsed = parseAmount(rawCell);
-          if (parsed !== 0) {
-            withVal = parsed;
-            break;
-          }
-        }
+      for (let offset = 1; offset <= 5; offset++) {
+        const v = extractCellValue(r, colWithdrawals + offset);
+        if (v !== null) { withVal = v; break; }
       }
     }
 
