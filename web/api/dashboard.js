@@ -31,6 +31,7 @@ export default async function handler(req, res) {
     }
 
     const data = await upstreamRes.json();
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     return res.status(200).json(data);
   } catch (err) {
     const isTimeout = err.name === 'AbortError';

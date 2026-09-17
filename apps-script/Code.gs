@@ -212,32 +212,40 @@ function doGet(e) {
       }, 200);
     }
 
-    if (action === 'debug_accounts') {
+    if (action === 'raw_grid_dump') {
       const sheet = ss.getSheetByName('Accounts');
       if (!sheet) {
         return createJsonResponse({ success: false, error: 'Accounts sheet not found' }, 404);
       }
-      const acctData = getAccountsData(ss);
-      const range = sheet.getRange(1, 1, 35, 50);
+      const range = sheet.getRange(12, 1, 14, 45); // Rows 12-25, Cols 1-45 (A to AS)
       const values = range.getValues();
       const displayValues = range.getDisplayValues();
-      const grid = [];
+      const dump = [];
       for (let r = 0; r < values.length; r++) {
-        const rowItems = [];
-        let hasContent = false;
+        const rowNum = 12 + r;
         for (let c = 0; c < values[r].length; c++) {
-          const v = values[r][c];
-          const d = displayValues[r][c];
-          if (v !== '' && v !== null) {
-            hasContent = true;
-            rowItems.push({ col: c + 1, val: v, disp: d });
+          const colNum = c + 1;
+          const val = values[r][c];
+          const disp = displayValues[r][c];
+          if (val !== '' && val !== null) {
+            let colLetter = '';
+            let tempCol = colNum;
+            while (tempCol > 0) {
+              let rem = (tempCol - 1) % 26;
+              colLetter = String.fromCharCode(65 + rem) + colLetter;
+              tempCol = Math.floor((tempCol - rem) / 26);
+            }
+            dump.push({
+              row: rowNum,
+              colLetter: colLetter,
+              colIndex: colNum,
+              val: val,
+              disp: disp
+            });
           }
         }
-        if (hasContent) {
-          grid.push({ row: r + 1, items: rowItems });
-        }
       }
-      return createJsonResponse({ success: true, acctData, grid }, 200);
+      return createJsonResponse({ success: true, dump }, 200);
     }
 
     // Protected endpoints require mandatory authentication check (admin/diagnostic only)
