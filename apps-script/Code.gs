@@ -384,6 +384,7 @@ function doPost(e) {
     if (action === 'createTransaction') {
       return handleCreateTransaction(payload.transaction);
     } else if (action === 'createTransferPair') {
+      // Explicit transfer pair handler
       const tx = payload.transaction || payload;
       return handleCreateTransferPair(tx);
     } else if (action === 'batchCreateTransactions') {
