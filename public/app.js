@@ -550,8 +550,9 @@ function renderReviewCards() {
 
         const result = await response.json();
 
-        if (response.status === 201 || result.success) {
-          showToast(`✓ Recorded ${confirmedTx.transactionCode} to row ${result.data?.row || 'next available'}`, 'success');
+        if (response.ok && result.success) {
+          const rowInfo = result.data?.row || (result.firstRow ? `${result.firstRow}-${result.lastRow}` : 'sheet');
+          showToast(`✓ Recorded ${confirmedTx.transactionCode} to row ${rowInfo}`, 'success');
           state.confirmedRecords.unshift({
             ...confirmedTx,
             status: 'SYNCED',
