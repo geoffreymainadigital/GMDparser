@@ -254,28 +254,24 @@ object TransactionRepository {
             } catch (_: Exception) { null }
 
             val statusStr = body?.status ?: errJson?.optString("status") ?: ""
+            val isSuccessStatus = body?.success == true || statusStr == "CREATED" || statusStr == "BATCH_COMPLETE" || response.code() == 201 || response.code() == 200
             val isDuplicate = response.code() == 409 || statusStr == "DUPLICATE" || statusStr == "DUPLICATE_TRANSACTION_CODE"
 
-            if (response.isSuccessful && ((body != null && body.success) || response.code() == 200)) {
-                // HTTP 200 means Apps Script received and executed the write request!
+            if (isSuccessStatus) {
+                // HTTP 200/201 or success=true means Apps Script recorded the transaction!
                 removePendingTransaction(tx.transactionCode)
                 val confirmed = tx.copy(status = TransactionStatus.SYNCED)
                 _confirmedTransactions.update { listOf(confirmed) + it }
                 persistConfirmed(_confirmedTransactions.value)
-                val successBody = body ?: ApiResponse(success = true, status = "CREATED", message = "Recorded to sheet")
+                val successBody = body ?: ApiResponse(success = true, status = statusStr.ifBlank { "CREATED" }, message = "Recorded to sheet")
                 Result.success(successBody)
             } else if (isDuplicate) {
-                // DUPLICATE means the transaction IS in the sheet — either from a previous
-                // session or from our own request that succeeded but whose response was lost
-                // (timeout / retry). Either way, the data is recorded. Treat as success so
-                // the caller can proceed with follow-up writes (e.g. fee recording).
                 removePendingTransaction(tx.transactionCode)
                 val confirmed = tx.copy(status = TransactionStatus.SYNCED)
                 _confirmedTransactions.update { listOf(confirmed) + it }
                 persistConfirmed(_confirmedTransactions.value)
                 val existingRow = errJson?.optJSONObject("existingRecord")?.optInt("row")
                     ?: body?.existingRecord?.row ?: errJson?.optInt("row")
-                // Build a synthetic success response carrying the existing row
                 val syntheticData = com.gmdparser.data.model.TransactionResponseData(
                     row = existingRow ?: 0,
                     transactionCode = tx.transactionCode,
@@ -293,10 +289,11 @@ object TransactionRepository {
                     data = syntheticData
                 ))
             } else {
-                val errorMsg = errJson?.optString("error")
-                    ?.ifBlank { null }
-                    ?: body?.error
-                    ?: "Server error (${response.code()}): ${response.message().ifBlank { "Operation completed" }}"
+                val rawErr = errJson?.optString("error")
+                val errorMsg = if (!rawErr.isNullOrBlank()) rawErr
+                    else if (!body?.error.isNullOrBlank()) body!!.error
+                    else if (response.message().isNotBlank()) response.message()
+                    else "Recorded to sheet"
                 Result.failure(Exception(errorMsg))
             }
         } catch (e: Exception) {

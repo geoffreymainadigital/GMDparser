@@ -66,8 +66,7 @@ export default async function handler(req, res) {
     const upstreamRes = await fetch(appsScriptUrl, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'X-GMD-Auth-Key': authSecret
+        'Content-Type': 'text/plain;charset=utf-8'
       },
       body: JSON.stringify(backendPayload),
       redirect: 'follow',

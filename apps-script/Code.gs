@@ -381,12 +381,12 @@ function doPost(e) {
 
     const action = payload.action || 'createTransaction';
 
-    if (action === 'createTransaction') {
-      return handleCreateTransaction(payload.transaction);
-    } else if (action === 'createTransferPair') {
-      // Explicit transfer pair handler
+    if (action === 'createTransaction' || action === 'createTransferPair') {
       const tx = payload.transaction || payload;
-      return handleCreateTransferPair(tx);
+      if (tx && (tx.destinationAccount || action === 'createTransferPair')) {
+        return handleCreateTransferPair(tx);
+      }
+      return handleCreateTransaction(tx);
     } else if (action === 'batchCreateTransactions') {
       return handleBatchCreateTransactions(payload.transactions);
     } else if (action === 'validateTransaction') {

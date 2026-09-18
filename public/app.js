@@ -542,7 +542,7 @@ function renderReviewCards() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            action: 'createTransaction',
+            action: isTransferType ? 'createTransferPair' : 'createTransaction',
             transaction: confirmedTx
           })
         });
