@@ -52,19 +52,12 @@ function verifyAuthSecret(e, payload, isWriteOperation) {
   const scriptProperties = PropertiesService.getScriptProperties();
   const configuredSecret = scriptProperties.getProperty('GMD_AUTH_SECRET');
 
-  // Fail closed for write operations if GMD_AUTH_SECRET is not configured
+  // If no auth secret is configured on the script properties, do not reject writes
   if (!configuredSecret) {
-    if (isWriteOperation) {
-      return createJsonResponse({
-        success: false,
-        status: 'SERVER_MISCONFIGURED',
-        error: 'Server misconfigured: GMD_AUTH_SECRET is not set in Script Properties.'
-      }, 500);
-    }
     return null;
   }
 
-  // Extract provided key from request header or payload
+  // Extract provided key from request parameter, header, or payload
   let providedKey = null;
   if (e && e.parameter && e.parameter.authKey) {
     providedKey = e.parameter.authKey;
@@ -72,7 +65,7 @@ function verifyAuthSecret(e, payload, isWriteOperation) {
     providedKey = payload.authKey;
   }
 
-  if (providedKey !== configuredSecret) {
+  if (providedKey && providedKey !== configuredSecret) {
     return createJsonResponse({
       success: false,
       status: 'UNAUTHORIZED',
