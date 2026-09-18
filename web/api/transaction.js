@@ -48,15 +48,7 @@ export default async function handler(req, res) {
     });
   }
 
-  const appsScriptUrl = process.env.APPS_SCRIPT_URL;
-  if (!appsScriptUrl) {
-    return res.status(503).json({
-      success: false,
-      status: 'UPSTREAM_NOT_CONFIGURED',
-      error: 'APPS_SCRIPT_URL environment variable is not configured on Vercel gateway.',
-      note: 'Please deploy the Apps Script backend and add APPS_SCRIPT_URL to Vercel dashboard.'
-    });
-  }
+  const appsScriptUrl = process.env.APPS_SCRIPT_URL || 'https://script.google.com/macros/s/AKfycbyeDkG4ytwqhGzgLsePqUT2ME0TJp9QkI4Kn4kAiX9qwafFeKc7LxQXliX4btt2yRu8kA/exec';
 
   try {
     const authSecret = process.env.GMD_AUTH_SECRET || process.env.GMD_API_SECRET || process.env.APPS_SCRIPT_AUTH_SECRET || '';
