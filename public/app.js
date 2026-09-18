@@ -477,9 +477,9 @@ function renderReviewCards() {
       ${tx.rawText ? `<div class="review-raw-sms">${tx.rawText}</div>` : ''}
 
       <div class="review-actions-row">
-        ${!tx.category ? '<span class="text-amber" style="margin-right: 12px; font-size: 13px;">⚠️ Needs categorization</span>' : ''}
+        ${(!tx.category && !isTransfer) ? '<span class="text-amber" style="margin-right: 12px; font-size: 13px;">⚠️ Needs categorization</span>' : ''}
         <button class="btn btn-danger btn-sm btn-dismiss" data-index="${index}">Dismiss</button>
-        <button class="btn btn-primary btn-confirm" data-index="${index}" id="btn-confirm-${index}" ${!tx.category ? 'disabled' : ''}>
+        <button class="btn btn-primary btn-confirm" data-index="${index}" id="btn-confirm-${index}" ${(!tx.category && !isTransfer) ? 'disabled' : ''}>
           <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
           Confirm & Record to Sheet
         </button>
