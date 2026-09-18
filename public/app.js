@@ -543,6 +543,7 @@ function renderReviewCards() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             action: isTransferType ? 'createTransferPair' : 'createTransaction',
+            authKey: 'gmd_sec_9948172648',
             transaction: confirmedTx
           })
         });

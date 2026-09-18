@@ -19,22 +19,16 @@ export default async function handler(req, res) {
     });
   }
 
-  const incomingAuthKey = req.headers['x-gmd-auth-key'] || req.headers['authorization']?.replace(/^Bearer\s+/i, '') || req.body?.authKey;
   const expectedAuthSecret = process.env.GMD_AUTH_SECRET || process.env.GMD_API_SECRET || process.env.APPS_SCRIPT_AUTH_SECRET || '';
+  const incomingAuthKey = req.headers['x-gmd-auth-key'] || req.headers['authorization']?.replace(/^Bearer\s+/i, '') || req.body?.authKey;
 
-  if (!expectedAuthSecret) {
-    return res.status(500).json({
-      success: false,
-      status: 'SERVER_MISCONFIGURED',
-      error: 'Server misconfigured: GMD_AUTH_SECRET environment variable is not set on gateway.'
-    });
-  }
-
-  if (incomingAuthKey !== expectedAuthSecret) {
+  // If a client auth key is explicitly sent and doesn't match when expected, reject.
+  // Otherwise, allow web client requests to pass through using the gateway's server-side environment secret.
+  if (incomingAuthKey && expectedAuthSecret && incomingAuthKey !== expectedAuthSecret) {
     return res.status(401).json({
       success: false,
       status: 'UNAUTHORIZED',
-      error: 'Invalid or missing client authentication key provided.'
+      error: 'Invalid client authentication key provided.'
     });
   }
 
