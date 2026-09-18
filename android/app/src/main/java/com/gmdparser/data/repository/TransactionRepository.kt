@@ -254,7 +254,12 @@ object TransactionRepository {
             } catch (_: Exception) { null }
 
             val statusStr = body?.status ?: errJson?.optString("status") ?: ""
-            val isSuccessStatus = body?.success == true || statusStr == "CREATED" || statusStr == "BATCH_COMPLETE" || response.code() == 201 || response.code() == 200
+            val isSuccessStatus = (response.isSuccessful && (body?.success == true || errJson?.optBoolean("success") == true)) ||
+                    body?.success == true ||
+                    statusStr == "CREATED" ||
+                    statusStr == "BATCH_COMPLETE" ||
+                    response.code() == 201 ||
+                    response.code() == 200
             val isDuplicate = response.code() == 409 || statusStr == "DUPLICATE" || statusStr == "DUPLICATE_TRANSACTION_CODE"
 
             if (isSuccessStatus) {
