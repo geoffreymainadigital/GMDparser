@@ -17,7 +17,8 @@ export default async function handler(req, res) {
     const timeoutId = setTimeout(() => controller.abort(), 12000);
     const authParam = authSecret ? `&authKey=${encodeURIComponent(authSecret)}` : '';
 
-    const upstreamRes = await fetch(, { redirect: 'follow',
+    const upstreamRes = await fetch(appsScriptUrl + '?action=getRecentTransactions&limit=' + limit + authParam, {
+      redirect: 'follow',
       method: 'GET',
       headers: {
         'X-GMD-Auth-Key': authSecret
