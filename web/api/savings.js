@@ -14,7 +14,7 @@ export default async function handler(req, res) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-    const upstreamRes = await fetch(appsScriptUrl + '?action=savings', {
+    const upstreamRes = await fetch(, { redirect: 'follow',
       method: 'GET',
       signal: controller.signal
     });
