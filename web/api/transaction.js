@@ -70,6 +70,7 @@ export default async function handler(req, res) {
         'X-GMD-Auth-Key': authSecret
       },
       body: JSON.stringify(backendPayload),
+      redirect: 'follow',
       signal: controller.signal
     });
     clearTimeout(timeoutId);
