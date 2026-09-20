@@ -3,7 +3,17 @@
  */
 
 export function verifyApiKey(req, res) {
-  const apiKey = process.env.GMD_API_KEY || process.env.GMD_AUTH_SECRET || 'gmd_secret_2026_x9k2m';
+  const apiKey = process.env.GMD_API_KEY || process.env.GMD_AUTH_SECRET;
+
+  if (!apiKey) {
+    res.status(500).json({
+      success: false,
+      status: 'SERVER_MISCONFIGURED',
+      error: 'API Key security misconfigured: Neither GMD_API_KEY nor GMD_AUTH_SECRET environment variable is set on Vercel.'
+    });
+    return false;
+  }
+
   const providedKey = req.headers['x-gmd-api-key'] || req.headers['x-gmd-auth-key'];
 
   // Check HTTP-only Session Cookie for Web portal requests
