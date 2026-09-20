@@ -376,6 +376,9 @@ function doPost(e) {
 
     if (action === 'createTransaction' || action === 'createTransferPair') {
       const tx = payload.transaction || payload;
+      if (payload.destinationAccount && tx && !tx.destinationAccount) {
+        tx.destinationAccount = payload.destinationAccount;
+      }
       if (tx && (tx.destinationAccount || action === 'createTransferPair')) {
         return handleCreateTransferPair(tx);
       }
