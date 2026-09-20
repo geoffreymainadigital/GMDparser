@@ -131,6 +131,18 @@ fun MainAppHost(initialScreen: Screen = Screen.DASHBOARD) {
                         )
                     }
                 },
+                actions = {
+                    val isPrivacyOn by AppPreferences.isPrivacyBlurFlow.collectAsState()
+                    IconButton(onClick = {
+                        AppPreferences.isPrivacyBlurEnabled = !isPrivacyOn
+                    }) {
+                        Icon(
+                            imageVector = if (isPrivacyOn) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                            contentDescription = "Toggle Privacy Blur",
+                            tint = if (isPrivacyOn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                     titleContentColor = MaterialTheme.colorScheme.onSurface

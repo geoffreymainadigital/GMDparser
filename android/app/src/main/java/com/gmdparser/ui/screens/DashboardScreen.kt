@@ -13,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -43,6 +44,7 @@ fun DashboardScreen(
             .padding(16.dp)
             .verticalScroll(rememberScrollState())
     ) {
+        val isPrivacyOn by com.gmdparser.util.AppPreferences.isPrivacyBlurFlow.collectAsState()
         val dashboardData by TransactionRepository.dashboardData.collectAsState()
         val mpesaAccount = dashboardData?.accounts?.find { it.accountName.equals("Mpesa", ignoreCase = true) || it.accountName.equals("M-PESA", ignoreCase = true) }
         val mpesaBalance = mpesaAccount?.currentBalance ?: 0.0
@@ -68,7 +70,8 @@ fun DashboardScreen(
                     text = "Ksh ${String.format("%,.2f", mpesaBalance)}",
                     color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 28.sp,
-                    fontWeight = FontWeight.ExtraBold
+                    fontWeight = FontWeight.ExtraBold,
+                    modifier = Modifier.blur(if (isPrivacyOn) 12.dp else 0.dp)
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -146,18 +149,18 @@ fun DashboardScreen(
 
                 val tiles = activeData?.summaryTiles
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    BudgetSummaryTile("Income", tiles?.totalIncome?.actual ?: 0.0, tiles?.totalIncome?.goal, MaterialTheme.colorScheme.primary, Modifier.weight(1f))
-                    BudgetSummaryTile("Bills", tiles?.totalBills?.actual ?: 0.0, tiles?.totalBills?.goal, AccentAmber, Modifier.weight(1f))
+                    BudgetSummaryTile("Income", tiles?.totalIncome?.actual ?: 0.0, tiles?.totalIncome?.goal, MaterialTheme.colorScheme.primary, Modifier.weight(1f), isPrivacyOn)
+                    BudgetSummaryTile("Bills", tiles?.totalBills?.actual ?: 0.0, tiles?.totalBills?.goal, AccentAmber, Modifier.weight(1f), isPrivacyOn)
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    BudgetSummaryTile("Debt", tiles?.totalDebtPayoff?.actual ?: 0.0, tiles?.totalDebtPayoff?.goal, AccentBlue, Modifier.weight(1f))
-                    BudgetSummaryTile("Expenses", tiles?.totalExpenses?.actual ?: 0.0, tiles?.totalExpenses?.goal, AccentRed, Modifier.weight(1f))
+                    BudgetSummaryTile("Debt", tiles?.totalDebtPayoff?.actual ?: 0.0, tiles?.totalDebtPayoff?.goal, AccentBlue, Modifier.weight(1f), isPrivacyOn)
+                    BudgetSummaryTile("Expenses", tiles?.totalExpenses?.actual ?: 0.0, tiles?.totalExpenses?.goal, AccentRed, Modifier.weight(1f), isPrivacyOn)
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    BudgetSummaryTile("Savings", tiles?.totalSavings?.actual ?: 0.0, tiles?.totalSavings?.goal, AccentCyan, Modifier.weight(1f))
-                    BudgetSummaryTile("Unallocated", tiles?.unallocatedIncome?.actual ?: 0.0, null, MaterialTheme.colorScheme.onSurfaceVariant, Modifier.weight(1f))
+                    BudgetSummaryTile("Savings", tiles?.totalSavings?.actual ?: 0.0, tiles?.totalSavings?.goal, AccentCyan, Modifier.weight(1f), isPrivacyOn)
+                    BudgetSummaryTile("Unallocated", tiles?.unallocatedIncome?.actual ?: 0.0, null, MaterialTheme.colorScheme.onSurfaceVariant, Modifier.weight(1f), isPrivacyOn)
                 }
             }
         }
@@ -374,7 +377,8 @@ fun BudgetSummaryTile(
     actual: Double,
     goal: Double?,
     color: androidx.compose.ui.graphics.Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isPrivacyOn: Boolean = false
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
@@ -388,7 +392,8 @@ fun BudgetSummaryTile(
                 text = "Ksh ${String.format("%,.0f", actual)}",
                 color = color,
                 fontSize = 14.sp,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.blur(if (isPrivacyOn) 8.dp else 0.dp)
             )
             if (goal != null) {
                 Spacer(modifier = Modifier.height(2.dp))

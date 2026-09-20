@@ -1439,7 +1439,7 @@ function updatePinSettingsUI(enabled) {
 function showPinModal(mode, title, subtitle) {
   currentPinMode = mode;
   pinBuffer = '';
-  const overlay = document.getElementById('pin-lock-overlay');
+  const overlay = document.getElementById('pin-overlay');
   const titleEl = document.getElementById('pin-modal-title');
   const subEl = document.getElementById('pin-modal-subtitle');
   const cancelBtn = document.getElementById('pin-btn-cancel');
@@ -1453,7 +1453,7 @@ function showPinModal(mode, title, subtitle) {
 }
 
 function hidePinModal() {
-  const overlay = document.getElementById('pin-lock-overlay');
+  const overlay = document.getElementById('pin-overlay');
   if (overlay) overlay.style.display = 'none';
   pinBuffer = '';
 }
@@ -1484,10 +1484,10 @@ function handlePinDigitInput(digit) {
 async function processPinSubmission() {
   if (currentPinMode === 'UNLOCK') {
     try {
-      const res = await fetch('/api/auth/verify-pin', {
+      const res = await fetch('/api/auth-check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin: pinBuffer })
+        body: JSON.stringify({ action: 'verifyPin', pin: pinBuffer })
       });
       const data = await res.json();
       if (res.ok && data.success) {

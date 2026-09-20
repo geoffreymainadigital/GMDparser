@@ -15,15 +15,27 @@ object AppPreferences {
     private const val KEY_PIN_ENABLED = "pin_enabled"
     private const val KEY_BIOMETRIC_ENABLED = "biometric_enabled"
     private const val KEY_AUTH_TYPE  = "auth_type"
+    private const val KEY_PRIVACY_BLUR = "privacy_blur"
 
     private var prefs: SharedPreferences? = null
+
+    val isPrivacyBlurFlow = kotlinx.coroutines.flow.MutableStateFlow(false)
 
     fun init(context: Context) {
         if (prefs == null) {
             prefs = context.applicationContext
                 .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            isPrivacyBlurFlow.value = isPrivacyBlurEnabled
         }
     }
+
+    /** Returns true when Privacy Blur Mode is active. */
+    var isPrivacyBlurEnabled: Boolean
+        get() = prefs?.getBoolean(KEY_PRIVACY_BLUR, false) ?: false
+        set(value) {
+            prefs?.edit()?.putBoolean(KEY_PRIVACY_BLUR, value)?.apply()
+            isPrivacyBlurFlow.value = value
+        }
 
     // ── PIN & Biometrics ──────────────────────────────────────────────────
 

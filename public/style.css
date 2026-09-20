@@ -1030,8 +1030,13 @@ textarea:focus, input:focus, select:focus {
 /* Blur Filter when Privacy Mode ON */
 body.privacy-on .metric-val,
 body.privacy-on .amount-cell,
-body.privacy-on .balance-val,
-body.privacy-on .privacy-blur {
+body.privacy-on .acc-bal,
+body.privacy-on .privacy-blur,
+body.privacy-on td:nth-child(2),
+body.privacy-on td:nth-child(3),
+body.privacy-on td:nth-child(4),
+body.privacy-on td:nth-child(5),
+body.privacy-on td:nth-child(7) {
   filter: blur(6px);
   user-select: none;
   transition: filter 200ms ease;
