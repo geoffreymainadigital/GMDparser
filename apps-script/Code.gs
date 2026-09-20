@@ -915,19 +915,16 @@ function handleBatchCreateTransactions(transactions) {
     // Stage 3b: Apply category data-validation rules for all rows in one call.
     //   Each row gets its own rule matching its Type — built from the taxonomy cache.
     //   setDataValidations accepts a 2-D array of DataValidation objects.
-    try {
-      const catRules2D = toWrite.map(function(item) {
+      toWrite.forEach(function(item, idx) {
         const cats = getCategoriesForType(item.tx.type);
-        if (!cats || cats.length === 0) return [null];  // no rule if taxonomy empty
-        return [SpreadsheetApp.newDataValidation()
-          .requireValueInList(cats, true)
-          .setAllowInvalid(false)
-          .build()];
+        if (cats && cats.length > 0) {
+          const rule = SpreadsheetApp.newDataValidation()
+            .requireValueInList(cats, true)
+            .setAllowInvalid(false)
+            .build();
+          sheet.getRange(firstTargetRow + idx, COL_CATEGORY).setDataValidation(rule);
+        }
       });
-      // Filter: only apply if all rows have valid non-null rules
-      if (catRules2D.length > 0 && catRules2D.every(function(r) { return r && r[0] !== null; })) {
-        sheet.getRange(firstTargetRow, COL_CATEGORY, toWrite.length, 1).setDataValidations(catRules2D);
-      }
     } catch (dvErr) {
       console.warn('Data validation rule application skipped: ' + dvErr.toString());
     }
