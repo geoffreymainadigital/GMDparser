@@ -1683,41 +1683,36 @@ function getMonthlyDashboardData(ss) {
   }
 
   function findTileValue(pos) {
-    // 1. Precise positional read: Large headline totals sit on row index 1 (Row 2 in sheet) at pos.col
-    if (pos.row > 1 && pos.col < values[1].length) {
-      const valRow2 = values[1][pos.col];
-      if (valRow2 !== '' && valRow2 !== null && valRow2 !== undefined) {
-        return parseAmount(valRow2);
-      }
-    }
-
-    // 2. Search radius using font size >= 18 or largest-font numeric candidate
-    for (let radius = 1; radius <= 5; radius++) {
-      let bestVal = null;
-      for (let dr = -radius; dr <= radius; dr++) {
-        for (let dc = -radius; dc <= radius; dc++) {
-          let r = pos.row + dr;
-          let c = pos.col + dc;
-          if (r >= 0 && r < values.length && c >= 0 && c < values[r].length) {
-            let val = values[r][c];
-            if (val !== '' && val !== null) {
-              const strVal = String(val);
-              // Ignore subtitle annotation strings like "Ksh... under goal/budget"
-              if (strVal.includes('under') || strVal.includes('over') || strVal.includes('goal') || strVal.includes('budget')) {
-                continue;
-              }
-              let num = parseAmount(val);
-              if (typeof val === 'number' || (typeof val === 'string' && val.match(/[0-9]/))) {
-                if (bestVal === null) {
-                  bestVal = num;
-                }
-              }
-            }
+    if (!pos) return null;
+    
+    // 1. Check directly below (up to 3 rows down in same column)
+    for (let dr = 1; dr <= 3; dr++) {
+      let r = pos.row + dr;
+      if (r < values.length && values[r][pos.col] !== '' && values[r][pos.col] !== null && values[r][pos.col] !== undefined) {
+        let strVal = String(values[r][pos.col]);
+        if (!strVal.includes('under') && !strVal.includes('over') && !strVal.includes('goal') && !strVal.includes('budget')) {
+          let num = parseAmount(values[r][pos.col]);
+          if (typeof values[r][pos.col] === 'number' || strVal.match(/[0-9]/)) {
+            return num;
           }
         }
       }
-      if (bestVal !== null) return bestVal;
     }
+
+    // 2. Check directly to the right (up to 3 columns right in same row)
+    for (let dc = 1; dc <= 3; dc++) {
+      let c = pos.col + dc;
+      if (c < values[pos.row].length && values[pos.row][c] !== '' && values[pos.row][c] !== null && values[pos.row][c] !== undefined) {
+        let strVal = String(values[pos.row][c]);
+        if (!strVal.includes('under') && !strVal.includes('over') && !strVal.includes('goal') && !strVal.includes('budget')) {
+          let num = parseAmount(values[pos.row][c]);
+          if (typeof values[pos.row][c] === 'number' || strVal.match(/[0-9]/)) {
+            return num;
+          }
+        }
+      }
+    }
+
     return null;
   }
 
