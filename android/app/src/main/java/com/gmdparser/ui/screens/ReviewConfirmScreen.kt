@@ -86,11 +86,16 @@ fun ReviewConfirmScreen(
                     onSuccess = { res ->
                         submittingTxCode = null
                         val isDupOk = res.status == "DUPLICATE_OK"
-                        feedbackStyle = FeedbackStyle.SUCCESS
-                        feedbackMessage = if (isDupOk) {
-                            "✓ Transfer ${tx.transactionCode} (-OUT & -IN) already in sheet."
+                        val isBatchOk = res.status == "BATCH_COMPLETE" || (res.written != null && res.written >= 2) || (res.results != null && res.results.size >= 2)
+                        if (isDupOk) {
+                            feedbackStyle = FeedbackStyle.SUCCESS
+                            feedbackMessage = "✓ Transfer ${tx.transactionCode} (-OUT & -IN) already in sheet."
+                        } else if (isBatchOk || res.status == "CREATED") {
+                            feedbackStyle = FeedbackStyle.SUCCESS
+                            feedbackMessage = "✓ Transfer recorded: -Ksh ${tx.amount} (${tx.account}) and +Ksh ${tx.amount} (${tx.destinationAccount})."
                         } else {
-                            "✓ Transfer recorded: -Ksh ${tx.amount} (${tx.account}) and +Ksh ${tx.amount} (${tx.destinationAccount})."
+                            feedbackStyle = FeedbackStyle.ERROR
+                            feedbackMessage = "✗ Transfer warning: Server did not confirm two-leg write (status=${res.status})."
                         }
                     },
                     onFailure = { err ->

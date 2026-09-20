@@ -108,6 +108,8 @@ data class ApiResponse(
     @SerializedName("status") val status: String,
     @SerializedName("message") val message: String? = null,
     @SerializedName("error") val error: String? = null,
+    @SerializedName("written") val written: Int? = null,
+    @SerializedName("results") val results: List<BatchTransactionResult>? = null,
     @SerializedName("data") val data: TransactionResponseData? = null,
     @SerializedName("existingRecord") val existingRecord: ExistingRecord? = null
 )
