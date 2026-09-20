@@ -66,6 +66,7 @@ export default async function handler(req, res) {
       authKey: authSecret,
       code: payload.code,
       rows: payload.rows,
+      ...(destAcc ? { destinationAccount: destAcc } : {}),
       transaction: txObj
     };
 
