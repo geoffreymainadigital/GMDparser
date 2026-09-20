@@ -19,8 +19,26 @@ export default async function handler(req, res) {
     });
   }
 
-  // Allow web client requests to pass through using server-side environment secret forwarding.
   const payload = req.body || {};
+  const requestedAction = payload.action || 'createTransaction';
+
+  if (requestedAction === 'deleteSingleRowByCode') {
+    const appsScriptUrl = process.env.APPS_SCRIPT_URL;
+    const authSecret = process.env.GMD_AUTH_SECRET || process.env.GMD_API_SECRET || process.env.APPS_SCRIPT_AUTH_SECRET || '';
+    try {
+      const upstreamRes = await fetch(appsScriptUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'deleteSingleRowByCode', authKey: authSecret, code: payload.code }),
+        redirect: 'follow'
+      });
+      const upstreamData = await upstreamRes.json();
+      return res.status(upstreamRes.status).json(upstreamData);
+    } catch (err) {
+      return res.status(502).json({ success: false, error: err.message });
+    }
+  }
+
   const transaction = payload.transaction || payload;
   if (!transaction || typeof transaction !== 'object') {
     return res.status(400).json({
@@ -39,8 +57,9 @@ export default async function handler(req, res) {
       ...(destAcc ? { destinationAccount: destAcc } : {})
     };
     const authSecret = process.env.GMD_AUTH_SECRET || process.env.GMD_API_SECRET || process.env.APPS_SCRIPT_AUTH_SECRET || '';
+    const requestedAction = payload.action || 'createTransaction';
     const backendPayload = {
-      action: 'createTransaction',
+      action: requestedAction,
       authKey: authSecret,
       code: payload.code,
       rows: payload.rows,
