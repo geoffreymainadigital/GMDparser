@@ -1458,15 +1458,25 @@ function handlePinDigitInput(digit) {
   }
 }
 
-function processPinSubmission() {
-  const storedPin = localStorage.getItem('gmd_pin_code');
-
+async function processPinSubmission() {
   if (currentPinMode === 'UNLOCK') {
-    if (pinBuffer === storedPin) {
-      hidePinModal();
-      showToast('✓ Unlocked Web Dashboard', 'success');
-    } else {
-      triggerPinError('Incorrect PIN code');
+    try {
+      const res = await fetch('/api/auth/verify-pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: pinBuffer })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        hidePinModal();
+        showToast('✓ Unlocked Web Dashboard', 'success');
+        // Refresh dashboard now that session cookie is set
+        if (typeof fetchDashboardData === 'function') fetchDashboardData();
+      } else {
+        triggerPinError(data.error || 'Incorrect PIN code');
+      }
+    } catch (err) {
+      triggerPinError('Connection error verifying PIN');
     }
   } else if (currentPinMode === 'CREATE') {
     stagedPin = pinBuffer;
@@ -1487,6 +1497,42 @@ function processPinSubmission() {
     }
   }
 }
+
+// Privacy Blur Toggle Manager
+function initPrivacyBlurManager() {
+  const toggleBtn = document.getElementById('web-privacy-toggle');
+  const icon = document.getElementById('privacy-eye-icon');
+  const isPrivacyOn = localStorage.getItem('gmd_privacy_blur') === 'true';
+
+  function applyPrivacyState(on) {
+    if (on) {
+      document.body.classList.add('privacy-on');
+      if (toggleBtn) toggleBtn.classList.add('active');
+      if (icon) icon.textContent = '🙈';
+    } else {
+      document.body.classList.remove('privacy-on');
+      if (toggleBtn) toggleBtn.classList.remove('active');
+      if (icon) icon.textContent = '👁️';
+    }
+  }
+
+  applyPrivacyState(isPrivacyOn);
+
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', () => {
+      const currentState = document.body.classList.contains('privacy-on');
+      const newState = !currentState;
+      localStorage.setItem('gmd_privacy_blur', newState ? 'true' : 'false');
+      applyPrivacyState(newState);
+      showToast(newState ? 'Privacy Mode ON (Amounts Blurred)' : 'Privacy Mode OFF', 'info');
+    });
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  initPrivacyBlurManager();
+});
+
 
 function triggerPinError(msg) {
   updatePinDotsUI(true);

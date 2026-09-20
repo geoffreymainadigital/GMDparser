@@ -51,6 +51,7 @@ object ApiClient {
                 val original = chain.request()
                 val requestBuilder = original.newBuilder()
                     .header("X-GMD-Auth-Key", BuildConfig.AUTH_SECRET)
+                    .header("X-GMD-API-Key", BuildConfig.AUTH_SECRET)
                 val request = requestBuilder.build()
                 chain.proceed(request)
             }

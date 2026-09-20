@@ -10,6 +10,38 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <!-- PIN Protection Glassmorphism Overlay -->
+  <div id="pin-overlay" class="pin-overlay">
+    <div class="pin-modal">
+      <div class="pin-header">
+        <div class="pin-shield-icon">🔒</div>
+        <h2>GMDParser Web Access</h2>
+        <p>Enter 4-Digit PIN to unlock dashboard</p>
+      </div>
+      <div class="pin-dots">
+        <span class="pin-dot"></span>
+        <span class="pin-dot"></span>
+        <span class="pin-dot"></span>
+        <span class="pin-dot"></span>
+      </div>
+      <div class="pin-keypad">
+        <button class="keypad-btn" data-key="1">1</button>
+        <button class="keypad-btn" data-key="2">2</button>
+        <button class="keypad-btn" data-key="3">3</button>
+        <button class="keypad-btn" data-key="4">4</button>
+        <button class="keypad-btn" data-key="5">5</button>
+        <button class="keypad-btn" data-key="6">6</button>
+        <button class="keypad-btn" data-key="7">7</button>
+        <button class="keypad-btn" data-key="8">8</button>
+        <button class="keypad-btn" data-key="9">9</button>
+        <button class="keypad-btn action-btn" id="pin-clear">C</button>
+        <button class="keypad-btn" data-key="0">0</button>
+        <button class="keypad-btn action-btn" id="pin-submit">➔</button>
+      </div>
+      <div class="pin-error" id="pin-error-msg"></div>
+    </div>
+  </div>
+
   <div class="app-layout">
     <!-- Sidebar Navigation -->
     <aside class="sidebar" id="sidebar">
@@ -69,6 +101,10 @@
           <h1 class="page-title" id="page-title">Dashboard</h1>
         </div>
         <div class="topbar-right">
+          <button id="web-privacy-toggle" class="privacy-btn" title="Toggle Privacy Blur">
+            <span id="privacy-eye-icon">👁️</span>
+            <span class="privacy-btn-text">Privacy</span>
+          </button>
           <div class="conn-pill" id="conn-pill">
             <span class="conn-dot"></span>
             <span id="conn-status-text">Checking network...</span>

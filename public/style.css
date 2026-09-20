@@ -998,3 +998,41 @@ textarea:focus, input:focus, select:focus {
   font-weight: 600;
   color: var(--text-secondary);
 }
+
+/* Privacy Blur Feature */
+.privacy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  margin-right: 12px;
+}
+
+.privacy-btn:hover {
+  background-color: var(--bg-card-hover);
+  border-color: var(--color-cyan);
+}
+
+.privacy-btn.active {
+  background-color: var(--color-cyan-soft);
+  border-color: var(--color-cyan);
+  color: var(--color-cyan);
+}
+
+/* Blur Filter when Privacy Mode ON */
+body.privacy-on .metric-val,
+body.privacy-on .amount-cell,
+body.privacy-on .balance-val,
+body.privacy-on .privacy-blur {
+  filter: blur(6px);
+  user-select: none;
+  transition: filter 200ms ease;
+}
