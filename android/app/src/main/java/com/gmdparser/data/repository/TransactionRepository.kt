@@ -229,6 +229,14 @@ object TransactionRepository {
             transaction = payload
         )
 
+        android.util.Log.d("GMD_NETWORK_DEBUG", "=== OUTGOING HTTP REQUEST ===")
+        android.util.Log.d("GMD_NETWORK_DEBUG", "Base URL: ${NetworkClient.baseUrl}")
+        android.util.Log.d("GMD_NETWORK_DEBUG", "Direct APPS_SCRIPT_URL: ${BuildConfig.APPS_SCRIPT_URL}")
+        android.util.Log.d("GMD_NETWORK_DEBUG", "Action: ${request.action}")
+        android.util.Log.d("GMD_NETWORK_DEBUG", "TxCode: ${payload.transactionCode}, Type: ${payload.type}, Account: ${payload.account}, DestAccount: ${payload.destinationAccount}")
+        val requestJson = com.google.gson.Gson().toJson(request)
+        android.util.Log.d("GMD_NETWORK_DEBUG", "Full Request Body: $requestJson")
+
         return try {
             val response = try {
                 val vercelRes = NetworkClient.apiService.recordTransaction(request)
