@@ -1484,10 +1484,10 @@ function handlePinDigitInput(digit) {
 async function processPinSubmission() {
   if (currentPinMode === 'UNLOCK') {
     try {
-      const res = await fetch('/api/auth-check', {
+      const res = await fetch('/api/verify-pin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'verifyPin', pin: pinBuffer })
+        body: JSON.stringify({ pin: pinBuffer })
       });
       const data = await res.json();
       if (res.ok && data.success) {
