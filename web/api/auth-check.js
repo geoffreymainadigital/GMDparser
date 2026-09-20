@@ -9,7 +9,11 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'POST') {
-    const { action, pin } = req.body || {};
+    let body = req.body || {};
+    if (typeof body === 'string') {
+      try { body = JSON.parse(body); } catch (e) {}
+    }
+    const { action, pin } = body;
     if (action === 'verifyPin' || pin !== undefined) {
       const expectedPin = process.env.GMD_WEB_PIN || '1234';
       if (!pin || String(pin).trim() !== String(expectedPin).trim()) {
