@@ -85,7 +85,7 @@ export default async function handler(req, res) {
     return res.status(isTimeout ? 504 : 502).json({
       success: false,
       status: isTimeout ? 'GATEWAY_TIMEOUT' : 'BAD_GATEWAY',
-      error: isTimeout ? 'Upstream Apps Script request timed out (20s)' : `Upstream connection failure: ${err.message}`
+      error: isTimeout ? 'Upstream Apps Script request timed out (55s)' : `Upstream connection failure: ${err.message}`
     });
   }
 }
