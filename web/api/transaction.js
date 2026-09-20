@@ -5,11 +5,15 @@
 
 export const maxDuration = 60;
 
+import { verifyApiKey } from './auth-guard.js';
+
 export default async function handler(req, res) {
   // CORS Preflight
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
+
+  if (!verifyApiKey(req, res)) return;
 
   if (req.method !== 'POST') {
     return res.status(405).json({

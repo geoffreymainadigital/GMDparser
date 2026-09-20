@@ -3,8 +3,11 @@
  * Proxies monthly budget and accounts summary directly from Google Apps Script
  */
 
+import { verifyApiKey } from './auth-guard.js';
+
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
+  if (!verifyApiKey(req, res)) return;
   if (req.method !== 'GET') return res.status(405).json({ success: false, error: 'Method not allowed' });
 
   const appsScriptUrl = process.env.APPS_SCRIPT_URL;
