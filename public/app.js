@@ -1255,21 +1255,44 @@ function initPinSecurityManager() {
   }
 
   // Bind Keypad Buttons
-  document.querySelectorAll('.pin-keypad .pin-btn[data-key]').forEach(btn => {
+  document.querySelectorAll('.keypad-btn[data-key], .pin-keypad .pin-btn[data-key]').forEach(btn => {
     btn.addEventListener('click', () => {
       const digit = btn.getAttribute('data-key');
       handlePinDigitInput(digit);
     });
   });
 
-  // Delete & Cancel Buttons
-  const delBtn = document.getElementById('pin-btn-del');
-  if (delBtn) {
-    delBtn.addEventListener('click', () => {
-      if (pinBuffer.length > 0) {
-        pinBuffer = pinBuffer.slice(0, -1);
-        updatePinDotsUI();
+  // Physical Keyboard listener for PIN entry
+  window.addEventListener('keydown', (e) => {
+    const overlay = document.getElementById('pin-overlay') || document.getElementById('pin-lock-overlay');
+    if (overlay && (overlay.style.display === 'flex' || getComputedStyle(overlay).display !== 'none')) {
+      if (e.key >= '0' && e.key <= '9') {
+        handlePinDigitInput(e.key);
+      } else if (e.key === 'Backspace') {
+        if (pinBuffer.length > 0) {
+          pinBuffer = pinBuffer.slice(0, -1);
+          updatePinDotsUI();
+        }
+      } else if (e.key === 'Enter') {
+        if (pinBuffer.length === 4) processPinSubmission();
       }
+    }
+  });
+
+  // Clear Button
+  const clearBtn = document.getElementById('pin-clear') || document.getElementById('pin-btn-del');
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+      pinBuffer = '';
+      updatePinDotsUI();
+    });
+  }
+
+  // Submit Button
+  const submitBtn = document.getElementById('pin-submit');
+  if (submitBtn) {
+    submitBtn.addEventListener('click', () => {
+      if (pinBuffer.length === 4) processPinSubmission();
     });
   }
 
@@ -1436,9 +1459,9 @@ function hidePinModal() {
 }
 
 function updatePinDotsUI(isError = false) {
-  const dots = document.querySelectorAll('#pin-dots .dot');
+  const dots = document.querySelectorAll('.pin-dot, #pin-dots .dot');
   dots.forEach((dot, idx) => {
-    dot.className = 'dot';
+    dot.className = dot.classList.contains('pin-dot') ? 'pin-dot' : 'dot';
     if (isError) {
       dot.classList.add('error');
     } else if (idx < pinBuffer.length) {
