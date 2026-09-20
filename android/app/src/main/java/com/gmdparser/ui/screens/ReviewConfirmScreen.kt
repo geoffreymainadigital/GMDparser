@@ -423,7 +423,12 @@ fun ReviewConfirmScreen(
                 },
                 onQuickConfirm = {
                     val recordFee = tx.cost != null && tx.cost > 0.0
-                    submitTransaction(tx, recordFee)
+                    val finalTx = if ((tx.type == "Balance" || tx.type == "Transfer") && tx.destinationAccount.isNullOrBlank()) {
+                        tx.copy(destinationAccount = "Mpesa")
+                    } else {
+                        tx
+                    }
+                    submitTransaction(finalTx, recordFee)
                 },
                 onCustomConfirm = { editedTx, recordFee ->
                     submitTransaction(editedTx, recordFee)
