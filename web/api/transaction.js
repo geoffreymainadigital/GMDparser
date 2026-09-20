@@ -33,13 +33,17 @@ export default async function handler(req, res) {
   const appsScriptUrl = process.env.APPS_SCRIPT_URL;
 
   try {
-    const authSecret = process.env.GMD_AUTH_SECRET || process.env.GMD_API_SECRET || process.env.APPS_SCRIPT_AUTH_SECRET || '';
+    const destAcc = payload.destinationAccount || (transaction && transaction.destinationAccount) || null;
+    const txObj = {
+      ...transaction,
+      ...(destAcc ? { destinationAccount: destAcc } : {})
+    };
     const backendPayload = {
       action: 'createTransaction',
       authKey: authSecret,
       code: payload.code,
       rows: payload.rows,
-      transaction: transaction
+      transaction: txObj
     };
 
     const controller = new AbortController();
