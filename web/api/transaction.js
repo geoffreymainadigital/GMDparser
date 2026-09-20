@@ -38,6 +38,7 @@ export default async function handler(req, res) {
       ...transaction,
       ...(destAcc ? { destinationAccount: destAcc } : {})
     };
+    const authSecret = process.env.GMD_AUTH_SECRET || process.env.GMD_API_SECRET || process.env.APPS_SCRIPT_AUTH_SECRET || '';
     const backendPayload = {
       action: 'createTransaction',
       authKey: authSecret,
