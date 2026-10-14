@@ -44,6 +44,7 @@ data class TransactionPayload(
 data class CreateTransactionRequest(
     @SerializedName("action") val action: String = "createTransaction",
     @SerializedName("authKey") val authKey: String = BuildConfig.AUTH_SECRET,
+    @SerializedName("destinationAccount") val destinationAccount: String? = null,
     @SerializedName("transaction") val transaction: TransactionPayload
 )
 

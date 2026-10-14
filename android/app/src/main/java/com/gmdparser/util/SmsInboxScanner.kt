@@ -50,11 +50,16 @@ object SmsInboxScanner {
                     val address = if (addressIdx >= 0) cursor.getString(addressIdx) else null
 
                     // Quick filter: Check address or keywords before full regex
-                    val isLikelyMpesa = (address != null && address.contains("MPESA", ignoreCase = true)) ||
-                        body.contains("Confirmed", ignoreCase = true) ||
-                        body.contains("M-PESA", ignoreCase = true)
+                    val isLikelyMpesaOrBank = (address != null && (
+                        address.contains("MPESA", ignoreCase = true) ||
+                        address.contains("IANDMBANK", ignoreCase = true) ||
+                        address.contains("I&M", ignoreCase = true)
+                    )) ||
+                    body.contains("Confirmed", ignoreCase = true) ||
+                    body.contains("M-PESA", ignoreCase = true) ||
+                    body.contains("Bank to M-PESA", ignoreCase = true)
 
-                    if (isLikelyMpesa) {
+                    if (isLikelyMpesaOrBank) {
                         val parsed = MpesaParser.parse(body)
                         if (parsed != null && parsed.transactionCode.isNotBlank()) {
                             mpesaTransactions.add(parsed)

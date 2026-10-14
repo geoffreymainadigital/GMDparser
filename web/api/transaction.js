@@ -23,11 +23,27 @@ export default async function handler(req, res) {
     });
   }
 
-  const payload = req.body || {};
+  if (!req.body || typeof req.body !== 'object' || Object.keys(req.body).length === 0) {
+    return res.status(400).json({
+      success: false,
+      status: 'BAD_REQUEST',
+      error: 'Invalid or missing transaction payload'
+    });
+  }
+
+  const payload = req.body;
   const requestedAction = payload.action || 'createTransaction';
 
+  const appsScriptUrl = process.env.APPS_SCRIPT_URL;
+  if (!appsScriptUrl) {
+    return res.status(503).json({
+      success: false,
+      status: 'UPSTREAM_NOT_CONFIGURED',
+      error: 'APPS_SCRIPT_URL environment variable is not configured on Vercel gateway.'
+    });
+  }
+
   if (requestedAction === 'deleteSingleRowByCode') {
-    const appsScriptUrl = process.env.APPS_SCRIPT_URL;
     const authSecret = process.env.GMD_AUTH_SECRET || process.env.GMD_API_SECRET || process.env.APPS_SCRIPT_AUTH_SECRET || '';
     try {
       const upstreamRes = await fetch(appsScriptUrl, {
@@ -51,8 +67,6 @@ export default async function handler(req, res) {
       error: 'Invalid transaction payload'
     });
   }
-
-  const appsScriptUrl = process.env.APPS_SCRIPT_URL;
 
   try {
     const destAcc = payload.destinationAccount || (transaction && transaction.destinationAccount) || null;

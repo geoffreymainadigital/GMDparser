@@ -36,15 +36,49 @@ object MpesaParser {
         RegexOption.IGNORE_CASE
     )
 
-    // 5. Airtime / Bundles purchase
+    // 5. Airtime or Bundles purchase
     private val AIRTIME_REGEX = Regex(
-        "(?:You\\s+(?:have\\s+)?bought|bought)\\s+(?:Ksh|KES)\\.?\\s*([\\d,]+\\.?\\d*)\\s+of\\s+(?:airtime|data(?:\\s+bundles?)?|bundles)(?:\\s+for\\s+(.+?))?\\s+on\\s+(\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4})\\s+at\\s+(\\d{1,2}:\\d{2}\\s*(?:AM|PM)?)",
+        "(?:Ksh|KES)\\.?\\s*([\\d,]+\\.?\\d*)\\s+of\\s+airtime\\s+(?:for\\s+(.+?)\\s+)?on\\s+(\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4})\\s+at\\s+(\\d{1,2}:\\d{2}\\s*(?:AM|PM)?)",
+        RegexOption.IGNORE_CASE
+    )
+
+    // 6. I&M Bank to M-PESA transfer
+    private val IM_TRANSFER_REGEX = Regex(
+        "Bank to M-PESA transfer of (?:Ksh|KES)\\.?\\s*([\\d,]+\\.?\\d*)\\s+to\\s+(?:\\d+\\s*-\\s*)?(.+?)\\s+successfully processed\\..*?M-PESA Ref ID:?\\s*([A-Z0-9]{8,12})",
         RegexOption.IGNORE_CASE
     )
 
     fun parse(smsBody: String?): Transaction? {
         if (smsBody.isNullOrBlank()) return null
         val trimmed = smsBody.trim()
+
+        // Check for I&M Bank transfer format first (which does not start with standard "TXCODE Confirmed")
+        val imMatch = IM_TRANSFER_REGEX.find(trimmed)
+        if (imMatch != null) {
+            val amount = imMatch.groupValues[1].replace(",", "").toDoubleOrNull() ?: 0.0
+            val recipientName = imMatch.groupValues[2].trim()
+            val mpesaRefId = imMatch.groupValues[3].uppercase(Locale.ROOT)
+
+            val classification = classifySentTarget(recipientName, null)
+            val today = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(Date())
+
+            return Transaction(
+                transactionCode = mpesaRefId,
+                amount = amount,
+                type = classification.type,
+                category = classification.category,
+                description = recipientName,
+                account = "I&M Bank",
+                date = today,
+                time = "",
+                destinationAccount = classification.destinationAccount,
+                balance = null,
+                cost = 0.0,
+                senderOrRecipient = recipientName,
+                rawText = trimmed,
+                status = TransactionStatus.PENDING_REVIEW
+            )
+        }
 
         val codeMatch = CONFIRMED_CODE_REGEX.find(trimmed) ?: return null
         val txCode = codeMatch.groupValues[1].uppercase(Locale.ROOT)

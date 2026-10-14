@@ -16,8 +16,8 @@ const COL_AMOUNT = 10;          // J (Amount)
 const COL_ACCOUNT = 11;         // K (Account)
 const COL_NOTES = 12;           // L (Notes)
 
-const SCRIPT_VERSION = '2026.09.12.v30_grand_totals_refined';
-const SCRIPT_BUILD_ID = 'GMD_GAS_20260912_PROD_30';
+const SCRIPT_VERSION = '2026.10.14.v32_lock_timeout_fix';
+const SCRIPT_BUILD_ID = 'GMD_GAS_20261014_PROD_32';
 
 let VALID_TYPES = ['Income', 'Expenses', 'Bills', 'Debt', 'Savings', 'Balance'];
 
@@ -337,13 +337,15 @@ function doGet(e) {
 function doPost(e) {
   const lock = LockService.getScriptLock();
   try {
-    // Acquire lock with 15-second timeout to ensure atomic sequential writes
-    const hasLock = lock.tryLock(15000);
+    // Acquire lock with 29-second timeout (just under Apps Script 30s hard cap).
+    // This tolerates slow multi-leg transfer writes that hold the lock longer.
+    const hasLock = lock.tryLock(29000);
     if (!hasLock) {
       return createJsonResponse({
         success: false,
         status: 'SERVER_BUSY',
-        error: 'Unable to acquire database write lock. Please retry.'
+        error: 'Unable to acquire database write lock. Please retry.',
+        retryAfterMs: 5000
       }, 503);
     }
 
@@ -533,10 +535,10 @@ function handleCreateTransaction(tx) {
       sheet.getRange(targetRow, COL_CATEGORY).setDataValidation(catRule);
     }
 
-    // 3. Write Category + Description (Columns G:H)
+    // 3. Write Category + Description (Columns G:H) with formula injection protection
     sheet.getRange(targetRow, COL_CATEGORY, 1, 2).setValues([[
-      tx.category,
-      tx.description
+      sanitizeTextField(tx.category),
+      sanitizeTextField(tx.description)
     ]]);
 
     // 4. Write Amount + Account + Notes (Columns J:L)
@@ -544,12 +546,12 @@ function handleCreateTransaction(tx) {
     // Columns A:B, E:F (F has VLOOKUP formula), and P:BR are also preserved.
     sheet.getRange(targetRow, COL_AMOUNT, 1, 3).setValues([[
       Number(tx.amount),
-      tx.account,
-      formattedNotes
+      sanitizeTextField(tx.account),
+      sanitizeTextField(formattedNotes)
     ]]);
 
     // 5. Write Date to Column C LAST — commits the row for findLastTransactionRow.
-    sheet.getRange(targetRow, COL_DATE).setValue(formattedDate);
+    sheet.getRange(targetRow, COL_DATE).setValue(sanitizeTextField(formattedDate));
 
   } catch (writeErr) {
     // If write failed before Date was written, clean up Type from Column D so row stays blank.
@@ -613,6 +615,23 @@ function handleCreateTransferPair(tx) {
   const codeLeg1 = baseCode + '-OUT';
   const codeLeg2 = baseCode + '-IN';
   const codeFee = baseCode + '-FEE';
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAME_TRANSACTIONS);
+  if (sheet) {
+    const dupCheckBase = checkDuplicateTransactionCode(sheet, baseCode);
+    const dupCheckLeg1 = checkDuplicateTransactionCode(sheet, codeLeg1);
+    const dupCheckLeg2 = checkDuplicateTransactionCode(sheet, codeLeg2);
+    if (dupCheckBase.isDuplicate || dupCheckLeg1.isDuplicate || dupCheckLeg2.isDuplicate) {
+      const dupRow = dupCheckLeg1.row || dupCheckLeg2.row || dupCheckBase.row;
+      return createJsonResponse({
+        success: true,
+        status: 'DUPLICATE_OK',
+        message: 'Transfer pair ' + baseCode + ' already recorded at row ' + dupRow,
+        data: { row: dupRow, transactionCode: baseCode }
+      }, 200);
+    }
+  }
 
   // Extract fee/cost if present
   let fee = 0;
@@ -820,12 +839,16 @@ function handleBatchCreateTransactions(transactions) {
   for (let i = 0; i < existingNotesValues.length; i++) {
     const rawVal = String(existingNotesValues[i][0] || '').trim();
     if (!rawVal) continue;
-    // Extract M-PESA Code from notes using the standard marker
-    const codeMatch = rawVal.match(/M-PESA Code:\s*([A-Z0-9]{8,25})/i);
+    // Extract M-PESA Code from notes using the standard marker (including -OUT, -IN, -FEE suffixes)
+    const codeMatch = rawVal.match(/M-PESA Code:\s*([A-Z0-9_\-]{8,35})/i);
     if (codeMatch) {
       const code = codeMatch[1].toUpperCase();
       existingCodes.add(code);
+      // Also index base code (without suffix) to block duplicate transfer pairs
+      const baseCode = code.replace(/-(?:OUT|IN|FEE)$/i, '');
+      existingCodes.add(baseCode);
       codeRowMap[code] = 10 + i;
+      codeRowMap[baseCode] = 10 + i;
     }
   }
 
@@ -918,6 +941,7 @@ function handleBatchCreateTransactions(transactions) {
     // Stage 3b: Apply category data-validation rules for all rows in one call.
     //   Each row gets its own rule matching its Type — built from the taxonomy cache.
     //   setDataValidations accepts a 2-D array of DataValidation objects.
+    try {
       toWrite.forEach(function(item, idx) {
         const cats = getCategoriesForType(item.tx.type);
         if (cats && cats.length > 0) {
@@ -932,22 +956,22 @@ function handleBatchCreateTransactions(transactions) {
       console.warn('Data validation rule application skipped: ' + dvErr.toString());
     }
 
-    // Stage 3c: Write Category + Description (Columns G:H) — single range write.
+    // Stage 3c: Write Category + Description (Columns G:H) — single range write with formula injection protection.
     const catData = toWrite.map(function(item) {
-      return [item.tx.category, item.tx.description];
+      return [sanitizeTextField(item.tx.category), sanitizeTextField(item.tx.description)];
     });
     sheet.getRange(firstTargetRow, COL_CATEGORY, toWrite.length, 2).setValues(catData);
 
     // Stage 3d: Write Amount + Account + Notes (Columns J:L) — single range write.
     // CRITICAL: Column I (currency formula) is NEVER written.
     const amtData = toWrite.map(function(item) {
-      return [Number(item.tx.amount), item.tx.account, item.formattedNotes];
+      return [Number(item.tx.amount), sanitizeTextField(item.tx.account), sanitizeTextField(item.formattedNotes)];
     });
     sheet.getRange(firstTargetRow, COL_AMOUNT, toWrite.length, 3).setValues(amtData);
 
     // Stage 3e: Write Date (Column C) LAST for ALL rows — commits every row atomically.
     // Only after this line will findLastTransactionRow() count these rows.
-    const dateData = toWrite.map(function(item) { return [item.formattedDate]; });
+    const dateData = toWrite.map(function(item) { return [sanitizeTextField(item.formattedDate)]; });
     sheet.getRange(firstTargetRow, COL_DATE, toWrite.length, 1).setValues(dateData);
 
   } catch (writeErr) {
@@ -1055,8 +1079,13 @@ function validateTransactionPayload(tx) {
     errors.push('Negative amounts are only valid for Savings and Balance transactions');
   }
 
-  if (!tx.date || typeof tx.date !== 'string') {
-    errors.push('Valid date string is required');
+  if (!tx.date || typeof tx.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(tx.date.trim())) {
+    errors.push('Valid date string in YYYY-MM-DD format is required');
+  } else {
+    const parsedDate = new Date(tx.date.trim());
+    if (isNaN(parsedDate.getTime())) {
+      errors.push('Date value must be a valid calendar date');
+    }
   }
 
   if (!tx.type || VALID_TYPES.indexOf(tx.type) === -1) {
@@ -1080,6 +1109,24 @@ function validateTransactionPayload(tx) {
     isValid: errors.length === 0,
     errors: errors
   };
+}
+
+/**
+ * Formula Injection Protection Helper.
+ * Strips non-printable ASCII control characters and prefixes a single quote (')
+ * if a string value starts with =, +, -, or @.
+ * Numbers, booleans, null/undefined, and safe text strings are preserved without modification.
+ */
+function sanitizeTextField(val) {
+  if (val === null || val === undefined) return '';
+  if (typeof val !== 'string') return val;
+  let str = String(val).trim();
+  // Strip non-printable ASCII control characters except \t and \n
+  str = str.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+  if (/^[=\+\-@]/.test(str)) {
+    return "'" + str;
+  }
+  return str;
 }
 
 /**

@@ -10,7 +10,8 @@ object TaxonomyDefaults {
         "Mpesa",
         "Till Number",
         "Tower Sacco",
-        "Airtime"
+        "Airtime",
+        "Coop Bank"
     )
 
     val CATEGORIES_BY_TYPE = mapOf(

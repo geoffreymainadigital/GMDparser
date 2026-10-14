@@ -24,16 +24,21 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
+
 object TransactionRepository {
 
     // Immutable Invariant: AutoSync is permanently disabled to enforce user confirmation
     fun isAutoSync(): Boolean = false
 
     private const val PREFS_NAME = "gmdparser_tx_repo"
+    private const val ENCRYPTED_PREFS_NAME = "gmdparser_tx_repo_encrypted"
     private const val KEY_PENDING = "pending_transactions"
     private const val KEY_CONFIRMED = "confirmed_transactions"
     private const val KEY_MONTHLY_DASHBOARD = "cached_monthly_dashboard"
     private const val KEY_FULL_DASHBOARD = "cached_full_dashboard"
+    private const val KEY_MIGRATED = "migrated_to_encrypted"
     /** Max transactions per batchCreateTransactions call — must match Apps Script MAX_BATCH. */
     private const val BATCH_MAX_SIZE = 50
 
@@ -113,43 +118,81 @@ object TransactionRepository {
         }
     }
 
+    private fun getEncryptedPrefs(context: Context): SharedPreferences? {
+        val appContext = context.applicationContext
+        return try {
+            val masterKey = MasterKey.Builder(appContext)
+                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                .build()
+            EncryptedSharedPreferences.create(
+                appContext,
+                ENCRYPTED_PREFS_NAME,
+                masterKey,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            )
+        } catch (e: Exception) {
+            // SAFEGUARD: Do not fall back to unencrypted SharedPreferences.
+            // Do not delete or regenerate keys automatically (preserve recoverable data).
+            // Fail closed by returning null so sensitive records are not written to plaintext disk storage.
+            android.util.Log.e("TransactionRepo", "Failed to initialize EncryptedSharedPreferences securely. Preserving storage and failing safely.", e)
+            null
+        }
+    }
+
     fun init(context: Context) {
         if (prefs != null) return
-        val sp = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        prefs = sp
+        val appContext = context.applicationContext
+        val encPrefs = getEncryptedPrefs(appContext)
 
-        val pendingJson = sp.getString(KEY_PENDING, null)
-        if (!pendingJson.isNullOrBlank()) {
-            try {
-                val type = object : TypeToken<List<Transaction>>() {}.type
-                val loaded: List<Transaction> = gson.fromJson(pendingJson, type)
-                _pendingTransactions.value = loaded
-            } catch (e: Exception) { e.printStackTrace() }
-        }
+        if (encPrefs != null) {
+            val plainPrefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            TransactionStorageMigrator.migrate(plainPrefs, encPrefs)
+            prefs = encPrefs
 
-        val confirmedJson = sp.getString(KEY_CONFIRMED, null)
-        if (!confirmedJson.isNullOrBlank()) {
             try {
-                val type = object : TypeToken<List<Transaction>>() {}.type
-                val loaded: List<Transaction> = gson.fromJson(confirmedJson, type)
-                _confirmedTransactions.value = loaded
-            } catch (e: Exception) { e.printStackTrace() }
-        }
+                val pendingJson = encPrefs.getString(KEY_PENDING, null)
+                if (!pendingJson.isNullOrBlank()) {
+                    val type = object : TypeToken<List<Transaction>>() {}.type
+                    val loaded: List<Transaction> = gson.fromJson(pendingJson, type)
+                    _pendingTransactions.value = loaded
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("TransactionRepo", "Failed to read cached pending transactions", e)
+            }
 
-        val monthlyJson = sp.getString(KEY_MONTHLY_DASHBOARD, null)
-        if (!monthlyJson.isNullOrBlank()) {
             try {
-                val loaded = gson.fromJson(monthlyJson, com.gmdparser.data.model.MonthlyDashboardData::class.java)
-                _monthlyDashboard.value = loaded
-            } catch (e: Exception) { e.printStackTrace() }
-        }
+                val confirmedJson = encPrefs.getString(KEY_CONFIRMED, null)
+                if (!confirmedJson.isNullOrBlank()) {
+                    val type = object : TypeToken<List<Transaction>>() {}.type
+                    val loaded: List<Transaction> = gson.fromJson(confirmedJson, type)
+                    _confirmedTransactions.value = loaded
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("TransactionRepo", "Failed to read cached confirmed transactions", e)
+            }
 
-        val fullDashJson = sp.getString(KEY_FULL_DASHBOARD, null)
-        if (!fullDashJson.isNullOrBlank()) {
             try {
-                val loaded = gson.fromJson(fullDashJson, com.gmdparser.data.model.DashboardResponse::class.java)
-                _dashboardData.value = loaded
-            } catch (e: Exception) { e.printStackTrace() }
+                val monthlyJson = encPrefs.getString(KEY_MONTHLY_DASHBOARD, null)
+                if (!monthlyJson.isNullOrBlank()) {
+                    val loaded = gson.fromJson(monthlyJson, com.gmdparser.data.model.MonthlyDashboardData::class.java)
+                    _monthlyDashboard.value = loaded
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("TransactionRepo", "Failed to read cached monthly dashboard", e)
+            }
+
+            try {
+                val fullDashJson = encPrefs.getString(KEY_FULL_DASHBOARD, null)
+                if (!fullDashJson.isNullOrBlank()) {
+                    val loaded = gson.fromJson(fullDashJson, com.gmdparser.data.model.DashboardResponse::class.java)
+                    _dashboardData.value = loaded
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("TransactionRepo", "Failed to read cached full dashboard", e)
+            }
+        } else {
+            android.util.Log.w("TransactionRepo", "Operating in secure in-memory mode due to unavailable hardware encryption")
         }
     }
 
@@ -202,8 +245,17 @@ object TransactionRepository {
     }
 
     /**
-     * Single-transaction confirmed write pipeline (unchanged behaviour).
+     * Returns true if the given [Result] represents a transient server-busy / lock-contention
+     * failure that is safe to retry automatically.
      */
+    private fun isLockContentionFailure(result: Result<ApiResponse>): Boolean {
+        val ex = result.exceptionOrNull() ?: return false
+        val msg = ex.message ?: return false
+        return msg.contains("write lock", ignoreCase = true) ||
+               msg.contains("SERVER_BUSY", ignoreCase = true) ||
+               msg.contains("503", ignoreCase = false)
+    }
+
     suspend fun confirmAndSubmitTransaction(
         tx: Transaction
     ): Result<ApiResponse> {
@@ -217,6 +269,20 @@ object TransactionRepository {
             // Transfer payload with destination account is valid
         }
 
+        // Attempt the request. On a transient lock-contention 503, wait and retry once.
+        val firstAttempt = confirmAndSubmitTransactionOnce(tx)
+        if (!isLockContentionFailure(firstAttempt)) return firstAttempt
+
+        android.util.Log.w("GMD_NETWORK_DEBUG", "Lock contention on first attempt for ${tx.transactionCode} — retrying in 5s")
+        kotlinx.coroutines.delay(5_000)
+        return confirmAndSubmitTransactionOnce(tx)
+    }
+
+    /** Single-attempt inner implementation used by [confirmAndSubmitTransaction]. */
+    private suspend fun confirmAndSubmitTransactionOnce(
+        tx: Transaction
+    ): Result<ApiResponse> {
+
         val payload = TransactionPayload(
             date = tx.date, type = tx.type, category = tx.category,
             description = tx.description, amount = tx.amount, account = tx.account,
@@ -225,6 +291,7 @@ object TransactionRepository {
         )
         val request = CreateTransactionRequest(
             action = "createTransaction", 
+            destinationAccount = payload.destinationAccount,
             transaction = payload
         )
 
@@ -252,7 +319,6 @@ object TransactionRepository {
 
             val body = response.body()
             val errBodyStr = try { response.errorBody()?.string() } catch (_: Exception) { null }
-            val rawBodyStr = try { response.body()?.toString() } catch (_: Exception) { null }
             
             // Apps Script web apps return HTTP 200 with HTML/redirect or JSON body
             val errJson = try {

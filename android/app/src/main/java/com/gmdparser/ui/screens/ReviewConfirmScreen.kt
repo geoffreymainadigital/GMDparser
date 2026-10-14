@@ -68,6 +68,7 @@ fun ReviewConfirmScreen(
     }
 
     fun submitTransaction(tx: Transaction, shouldRecordFee: Boolean) {
+        if (submittingTxCode != null) return
         if ((tx.type == "Balance" || tx.type == "Transfer") && tx.destinationAccount.isNullOrBlank()) {
             feedbackStyle = FeedbackStyle.ERROR
             feedbackMessage = "✗ Destination Account is required for Balance transfers."

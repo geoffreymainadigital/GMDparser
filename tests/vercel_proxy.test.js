@@ -7,11 +7,14 @@ import taxonomyHandler from '../web/api/taxonomy.js';
 import transactionHandler from '../web/api/transaction.js';
 import testConnectionHandler from '../web/api/test-connection.js';
 
+process.env.GMD_API_KEY = 'test-secret-key-123';
+
 // Mock request / response helpers
 function createMockReq(options = {}) {
+  const headers = Object.assign({ 'x-gmd-api-key': 'test-secret-key-123' }, options.headers || {});
   return {
     method: options.method || 'GET',
-    headers: options.headers || {},
+    headers,
     body: options.body || null,
     query: options.query || {}
   };

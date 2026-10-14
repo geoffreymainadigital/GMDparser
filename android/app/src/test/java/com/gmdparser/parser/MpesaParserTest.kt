@@ -272,4 +272,18 @@ class MpesaParserTest {
         assertEquals(2.0, tx?.amount ?: 0.0, 0.001)
         assertEquals("Expenses", tx?.type)
     }
+
+    // 21. I&M Bank to M-PESA transfer parsing
+    @Test
+    fun testIMBankTransferParsing() {
+        val sms = "Bank to M-PESA transfer of KES 8,000.00 to 0726336988 - winnie wanjiku githinji successfully processed. Transaction Ref ID: 5524RNQQ7635. M-PESA Ref ID: UJ2IY9O5RU"
+        val tx = MpesaParser.parse(sms)
+        assertNotNull(tx)
+        assertEquals("UJ2IY9O5RU", tx?.transactionCode)
+        assertEquals(8000.00, tx?.amount ?: 0.0, 0.001)
+        assertEquals("Expenses", tx?.type)
+        assertEquals("", tx?.category)
+        assertEquals("I&M Bank", tx?.account)
+        assertEquals("winnie wanjiku githinji", tx?.description)
+    }
 }

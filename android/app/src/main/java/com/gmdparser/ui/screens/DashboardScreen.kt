@@ -212,14 +212,16 @@ fun DashboardScreen(
                             actual = savingsTotals.totalGoal,
                             goal = null,
                             color = AccentCyan,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
+                            isPrivacyOn = isPrivacyOn
                         )
                         BudgetSummaryTile(
                             label = "Total saved",
                             actual = savingsTotals.totalSaved,
                             goal = savingsTotals.totalGoal,
                             color = MpesaGreen,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
+                            isPrivacyOn = isPrivacyOn
                         )
                     }
                     Spacer(modifier = Modifier.height(8.dp))
@@ -232,7 +234,8 @@ fun DashboardScreen(
                             actual = savingsTotals.totalRemaining,
                             goal = null,
                             color = AccentAmber,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
+                            isPrivacyOn = isPrivacyOn
                         )
                         val overallPct = (savingsTotals.overallProgress * 100).toInt()
                         Surface(

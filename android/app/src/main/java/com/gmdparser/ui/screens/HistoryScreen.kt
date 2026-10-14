@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -103,7 +104,10 @@ fun HistoryScreen() {
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                items(filteredTransactions, key = { it.transactionCode }) { tx ->
+                itemsIndexed(
+                    items = filteredTransactions,
+                    key = { index, tx -> "${tx.transactionCode.ifBlank { "TX" }}_${tx.date}_${index}" }
+                ) { _, tx ->
                     HistoryItemCard(transaction = tx)
                 }
             }
@@ -130,7 +134,7 @@ fun HistoryItemCard(transaction: Transaction) {
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = transaction.description,
+                        text = transaction.description.ifBlank { "Transaction" },
                         color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold
@@ -138,20 +142,23 @@ fun HistoryItemCard(transaction: Transaction) {
                 }
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    val displayCat = transaction.category.ifBlank {
+                        if (transaction.type == "Balance") "Balance Log" else "Uncategorized"
+                    }
                     Text(
-                        text = transaction.category,
+                        text = displayCat,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 11.sp
                     )
                     Text(
-                        text = " • ${transaction.date}",
+                        text = " • ${transaction.date.ifBlank { "N/A" }}",
                         color = MaterialTheme.colorScheme.outline,
                         fontSize = 11.sp
                     )
                 }
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = transaction.transactionCode,
+                    text = transaction.transactionCode.ifBlank { "N/A" },
                     color = AccentCyan,
                     fontFamily = FontFamily.Monospace,
                     fontSize = 11.sp
@@ -160,8 +167,13 @@ fun HistoryItemCard(transaction: Transaction) {
 
             Column(horizontalAlignment = Alignment.End) {
                 val isIncome = transaction.type == "Income"
+                val formattedAmount = try {
+                    String.format("%,.2f", transaction.amount)
+                } catch (_: Exception) {
+                    "${transaction.amount}"
+                }
                 Text(
-                    text = "${if (isIncome) "+" else "-"}Ksh ${String.format("%,.2f", transaction.amount)}",
+                    text = "${if (isIncome) "+" else "-"}Ksh $formattedAmount",
                     color = if (isIncome) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold

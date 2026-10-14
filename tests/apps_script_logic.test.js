@@ -122,8 +122,13 @@ function validateTransactionPayload(tx) {
     errors.push('Negative amounts are only valid for Savings and Balance transactions');
   }
 
-  if (!tx.date || typeof tx.date !== 'string') {
-    errors.push('Valid date string is required');
+  if (!tx.date || typeof tx.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(tx.date.trim())) {
+    errors.push('Valid date string in YYYY-MM-DD format is required');
+  } else {
+    const parsedDate = new Date(tx.date.trim());
+    if (isNaN(parsedDate.getTime())) {
+      errors.push('Date value must be a valid calendar date');
+    }
   }
 
   if (!tx.type || VALID_TYPES.indexOf(tx.type) === -1) {
@@ -146,6 +151,22 @@ function validateTransactionPayload(tx) {
     isValid: errors.length === 0,
     errors: errors
   };
+}
+
+/**
+ * Formula Injection Protection Helper.
+ * Strips non-printable ASCII control characters and prefixes a single quote (')
+ * if a string value starts with =, +, -, or @.
+ */
+function sanitizeTextField(val) {
+  if (val === null || val === undefined) return '';
+  if (typeof val !== 'string') return val;
+  let str = String(val).trim();
+  str = str.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+  if (/^[=\+\-@]/.test(str)) {
+    return "'" + str;
+  }
+  return str;
 }
 
 /**
@@ -789,8 +810,58 @@ assert.strictEqual(expResult.success, true, 'Single row Expense transaction writ
 assert.strictEqual(expResult.data.amount, 150, 'Single row Expense amount unchanged');
 console.log('✓ Test 30: Existing single-row transaction types (Expenses, Income, Bills, Debt, Savings) are unaffected');
 
+// --- Test 31: Formula injection protection helper sanitizeTextField ---
+assert.strictEqual(sanitizeTextField('=1+1'), "'=1+1", "Formula starting with = must be single-quoted");
+assert.strictEqual(sanitizeTextField('+2+2'), "'+2+2", "Formula starting with + must be single-quoted");
+assert.strictEqual(sanitizeTextField('-500'), "'-500", "Formula starting with - must be single-quoted");
+assert.strictEqual(sanitizeTextField('@SUM(A1:B1)'), "'@SUM(A1:B1)", "Formula starting with @ must be single-quoted");
+assert.strictEqual(sanitizeTextField('   =cmd|'), "'=cmd|", "Formula with leading whitespace must be trimmed and quoted");
+assert.strictEqual(sanitizeTextField('\t=1+1'), "'=1+1", "Formula with leading tab must be trimmed and quoted");
+assert.strictEqual(sanitizeTextField('\x00=1+1'), "'=1+1", "Control characters must be stripped before formula check");
+assert.strictEqual(sanitizeTextField('Buy 1+1 groceries'), "Buy 1+1 groceries", "Innocuous text must not be quoted");
+assert.strictEqual(sanitizeTextField(123), 123, "Numbers must be preserved unmodified");
+assert.strictEqual(sanitizeTextField(null), '', "Null must return empty string");
+console.log('✓ Test 31: sanitizeTextField properly neutralizes =, +, -, @, control characters, and whitespace vectors');
+
+// --- Test 32: Strict date validation blocks formula injection in date field ---
+const formulaDateTx = {
+  transactionCode: 'TD99DATE01',
+  amount: 150,
+  type: 'Expenses',
+  category: 'Food',
+  description: 'Dinner',
+  account: 'Mpesa',
+  date: '=1+1'
+};
+const formulaDateResult = validateTransactionPayload(formulaDateTx);
+assert.strictEqual(formulaDateResult.isValid, false, 'Formula payload in date field must be rejected');
+assert.ok(formulaDateResult.errors.some(e => e.includes('YYYY-MM-DD')), 'Error message must specify YYYY-MM-DD format');
+
+const nonIsoDateTx = {
+  transactionCode: 'TD99DATE02',
+  amount: 150,
+  type: 'Expenses',
+  category: 'Food',
+  description: 'Dinner',
+  account: 'Mpesa',
+  date: '2026/09/13'
+};
+assert.strictEqual(validateTransactionPayload(nonIsoDateTx).isValid, false, 'Non-ISO date must be rejected');
+
+const validDateTx = {
+  transactionCode: 'TD99DATE03',
+  amount: 150,
+  type: 'Expenses',
+  category: 'Food',
+  description: 'Dinner',
+  account: 'Mpesa',
+  date: '2026-09-13'
+};
+assert.strictEqual(validateTransactionPayload(validDateTx).isValid, true, 'Valid YYYY-MM-DD date must be accepted');
+console.log('✓ Test 32: Strict YYYY-MM-DD date validation prevents date-based formula injection');
+
 console.log('\n========================================================================');
-console.log('ALL 28 CRITICAL INVARIANT TESTS PASSED WITH 100% SPECIFICATION FIDELITY!');
+console.log('ALL 32 CRITICAL INVARIANT TESTS PASSED WITH 100% SPECIFICATION FIDELITY!');
 console.log('========================================================================\n');
 
 

@@ -12,16 +12,19 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gmdparser.data.repository.TransactionRepository
 import com.gmdparser.ui.theme.*
+import com.gmdparser.util.AppPreferences
 
 @Composable
 fun SavingsCategoriesScreen(
     onNavigateBack: () -> Unit
 ) {
+    val isPrivacyOn by AppPreferences.isPrivacyBlurFlow.collectAsState()
     val dashboardData by TransactionRepository.dashboardData.collectAsState()
     val savingsData = dashboardData?.savings
     val savingsGoals = savingsData?.goals ?: emptyList()
@@ -130,13 +133,15 @@ fun SavingsCategoriesScreen(
                                 text = "Ksh ${String.format("%,.2f", item.saved)}",
                                 color = MpesaGreen,
                                 fontSize = 17.sp,
-                                fontWeight = FontWeight.ExtraBold
+                                fontWeight = FontWeight.ExtraBold,
+                                modifier = Modifier.blur(if (isPrivacyOn) 10.dp else 0.dp)
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = "Goal: Ksh ${String.format("%,.2f", item.goal)} • Remaining: Ksh ${String.format("%,.2f", item.remaining)}",
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontSize = 11.sp
+                                fontSize = 11.sp,
+                                modifier = Modifier.blur(if (isPrivacyOn) 10.dp else 0.dp)
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             LinearProgressIndicator(

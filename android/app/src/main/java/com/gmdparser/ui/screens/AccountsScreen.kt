@@ -16,15 +16,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gmdparser.data.repository.TransactionRepository
 import com.gmdparser.ui.theme.*
+import com.gmdparser.util.AppPreferences
 import kotlinx.coroutines.launch
 
 data class AccountItem(
@@ -36,8 +41,11 @@ data class AccountItem(
 
 @Composable
 fun AccountsScreen() {
+    val isPrivacyOn by AppPreferences.isPrivacyBlurFlow.collectAsState()
     val dashboardResponse by TransactionRepository.dashboardData.collectAsState()
     val scope = rememberCoroutineScope()
+    var isRefreshing by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(Unit) {
         TransactionRepository.fetchDashboard()
@@ -45,46 +53,79 @@ fun AccountsScreen() {
 
     val liveAccounts = dashboardResponse?.accounts
 
-    val staticAccounts = listOf(
-        AccountItem("Equity Bank", "Bank Account", Icons.Default.AccountBalance),
-        AccountItem("I&M Bank", "Bank Account", Icons.Default.AccountBalance),
-        AccountItem("Cash", "Physical Cash", Icons.Default.AccountBalance),
-        AccountItem("Mpesa", "Mobile Money", Icons.Default.PhoneAndroid, isDefault = true),
-        AccountItem("Till Number", "Merchant Account", Icons.Default.PhoneAndroid),
-        AccountItem("Tower Sacco", "SACCO Account", Icons.Default.Savings),
-        AccountItem("Airtime", "Telecom", Icons.Default.PhoneAndroid)
-    )
+    val staticAccounts = remember(liveAccounts) {
+        val predefined = listOf(
+            AccountItem("Equity Bank", "Bank Account", Icons.Default.AccountBalance),
+            AccountItem("I&M Bank", "Bank Account", Icons.Default.AccountBalance),
+            AccountItem("Cash", "Physical Cash", Icons.Default.AccountBalance),
+            AccountItem("Mpesa", "Mobile Money", Icons.Default.PhoneAndroid, isDefault = true),
+            AccountItem("Till Number", "Merchant Account", Icons.Default.PhoneAndroid),
+            AccountItem("Tower Sacco", "SACCO Account", Icons.Default.Savings),
+            AccountItem("Airtime", "Telecom", Icons.Default.PhoneAndroid),
+            AccountItem("Coop Bank", "Bank Account", Icons.Default.AccountBalance)
+        )
+        val predefinedNames = predefined.map { it.name.lowercase() }.toSet()
+        val extraLive = (liveAccounts ?: emptyList())
+            .filter { it.accountName.lowercase() !in predefinedNames }
+            .map { AccountItem(it.accountName, "Bank Account", Icons.Default.AccountBalance) }
+        predefined + extraLive
+    }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(16.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(16.dp)
         ) {
-            Column {
-                Text(
-                    text = "Financial Accounts",
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "Live balances from Accounts tab in Google Sheets",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 12.sp
-                )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "Financial Accounts",
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Live balances from Accounts tab in Google Sheets",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp
+                    )
+                }
+                IconButton(
+                    enabled = !isRefreshing,
+                    onClick = {
+                        scope.launch {
+                            isRefreshing = true
+                            val result = TransactionRepository.fetchDashboard()
+                            isRefreshing = false
+                            if (result.isSuccess) {
+                                snackbarHostState.showSnackbar("Accounts data updated live from Sheets")
+                            } else {
+                                val err = result.exceptionOrNull()?.localizedMessage ?: "Refresh failed"
+                                snackbarHostState.showSnackbar("Failed to sync accounts: $err")
+                            }
+                        }
+                    }
+                ) {
+                    if (isRefreshing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = AccentCyan,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = AccentCyan)
+                    }
+                }
             }
-            IconButton(onClick = {
-                scope.launch { TransactionRepository.fetchDashboard() }
-            }) {
-                Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = AccentCyan)
-            }
-        }
 
         Spacer(modifier = Modifier.height(14.dp))
 
@@ -170,7 +211,8 @@ fun AccountsScreen() {
                                     text = "Ksh ${String.format("%,.2f", curBal)}",
                                     color = if (curBal >= 0) MaterialTheme.colorScheme.onSurface else AccentRed,
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 15.sp
+                                    fontSize = 15.sp,
+                                    modifier = Modifier.blur(if (isPrivacyOn) 10.dp else 0.dp)
                                 )
                             }
                             Column(horizontalAlignment = Alignment.End) {
@@ -179,7 +221,8 @@ fun AccountsScreen() {
                                     text = "+Ksh ${String.format("%,.2f", dep)}",
                                     color = MaterialTheme.colorScheme.primary,
                                     fontWeight = FontWeight.Medium,
-                                    fontSize = 12.sp
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.blur(if (isPrivacyOn) 10.dp else 0.dp)
                                 )
                             }
                             Column(horizontalAlignment = Alignment.End) {
@@ -188,7 +231,8 @@ fun AccountsScreen() {
                                     text = "Ksh ${String.format("%,.2f", wth)}",
                                     color = AccentAmber,
                                     fontWeight = FontWeight.Medium,
-                                    fontSize = 12.sp
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.blur(if (isPrivacyOn) 10.dp else 0.dp)
                                 )
                             }
                         }
@@ -218,7 +262,8 @@ fun AccountsScreen() {
                                     text = "Ksh ${String.format("%,.2f", totalAcct.currentBalance)}",
                                     color = if (totalAcct.currentBalance >= 0) MaterialTheme.colorScheme.primary else AccentRed,
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 15.sp
+                                    fontSize = 15.sp,
+                                    modifier = Modifier.blur(if (isPrivacyOn) 10.dp else 0.dp)
                                 )
                             }
                             Spacer(modifier = Modifier.height(6.dp))
@@ -226,8 +271,18 @@ fun AccountsScreen() {
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text("Deposits: +Ksh ${String.format("%,.2f", totalAcct.deposits)}", color = MaterialTheme.colorScheme.primary, fontSize = 11.sp)
-                                Text("Withdrawals: Ksh ${String.format("%,.2f", totalAcct.withdrawals)}", color = AccentAmber, fontSize = 11.sp)
+                                Text(
+                                    text = "Deposits: +Ksh ${String.format("%,.2f", totalAcct.deposits)}",
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontSize = 11.sp,
+                                    modifier = Modifier.blur(if (isPrivacyOn) 10.dp else 0.dp)
+                                )
+                                Text(
+                                    text = "Withdrawals: Ksh ${String.format("%,.2f", totalAcct.withdrawals)}",
+                                    color = AccentAmber,
+                                    fontSize = 11.sp,
+                                    modifier = Modifier.blur(if (isPrivacyOn) 10.dp else 0.dp)
+                                )
                             }
                         }
                     }
@@ -235,4 +290,5 @@ fun AccountsScreen() {
             }
         }
     }
+}
 }
