@@ -80,7 +80,12 @@ object MpesaParser {
             )
         }
 
-        val codeMatch = CONFIRMED_CODE_REGEX.find(trimmed) ?: return null
+        val codeMatch = CONFIRMED_CODE_REGEX.find(trimmed)
+        if (codeMatch == null) {
+            val equityTx = EquityParser.parse(trimmed)
+            if (equityTx != null) return equityTx
+            return null
+        }
         val txCode = codeMatch.groupValues[1].uppercase(Locale.ROOT)
 
         val balance = BALANCE_REGEX.find(trimmed)?.groupValues?.get(1)?.replace(",", "")?.toDoubleOrNull()

@@ -39,7 +39,7 @@ class SmsReceiver : BroadcastReceiver() {
             TransactionRepository.addPendingTransaction(transaction)
 
             // Notify user for mandatory review and explicit confirmation
-            showConfirmationNotification(context, transaction.transactionCode, transaction.amount, transaction.description)
+            showConfirmationNotification(context, transaction.transactionCode, transaction.amount, transaction.description, transaction.account)
 
         } catch (e: Exception) {
             // Fail safely without crashing receiver
@@ -47,7 +47,7 @@ class SmsReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun showConfirmationNotification(context: Context, code: String, amount: Double, desc: String) {
+    private fun showConfirmationNotification(context: Context, code: String, amount: Double, desc: String, account: String = "M-PESA") {
         val channelId = "gmdparser_confirmations"
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -76,7 +76,7 @@ class SmsReceiver : BroadcastReceiver() {
 
         val notification = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("M-PESA: Review Ksh ${String.format("%.2f", amount)}")
+            .setContentTitle("${if (account.isNotBlank()) account else "M-PESA"}: Review Ksh ${String.format("%.2f", amount)}")
             .setContentText("$desc - Tap to verify and confirm recording.")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)

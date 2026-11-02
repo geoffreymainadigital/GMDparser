@@ -53,11 +53,17 @@ object SmsInboxScanner {
                     val isLikelyMpesaOrBank = (address != null && (
                         address.contains("MPESA", ignoreCase = true) ||
                         address.contains("IANDMBANK", ignoreCase = true) ||
-                        address.contains("I&M", ignoreCase = true)
+                        address.contains("I&M", ignoreCase = true) ||
+                        address.contains("Equity", ignoreCase = true) ||
+                        address.contains("ABORELKEA", ignoreCase = true)
                     )) ||
                     body.contains("Confirmed", ignoreCase = true) ||
                     body.contains("M-PESA", ignoreCase = true) ||
-                    body.contains("Bank to M-PESA", ignoreCase = true)
+                    body.contains("Bank to M-PESA", ignoreCase = true) ||
+                    body.contains("credited to", ignoreCase = true) ||
+                    body.contains("drawn from", ignoreCase = true) ||
+                    body.contains("successfully sent to", ignoreCase = true) ||
+                    body.contains("successfully paid to", ignoreCase = true)
 
                     if (isLikelyMpesaOrBank) {
                         val parsed = MpesaParser.parse(body)

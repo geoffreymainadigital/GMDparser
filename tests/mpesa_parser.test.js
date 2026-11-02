@@ -2,7 +2,7 @@
  * Automated Verification for Kenyan M-PESA SMS Parser
  */
 import assert from 'node:assert';
-import { MpesaParser } from './mpesa_parser.js';
+import { MpesaParser, EquityParser } from './mpesa_parser.js';
 
 console.log('Running M-PESA SMS parser unit tests...\n');
 
@@ -173,4 +173,65 @@ assert.strictEqual(r16.amount, 5);
 assert.strictEqual(r16.type, 'Expenses');
 console.log('✓ TC-SMS-16 (Currency with Spacing) passed');
 
-console.log('\nAll Kenyan M-PESA parser unit tests PASSED successfully!');
+// 17. Equity to M-PESA Transfer
+const eqMpesaMsg = 'Your transaction of Kshs. 14000.0  has been credited to 254728118706 GEOFFREY KIBUCHI MAINA. Ref. EQAF2CAE012FD91. MPESA Ref.  UJMG406C9F on 22/10/2026 at 12:47:33.';
+const r17 = MpesaParser.parse(eqMpesaMsg);
+assert.strictEqual(r17.isFinancial, true);
+assert.strictEqual(r17.transactionCode, 'UJMG406C9F');
+assert.strictEqual(r17.amount, 14000.0);
+assert.strictEqual(r17.type, 'Balance');
+assert.strictEqual(r17.account, 'Equity Bank');
+assert.strictEqual(r17.destinationAccount, 'Mpesa');
+assert.strictEqual(r17.date, '2026-10-22');
+assert.strictEqual(r17.time, '12:47:33');
+console.log('✓ TC-EQ-01 (Equity to M-PESA Transfer) passed');
+
+// 18. Equity Loan Auto-Payment
+const eqLoanMsg = 'Confirmed. KES 186.00 has been successfully paid to your loan account 016OD00003404 from account 0160***7370 on 22-Oct-2026. Reference OJV15KEA9F121';
+const r18 = MpesaParser.parse(eqLoanMsg);
+assert.strictEqual(r18.isFinancial, true);
+assert.strictEqual(r18.transactionCode, 'OJV15KEA9F121');
+assert.strictEqual(r18.amount, 186.00);
+assert.strictEqual(r18.type, 'Debt');
+assert.strictEqual(r18.category, 'Equity Loan');
+assert.strictEqual(r18.account, 'Equity Bank');
+assert.strictEqual(r18.date, '2026-10-22');
+console.log('✓ TC-EQ-02 (Equity Loan Payment) passed');
+
+// 19. Equity Inter-Bank Transfer (to I&M Bank)
+const eqBankMsg = '37626.00 KES has been successfully sent to Geoffrey Kibuchi Maina 0*********3050 INVESTMENT & MORGAGES BANK. Ref. A4894D26FDB0C on 24 Oct 2026 at 17:28 EAT. Charges 59.76 KES';
+const r19 = MpesaParser.parse(eqBankMsg);
+assert.strictEqual(r19.isFinancial, true);
+assert.strictEqual(r19.transactionCode, 'A4894D26FDB0C');
+assert.strictEqual(r19.amount, 37626.00);
+assert.strictEqual(r19.cost, 59.76);
+assert.strictEqual(r19.type, 'Balance');
+assert.strictEqual(r19.account, 'Equity Bank');
+assert.strictEqual(r19.destinationAccount, 'I&M Bank');
+assert.strictEqual(r19.date, '2026-10-24');
+console.log('✓ TC-EQ-03 (Equity to I&M Inter-Bank Transfer) passed');
+
+// 20. Equity Account Credited (Salary/Deposit)
+const eqCreditMsg = 'Dear GEOFFREY KES 16871.85 has been credited to your account 0160......7370 Ref:S5668008 on 02-NOV-2026 13:16:17 PM. For any queries, contact 0763000000';
+const r20 = MpesaParser.parse(eqCreditMsg);
+assert.strictEqual(r20.isFinancial, true);
+assert.strictEqual(r20.transactionCode, 'S5668008');
+assert.strictEqual(r20.amount, 16871.85);
+assert.strictEqual(r20.type, 'Income');
+assert.strictEqual(r20.category, 'Salary');
+assert.strictEqual(r20.account, 'Equity Bank');
+assert.strictEqual(r20.date, '2026-11-02');
+console.log('✓ TC-EQ-04 (Equity Account Credited) passed');
+
+// 21. Equity Account Drawn (Debit/Expense)
+const eqDrawnMsg = 'Dear GEOFFREY KES 745.00 has been drawn from your account 0160......7370 Ref:S5674716 on 02-NOV-2026 13:17:02 PM. For any queries, contact 0763000000';
+const r21 = MpesaParser.parse(eqDrawnMsg);
+assert.strictEqual(r21.isFinancial, true);
+assert.strictEqual(r21.transactionCode, 'S5674716');
+assert.strictEqual(r21.amount, 745.00);
+assert.strictEqual(r21.type, 'Expenses');
+assert.strictEqual(r21.account, 'Equity Bank');
+assert.strictEqual(r21.date, '2026-11-02');
+console.log('✓ TC-EQ-05 (Equity Account Drawn) passed');
+
+console.log('\nAll Kenyan M-PESA & Equity Bank parser unit tests PASSED successfully!');

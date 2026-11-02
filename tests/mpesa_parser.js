@@ -15,6 +15,8 @@ export class MpesaParser {
     }
 
     const trimmed = smsBody.trim();
+    const equityTx = EquityParser.parse(trimmed);
+    if (equityTx) return equityTx;
 
     // Must contain Confirmed and an 8-12 char alphanumeric transaction code at start
     const codeMatch = trimmed.match(/^([A-Z0-9]{8,12})\s+Confirmed\./i);
@@ -389,4 +391,204 @@ function formatDateIso(dateStr) {
     year = '20' + year;
   }
   return `${year}-${month}-${day}`;
+}
+
+
+export class EquityParser {
+  static parse(smsBody) {
+    if (!smsBody || typeof smsBody !== 'string') return null;
+    const trimmed = smsBody.trim();
+
+    // 1. Equity to M-PESA
+    const mpesaMatch = trimmed.match(/Your transaction of (?:Kshs?\.?|KES)\s*([\d,]+\.?\d*)\s+has been credited to\s+(\d+)\s+(.+?)\.\s*Ref\.\s*([A-Z0-9]+)\.\s*MPESA Ref\.?\s*([A-Z0-9]+)\s+on\s+(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\s+at\s+(\d{1,2}:\d{2}(?::\d{2})?(?:\s*(?:AM|PM))?)/i);
+    if (mpesaMatch) {
+      const amount = parseFloat(mpesaMatch[1].replace(/,/g, ''));
+      const phone = mpesaMatch[2].trim();
+      const recipient = mpesaMatch[3].trim();
+      const equityRef = mpesaMatch[4].trim();
+      const mpesaRef = mpesaMatch[5].trim();
+      const dateStr = mpesaMatch[6].trim();
+      const timeStr = mpesaMatch[7].trim();
+
+      const txCode = mpesaRef || equityRef;
+
+      return {
+        isFinancial: true,
+        confidence: 0.95,
+        transactionCode: txCode,
+        amount,
+        balance: null,
+        cost: 0,
+        date: normalizeEquityDate(dateStr),
+        rawDate: dateStr,
+        time: timeStr,
+        recipient,
+        description: `Transfer to Mpesa (${phone} ${recipient})`.trim(),
+        type: 'Balance',
+        category: '',
+        account: 'Equity Bank',
+        destinationAccount: 'Mpesa',
+        rawText: trimmed
+      };
+    }
+
+    // 2. Loan payment
+    const loanMatch = trimmed.match(/Confirmed\.\s*(?:KES|Kshs?\.?)\s*([\d,]+\.?\d*)\s+has been successfully paid to your loan account\s+([A-Z0-9]+)\s+from account\s+([^\s]+)\s+on\s+(\d{1,2}[-\s][A-Za-z]{3,}[-\s]\d{2,4})\.\s*Reference\s+([A-Z0-9]+)/i);
+    if (loanMatch) {
+      const amount = parseFloat(loanMatch[1].replace(/,/g, ''));
+      const loanAccount = loanMatch[2].trim();
+      const fromAccount = loanMatch[3].trim();
+      const dateStr = loanMatch[4].trim();
+      const reference = loanMatch[5].trim();
+
+      return {
+        isFinancial: true,
+        confidence: 0.95,
+        transactionCode: reference,
+        amount,
+        balance: null,
+        cost: 0,
+        date: normalizeEquityDate(dateStr),
+        rawDate: dateStr,
+        time: '',
+        recipient: loanAccount,
+        description: `Loan payment: ${loanAccount} from ${fromAccount}`.trim(),
+        type: 'Debt',
+        category: 'Equity Loan',
+        account: 'Equity Bank',
+        destinationAccount: null,
+        rawText: trimmed
+      };
+    }
+
+    // 3. Sent to another bank (e.g. I&M Bank)
+    const sentBankMatch = trimmed.match(/([\d,]+\.?\d*)\s*(?:KES|Kshs?\.?)\s+has been successfully sent to\s+(.+?)\.\s*Ref\.\s*([A-Z0-9]+)\s+on\s+(\d{1,2}[-\s][A-Za-z]{3,}[-\s]\d{2,4})\s+at\s+(\d{1,2}:\d{2}(?::\d{2})?(?:\s*(?:AM|PM))?)(?:\s+EAT)?(?:\.\s*Charges\s*([\d,]+\.?\d*)\s*(?:KES|Kshs?\.?))?/i);
+    if (sentBankMatch) {
+      const amount = parseFloat(sentBankMatch[1].replace(/,/g, ''));
+      const targetRaw = sentBankMatch[2].trim();
+      const reference = sentBankMatch[3].trim();
+      const dateStr = sentBankMatch[4].trim();
+      const timeStr = sentBankMatch[5].trim();
+      const charges = sentBankMatch[6] ? parseFloat(sentBankMatch[6].replace(/,/g, '')) : 0;
+
+      const upper = targetRaw.toUpperCase();
+      let destAccount = 'I&M Bank';
+      if (upper.includes('COOP') || upper.includes('CO-OPERATIVE')) destAccount = 'Coop Bank';
+      else if (upper.includes('MPESA') || upper.includes('M-PESA')) destAccount = 'Mpesa';
+      else if (upper.includes('TOWER')) destAccount = 'Tower Sacco';
+
+      return {
+        isFinancial: true,
+        confidence: 0.95,
+        transactionCode: reference,
+        amount,
+        balance: null,
+        cost: charges,
+        date: normalizeEquityDate(dateStr),
+        rawDate: dateStr,
+        time: timeStr,
+        recipient: targetRaw,
+        description: `Sent to ${targetRaw}`.trim(),
+        type: 'Balance',
+        category: '',
+        account: 'Equity Bank',
+        destinationAccount: destAccount,
+        rawText: trimmed
+      };
+    }
+
+    // 4. Credited to account (Salary/Deposit)
+    const creditedMatch = trimmed.match(/Dear\s+([A-Za-z]+)\s+(?:KES|Kshs?\.?)\s*([\d,]+\.?\d*)\s+has been credited to your account\s+([^\s]+)\s+Ref:\s*([A-Z0-9]+)\s+on\s+(\d{1,2}[-\s][A-Za-z]{3,}[-\s]\d{2,4})\s+(\d{1,2}:\d{2}(?::\d{2})?(?:\s*(?:AM|PM))?)/i);
+    if (creditedMatch) {
+      const amount = parseFloat(creditedMatch[2].replace(/,/g, ''));
+      const accountNum = creditedMatch[3].trim();
+      const reference = creditedMatch[4].trim();
+      const dateStr = creditedMatch[5].trim();
+      const timeStr = creditedMatch[6].trim();
+
+      return {
+        isFinancial: true,
+        confidence: 0.95,
+        transactionCode: reference,
+        amount,
+        balance: null,
+        cost: 0,
+        date: normalizeEquityDate(dateStr),
+        rawDate: dateStr,
+        time: timeStr,
+        recipient: 'Equity Bank',
+        description: `Credited to account ${accountNum}`.trim(),
+        type: 'Income',
+        category: 'Salary',
+        account: 'Equity Bank',
+        destinationAccount: null,
+        rawText: trimmed
+      };
+    }
+
+    // 5. Drawn from account (Debit/Expense)
+    const drawnMatch = trimmed.match(/Dear\s+([A-Za-z]+)\s+(?:KES|Kshs?\.?)\s*([\d,]+\.?\d*)\s+has been drawn from your account\s+([^\s]+)\s+Ref:\s*([A-Z0-9]+)\s+on\s+(\d{1,2}[-\s][A-Za-z]{3,}[-\s]\d{2,4})\s+(\d{1,2}:\d{2}(?::\d{2})?(?:\s*(?:AM|PM))?)/i);
+    if (drawnMatch) {
+      const amount = parseFloat(drawnMatch[2].replace(/,/g, ''));
+      const accountNum = drawnMatch[3].trim();
+      const reference = drawnMatch[4].trim();
+      const dateStr = drawnMatch[5].trim();
+      const timeStr = drawnMatch[6].trim();
+
+      return {
+        isFinancial: true,
+        confidence: 0.95,
+        transactionCode: reference,
+        amount,
+        balance: null,
+        cost: 0,
+        date: normalizeEquityDate(dateStr),
+        rawDate: dateStr,
+        time: timeStr,
+        recipient: 'Equity Bank',
+        description: `Drawn from account ${accountNum}`.trim(),
+        type: 'Expenses',
+        category: '',
+        account: 'Equity Bank',
+        destinationAccount: null,
+        rawText: trimmed
+      };
+    }
+
+    return null;
+  }
+}
+
+function normalizeEquityDate(rawDate) {
+  if (!rawDate) return new Date().toISOString().split('T')[0];
+  const trimmed = rawDate.trim();
+
+  if (trimmed.includes('/')) {
+    const parts = trimmed.split('/');
+    if (parts.length === 3) {
+      let day = parts[0].padStart(2, '0');
+      let month = parts[1].padStart(2, '0');
+      let year = parts[2];
+      if (year.length === 2) year = '20' + year;
+      return `${year}-${month}-${day}`;
+    }
+  }
+
+  const namedMatch = trimmed.match(/(\d{1,2})[-\s]([A-Za-z]{3,})[-\s](\d{2,4})/);
+  if (namedMatch) {
+    let day = namedMatch[1].padStart(2, '0');
+    let monthStr = namedMatch[2].toUpperCase();
+    let year = namedMatch[3];
+    if (year.length === 2) year = '20' + year;
+
+    const months = {
+      JAN: '01', FEB: '02', MAR: '03', APR: '04', MAY: '05', JUN: '06',
+      JUL: '07', AUG: '08', SEP: '09', OCT: '10', NOV: '11', DEC: '12'
+    };
+    const prefix = monthStr.substring(0, 3);
+    const month = months[prefix] || '01';
+    return `${year}-${month}-${day}`;
+  }
+
+  return new Date().toISOString().split('T')[0];
 }

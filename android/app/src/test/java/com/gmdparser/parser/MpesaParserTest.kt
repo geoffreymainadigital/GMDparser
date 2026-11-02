@@ -286,4 +286,76 @@ class MpesaParserTest {
         assertEquals("I&M Bank", tx?.account)
         assertEquals("winnie wanjiku githinji", tx?.description)
     }
+
+    // 22. Equity to M-PESA Transfer
+    @Test
+    fun testEquityToMpesaTransferParsing() {
+        val sms = "Your transaction of Kshs. 14000.0  has been credited to 254728118706 GEOFFREY KIBUCHI MAINA. Ref. EQAF2CAE012FD91. MPESA Ref.  UJMG406C9F on 22/10/2026 at 12:47:33."
+        val tx = MpesaParser.parse(sms)
+        assertNotNull(tx)
+        assertEquals("UJMG406C9F", tx?.transactionCode)
+        assertEquals(14000.00, tx?.amount ?: 0.0, 0.001)
+        assertEquals("Balance", tx?.type)
+        assertEquals("Equity Bank", tx?.account)
+        assertEquals("Mpesa", tx?.destinationAccount)
+        assertEquals("2026-10-22", tx?.date)
+        assertEquals("12:47:33", tx?.time)
+    }
+
+    // 23. Equity Loan Repayment
+    @Test
+    fun testEquityLoanRepaymentParsing() {
+        val sms = "Confirmed. KES 186.00 has been successfully paid to your loan account 016OD00003404 from account 0160***7370 on 22-Oct-2026. Reference OJV15KEA9F121"
+        val tx = MpesaParser.parse(sms)
+        assertNotNull(tx)
+        assertEquals("OJV15KEA9F121", tx?.transactionCode)
+        assertEquals(186.00, tx?.amount ?: 0.0, 0.001)
+        assertEquals("Debt", tx?.type)
+        assertEquals("Equity Loan", tx?.category)
+        assertEquals("Equity Bank", tx?.account)
+        assertEquals("2026-10-22", tx?.date)
+    }
+
+    // 24. Equity Inter-Bank Transfer to I&M
+    @Test
+    fun testEquityInterBankTransferParsing() {
+        val sms = "37626.00 KES has been successfully sent to Geoffrey Kibuchi Maina 0*********3050 INVESTMENT & MORGAGES BANK. Ref. A4894D26FDB0C on 24 Oct 2026 at 17:28 EAT. Charges 59.76 KES"
+        val tx = MpesaParser.parse(sms)
+        assertNotNull(tx)
+        assertEquals("A4894D26FDB0C", tx?.transactionCode)
+        assertEquals(37626.00, tx?.amount ?: 0.0, 0.001)
+        assertEquals(59.76, tx?.cost ?: 0.0, 0.001)
+        assertEquals("Balance", tx?.type)
+        assertEquals("Equity Bank", tx?.account)
+        assertEquals("I&M Bank", tx?.destinationAccount)
+        assertEquals("2026-10-24", tx?.date)
+        assertEquals("17:28", tx?.time)
+    }
+
+    // 25. Equity Account Credited (Salary)
+    @Test
+    fun testEquityAccountCreditedParsing() {
+        val sms = "Dear GEOFFREY KES 16871.85 has been credited to your account 0160......7370 Ref:S5668008 on 02-NOV-2026 13:16:17 PM. For any queries, contact 0763000000"
+        val tx = MpesaParser.parse(sms)
+        assertNotNull(tx)
+        assertEquals("S5668008", tx?.transactionCode)
+        assertEquals(16871.85, tx?.amount ?: 0.0, 0.001)
+        assertEquals("Income", tx?.type)
+        assertEquals("Salary", tx?.category)
+        assertEquals("Equity Bank", tx?.account)
+        assertEquals("2026-11-02", tx?.date)
+    }
+
+    // 26. Equity Account Drawn (Expenses)
+    @Test
+    fun testEquityAccountDrawnParsing() {
+        val sms = "Dear GEOFFREY KES 745.00 has been drawn from your account 0160......7370 Ref:S5674716 on 02-NOV-2026 13:17:02 PM. For any queries, contact 0763000000"
+        val tx = MpesaParser.parse(sms)
+        assertNotNull(tx)
+        assertEquals("S5674716", tx?.transactionCode)
+        assertEquals(745.00, tx?.amount ?: 0.0, 0.001)
+        assertEquals("Expenses", tx?.type)
+        assertEquals("Equity Bank", tx?.account)
+        assertEquals("2026-11-02", tx?.date)
+    }
 }
