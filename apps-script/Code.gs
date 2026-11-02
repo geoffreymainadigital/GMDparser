@@ -16,8 +16,8 @@ const COL_AMOUNT = 10;          // J (Amount)
 const COL_ACCOUNT = 11;         // K (Account)
 const COL_NOTES = 12;           // L (Notes)
 
-const SCRIPT_VERSION = '2026.10.14.v32_lock_timeout_fix';
-const SCRIPT_BUILD_ID = 'GMD_GAS_20261014_PROD_32';
+const SCRIPT_VERSION = '2026.11.02.v33_savings_tile_fix';
+const SCRIPT_BUILD_ID = 'GMD_GAS_20261102_PROD_33';
 
 let VALID_TYPES = ['Income', 'Expenses', 'Bills', 'Debt', 'Savings', 'Balance'];
 
@@ -1732,6 +1732,20 @@ function getMonthlyDashboardData(ss) {
   function findTileValue(pos) {
     if (!pos) return null;
     
+    // 0. Check directly above (up to 4 rows above in same column, e.g. Row 2 tile card above Row 5 label)
+    for (let dr = -1; dr >= -4; dr--) {
+      let r = pos.row + dr;
+      if (r >= 0 && r < values.length && values[r][pos.col] !== '' && values[r][pos.col] !== null && values[r][pos.col] !== undefined) {
+        let strVal = String(values[r][pos.col]);
+        if (!strVal.includes('under') && !strVal.includes('over') && !strVal.includes('goal') && !strVal.includes('budget')) {
+          let num = parseAmount(values[r][pos.col]);
+          if (typeof values[r][pos.col] === 'number' || strVal.match(/[0-9]/)) {
+            return num;
+          }
+        }
+      }
+    }
+
     // 1. Check directly below (up to 3 rows down in same column)
     for (let dr = 1; dr <= 3; dr++) {
       let r = pos.row + dr;
@@ -1877,6 +1891,13 @@ function getMonthlyDashboardData(ss) {
     
     if (headerPos) {
       a = findTileValue(headerPos);
+      // Check if Row 1 has the formula actual value at headerPos.col + 2
+      if ((a === null || a === undefined) && values.length > 0 && (headerPos.col + 2) < values[0].length) {
+        const valActualCol = values[0][headerPos.col + 2];
+        if (valActualCol !== '' && valActualCol !== null && valActualCol !== undefined) {
+          a = parseAmount(valActualCol);
+        }
+      }
       // Goal value sits on Row 1 (index 0) at the tile header's column index
       if (headerPos.col < values[0].length) {
         const valRow1 = values[0][headerPos.col];

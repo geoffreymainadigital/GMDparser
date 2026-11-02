@@ -148,6 +148,23 @@ fun DashboardScreen(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 val tiles = activeData?.summaryTiles
+                val currentMonthSavings = remember(confirmedList, activeData?.month) {
+                    val monthStr = activeData?.month ?: ""
+                    confirmedList.filter { tx ->
+                        tx.type.equals("Savings", ignoreCase = true) &&
+                        (monthStr.isBlank() || try {
+                            val d = java.time.LocalDate.parse(tx.date)
+                            d.month.name.take(3).equals(monthStr, ignoreCase = true)
+                        } catch (_: Exception) { true })
+                    }.sumOf { it.amount }
+                }
+                val savingsActual = if ((tiles?.totalSavings?.actual ?: 0.0) > 0.0) {
+                    tiles?.totalSavings?.actual ?: 0.0
+                } else if (currentMonthSavings > 0.0) {
+                    currentMonthSavings
+                } else {
+                    0.0
+                }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     BudgetSummaryTile("Income", tiles?.totalIncome?.actual ?: 0.0, tiles?.totalIncome?.goal, MaterialTheme.colorScheme.primary, Modifier.weight(1f), isPrivacyOn)
                     BudgetSummaryTile("Bills", tiles?.totalBills?.actual ?: 0.0, tiles?.totalBills?.goal, AccentAmber, Modifier.weight(1f), isPrivacyOn)
@@ -159,7 +176,7 @@ fun DashboardScreen(
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    BudgetSummaryTile("Savings", tiles?.totalSavings?.actual ?: 0.0, tiles?.totalSavings?.goal, AccentCyan, Modifier.weight(1f), isPrivacyOn)
+                    BudgetSummaryTile("Savings", savingsActual, tiles?.totalSavings?.goal, AccentCyan, Modifier.weight(1f), isPrivacyOn)
                     BudgetSummaryTile("Unallocated", tiles?.unallocatedIncome?.actual ?: 0.0, null, MaterialTheme.colorScheme.onSurfaceVariant, Modifier.weight(1f), isPrivacyOn)
                 }
             }
