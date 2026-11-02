@@ -51,7 +51,12 @@ fun AccountsScreen() {
         TransactionRepository.fetchDashboard()
     }
 
-    val liveAccounts = dashboardResponse?.accounts
+    val rawAccounts = dashboardResponse?.accounts
+    val totalAcct = rawAccounts?.firstOrNull { it.accountName.trim().equals("TOTAL", ignoreCase = true) }
+    val liveAccounts = rawAccounts?.filterNot {
+        val lower = it.accountName.trim().lowercase()
+        lower == "total" || lower == "all accounts" || lower.startsWith("total ") || lower.endsWith(" total")
+    }
 
     val sortedAccounts = remember(liveAccounts) {
         val predefined = listOf(
@@ -66,9 +71,15 @@ fun AccountsScreen() {
         )
         val predefinedNames = predefined.map { it.name.lowercase() }.toSet()
         val extraLive = (liveAccounts ?: emptyList())
-            .filter { it.accountName.lowercase() !in predefinedNames }
+            .filter {
+                val lower = it.accountName.trim().lowercase()
+                lower !in predefinedNames && lower != "total" && lower != "all accounts" && !lower.startsWith("total ") && !lower.endsWith(" total")
+            }
             .map { AccountItem(it.accountName, "Bank Account", Icons.Default.AccountBalance) }
-        val all = predefined + extraLive
+        val all = (predefined + extraLive).filterNot {
+            val lower = it.name.trim().lowercase()
+            lower == "total" || lower == "all accounts" || lower.startsWith("total ") || lower.endsWith(" total")
+        }
 
         all.sortedWith(
             compareByDescending<AccountItem> { acc ->
@@ -253,9 +264,11 @@ fun AccountsScreen() {
                 }
             }
 
-            // TOTAL Row
-            val totalAcct = liveAccounts?.firstOrNull { it.accountName.equals("TOTAL", ignoreCase = true) }
-            if (totalAcct != null) {
+            // TOTAL NET ACCOUNTS Row pinned at bottom
+            if (liveAccounts != null && liveAccounts.isNotEmpty()) {
+                val netBalance = totalAcct?.currentBalance ?: liveAccounts.sumOf { it.currentBalance }
+                val netDeposits = totalAcct?.deposits ?: liveAccounts.sumOf { it.deposits }
+                val netWithdrawals = totalAcct?.withdrawals ?: liveAccounts.sumOf { it.withdrawals }
                 item {
                     Card(
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -272,8 +285,8 @@ fun AccountsScreen() {
                             ) {
                                 Text("TOTAL NET ACCOUNTS", color = AccentCyan, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                 Text(
-                                    text = "Ksh ${String.format("%,.2f", totalAcct.currentBalance)}",
-                                    color = if (totalAcct.currentBalance >= 0) MaterialTheme.colorScheme.primary else AccentRed,
+                                    text = "Ksh ${String.format("%,.2f", netBalance)}",
+                                    color = if (netBalance >= 0) MaterialTheme.colorScheme.primary else AccentRed,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 15.sp,
                                     modifier = Modifier.blur(if (isPrivacyOn) 10.dp else 0.dp)
@@ -285,13 +298,13 @@ fun AccountsScreen() {
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Text(
-                                    text = "Deposits: +Ksh ${String.format("%,.2f", totalAcct.deposits)}",
+                                    text = "Deposits: +Ksh ${String.format("%,.2f", netDeposits)}",
                                     color = MaterialTheme.colorScheme.primary,
                                     fontSize = 11.sp,
                                     modifier = Modifier.blur(if (isPrivacyOn) 10.dp else 0.dp)
                                 )
                                 Text(
-                                    text = "Withdrawals: Ksh ${String.format("%,.2f", totalAcct.withdrawals)}",
+                                    text = "Withdrawals: Ksh ${String.format("%,.2f", netWithdrawals)}",
                                     color = AccentAmber,
                                     fontSize = 11.sp,
                                     modifier = Modifier.blur(if (isPrivacyOn) 10.dp else 0.dp)
