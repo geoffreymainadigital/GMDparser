@@ -254,7 +254,20 @@ fun DashboardScreen(
                             modifier = Modifier.weight(1f),
                             isPrivacyOn = isPrivacyOn
                         )
-                        val overallPct = (savingsTotals.overallProgress * 100).toInt()
+                        val annualIncome = if (savingsTotals.annualIncome > 0.0) savingsTotals.annualIncome else 679892.24
+                        val annualRate = if (savingsTotals.annualSavingsRate > 0.0) {
+                            savingsTotals.annualSavingsRate * 100.0
+                        } else if (annualIncome > 0.0) {
+                            (savingsTotals.totalSaved / annualIncome) * 100.0
+                        } else {
+                            0.0
+                        }
+                        val rateStr = String.format(java.util.Locale.US, "%.1f%%", annualRate)
+                        val incomeStr = if (annualIncome >= 1000.0) {
+                            String.format(java.util.Locale.US, "%,.0fk", annualIncome / 1000.0)
+                        } else {
+                            String.format(java.util.Locale.US, "%,.0f", annualIncome)
+                        }
                         Surface(
                             color = MaterialTheme.colorScheme.surfaceVariant,
                             shape = RoundedCornerShape(10.dp),
@@ -262,16 +275,24 @@ fun DashboardScreen(
                         ) {
                             Column(modifier = Modifier.padding(10.dp)) {
                                 Text(
-                                    text = "Progress",
+                                    text = "Annual Savings Rate",
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontSize = 11.sp
+                                    fontSize = 11.sp,
+                                    maxLines = 1
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = "$overallPct%",
+                                    text = rateStr,
                                     color = MpesaGreen,
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "of Ksh $incomeStr 2026",
+                                    color = MaterialTheme.colorScheme.outline,
+                                    fontSize = 9.5.sp,
+                                    maxLines = 1
                                 )
                             }
                         }

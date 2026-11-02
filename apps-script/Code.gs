@@ -16,8 +16,8 @@ const COL_AMOUNT = 10;          // J (Amount)
 const COL_ACCOUNT = 11;         // K (Account)
 const COL_NOTES = 12;           // L (Notes)
 
-const SCRIPT_VERSION = '2026.11.02.v33_savings_tile_fix';
-const SCRIPT_BUILD_ID = 'GMD_GAS_20261102_PROD_33';
+const SCRIPT_VERSION = '2026.11.02.v34_annual_savings_rate';
+const SCRIPT_BUILD_ID = 'GMD_GAS_20261102_PROD_34';
 
 let VALID_TYPES = ['Income', 'Expenses', 'Bills', 'Debt', 'Savings', 'Balance'];
 
@@ -263,8 +263,8 @@ function doGet(e) {
 
     if (action === 'test_dump') {
       const targetSs = (e && e.parameter && e.parameter.spreadsheetId) ? SpreadsheetApp.openById(e.parameter.spreadsheetId) : ss;
-      const sheet = targetSs.getSheetByName("SEP");
-      const values = sheet.getRange(1, 1, 100, 20).getDisplayValues();
+      const sheet = targetSs.getSheetByName("Annual Dashboard") || targetSs.getSheetByName("Annual Budget");
+      const values = sheet.getRange(1, 20, 15, 55).getDisplayValues();
       return createJsonResponse({
         success: true,
         data: values,
@@ -2257,6 +2257,28 @@ function getSavingsDashboardData(ss) {
   if (!totals.totalGoal) totals.totalGoal = 327751.01;
   if (!totals.totalSaved) totals.totalSaved = 96127.83;
   if (!totals.overallProgress) totals.overallProgress = 0.29329528412437234;
+
+  // Read Total Annual Income from Annual Dashboard
+  let annualIncome = 679892.24;
+  try {
+    const annualSheet = ss.getSheetByName('Annual Dashboard') || ss.getSheetByName('Annual Budget');
+    if (annualSheet) {
+      const valRow3 = annualSheet.getRange(3, 24).getValue();
+      const parsed = parseAmount(valRow3);
+      if (parsed > 0) {
+        annualIncome = parsed;
+      } else {
+        const valRow1 = annualSheet.getRange(1, 26).getValue();
+        const parsed1 = parseAmount(valRow1);
+        if (parsed1 > 0) annualIncome = parsed1;
+      }
+    }
+  } catch (aErr) {
+    console.warn('Annual income read error:', aErr.message);
+  }
+
+  totals.annualIncome = annualIncome;
+  totals.annualSavingsRate = annualIncome > 0 ? (totals.totalSaved / annualIncome) : 0;
 
   return {
     tab: tabName,

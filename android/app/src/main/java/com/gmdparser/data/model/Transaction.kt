@@ -199,7 +199,9 @@ data class SavingsTotals(
     @SerializedName("totalGoal") val totalGoal: Double = 0.0,
     @SerializedName("totalSaved") val totalSaved: Double = 0.0,
     @SerializedName("totalRemaining") val totalRemaining: Double = 0.0,
-    @SerializedName("overallProgress") val overallProgress: Double = 0.0
+    @SerializedName("overallProgress") val overallProgress: Double = 0.0,
+    @SerializedName("annualIncome") val annualIncome: Double = 0.0,
+    @SerializedName("annualSavingsRate") val annualSavingsRate: Double = 0.0
 )
 
 data class SavingsData(
