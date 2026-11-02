@@ -399,6 +399,7 @@ object TransactionRepository {
                 val confirmed = tx.copy(status = TransactionStatus.SYNCED)
                 _confirmedTransactions.update { listOf(confirmed) + it }
                 persistConfirmed(_confirmedTransactions.value)
+                try { fetchDashboard() } catch (_: Exception) {}
                 val successBody = body ?: ApiResponse(success = true, status = statusStr.ifBlank { "CREATED" }, message = "Recorded to sheet")
                 Result.success(successBody)
             } else if (isDuplicate) {
@@ -540,6 +541,7 @@ object TransactionRepository {
             if (newConfirmed.isNotEmpty()) {
                 _confirmedTransactions.update { newConfirmed + it }
                 persistConfirmed(_confirmedTransactions.value)
+                try { fetchDashboard() } catch (_: Exception) {}
             }
 
             // Re-index results to the global list position

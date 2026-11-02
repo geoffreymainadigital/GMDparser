@@ -53,7 +53,7 @@ fun AccountsScreen() {
 
     val liveAccounts = dashboardResponse?.accounts
 
-    val staticAccounts = remember(liveAccounts) {
+    val sortedAccounts = remember(liveAccounts) {
         val predefined = listOf(
             AccountItem("Equity Bank", "Bank Account", Icons.Default.AccountBalance),
             AccountItem("I&M Bank", "Bank Account", Icons.Default.AccountBalance),
@@ -68,7 +68,20 @@ fun AccountsScreen() {
         val extraLive = (liveAccounts ?: emptyList())
             .filter { it.accountName.lowercase() !in predefinedNames }
             .map { AccountItem(it.accountName, "Bank Account", Icons.Default.AccountBalance) }
-        predefined + extraLive
+        val all = predefined + extraLive
+
+        all.sortedWith(
+            compareByDescending<AccountItem> { acc ->
+                val bal = liveAccounts?.firstOrNull { it.accountName.equals(acc.name, ignoreCase = true) }?.currentBalance ?: 0.0
+                when {
+                    bal > 0.0 -> 2   // Top: Accounts with money
+                    bal == 0.0 -> 1  // Middle: Zeros
+                    else -> 0        // Bottom: Negatives / Overdrawn
+                }
+            }.thenByDescending { acc ->
+                liveAccounts?.firstOrNull { it.accountName.equals(acc.name, ignoreCase = true) }?.currentBalance ?: 0.0
+            }
+        )
     }
 
     Scaffold(
@@ -130,7 +143,7 @@ fun AccountsScreen() {
         Spacer(modifier = Modifier.height(14.dp))
 
         LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            items(staticAccounts) { acc ->
+            items(sortedAccounts, key = { it.name }) { acc ->
                 val liveAcct = liveAccounts?.firstOrNull { it.accountName.equals(acc.name, ignoreCase = true) }
 
                 Card(
