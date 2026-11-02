@@ -171,6 +171,7 @@ object TransactionRepository {
             } catch (e: Exception) {
                 android.util.Log.e("TransactionRepo", "Failed to read cached confirmed transactions", e)
             }
+            deduplicatePendingItems()
 
             try {
                 val monthlyJson = encPrefs.getString(KEY_MONTHLY_DASHBOARD, null)
@@ -204,13 +205,60 @@ object TransactionRepository {
         prefs?.edit()?.putString(KEY_CONFIRMED, gson.toJson(list))?.apply()
     }
 
+    private fun isGenericEquityDebit(tx: Transaction): Boolean {
+        return tx.account.equals("Equity Bank", ignoreCase = true) &&
+               tx.description.startsWith("Drawn from account", ignoreCase = true)
+    }
+
+    private fun isSpecificEquityOutgoing(tx: Transaction): Boolean {
+        return tx.account.equals("Equity Bank", ignoreCase = true) &&
+               !tx.description.startsWith("Drawn from account", ignoreCase = true) &&
+               tx.type != "Income"
+    }
+
+    private fun isMatchingGenericEquityDebit(genericTx: Transaction, specificTx: Transaction): Boolean {
+        return isGenericEquityDebit(genericTx) &&
+               isSpecificEquityOutgoing(specificTx) &&
+               genericTx.date == specificTx.date &&
+               Math.abs(genericTx.amount - specificTx.amount) < 0.01
+    }
+
+    fun isRedundantTransaction(tx: Transaction): Boolean {
+        if (!isGenericEquityDebit(tx)) return false
+        val hasMatchingPending = _pendingTransactions.value.any { isMatchingGenericEquityDebit(tx, it) }
+        val hasMatchingConfirmed = _confirmedTransactions.value.any { isMatchingGenericEquityDebit(tx, it) }
+        return hasMatchingPending || hasMatchingConfirmed
+    }
+
+    fun deduplicatePendingItems() {
+        _pendingTransactions.update { current ->
+            current.filterNot { pendingItem ->
+                isGenericEquityDebit(pendingItem) && (
+                    current.any { isMatchingGenericEquityDebit(pendingItem, it) } ||
+                    _confirmedTransactions.value.any { isMatchingGenericEquityDebit(pendingItem, it) }
+                )
+            }
+        }
+        persistPending(_pendingTransactions.value)
+    }
+
     fun addPendingTransaction(tx: Transaction) {
         _pendingTransactions.update { current ->
-            if (current.none { it.transactionCode == tx.transactionCode } &&
-                _confirmedTransactions.value.none { it.transactionCode == tx.transactionCode }) {
-                listOf(tx) + current
+            if (isRedundantTransaction(tx)) {
+                return@update current
+            }
+
+            val sanitizedCurrent = if (isSpecificEquityOutgoing(tx)) {
+                current.filterNot { isMatchingGenericEquityDebit(it, tx) }
             } else {
                 current
+            }
+
+            if (sanitizedCurrent.none { it.transactionCode == tx.transactionCode } &&
+                _confirmedTransactions.value.none { it.transactionCode == tx.transactionCode }) {
+                listOf(tx) + sanitizedCurrent
+            } else {
+                sanitizedCurrent
             }
         }
         persistPending(_pendingTransactions.value)
@@ -219,12 +267,22 @@ object TransactionRepository {
     fun addPendingTransactions(list: List<Transaction>): Int {
         var addedCount = 0
         _pendingTransactions.update { current ->
-            val newItems = list.filter { item ->
-                current.none { it.transactionCode == item.transactionCode } &&
-                _confirmedTransactions.value.none { it.transactionCode == item.transactionCode }
+            val cleanedIncoming = list.filterNot { incoming ->
+                isGenericEquityDebit(incoming) && list.any { isMatchingGenericEquityDebit(incoming, it) }
+            }
+
+            val specificIncoming = cleanedIncoming.filter { isSpecificEquityOutgoing(it) }
+            val sanitizedCurrent = current.filterNot { existing ->
+                isGenericEquityDebit(existing) && specificIncoming.any { isMatchingGenericEquityDebit(existing, it) }
+            }
+
+            val newItems = cleanedIncoming.filter { item ->
+                sanitizedCurrent.none { it.transactionCode == item.transactionCode } &&
+                _confirmedTransactions.value.none { it.transactionCode == item.transactionCode } &&
+                !isRedundantTransaction(item)
             }
             addedCount = newItems.size
-            newItems + current
+            newItems + sanitizedCurrent
         }
         if (addedCount > 0) persistPending(_pendingTransactions.value)
         return addedCount

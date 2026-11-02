@@ -358,4 +358,43 @@ class MpesaParserTest {
         assertEquals("Equity Bank", tx?.account)
         assertEquals("2026-11-02", tx?.date)
     }
+
+    // 27. Equity Transfer and Generic Debit Alert Deduplication
+    @Test
+    fun testEquityTransferAndDebitAlertDeduplication() {
+        val debitSms = "Dear GEOFFREY KES 15951.24 has been drawn from your account 0160......7370 Ref:S6239316 on 02-NOV-2026 16:32:14 PM. For any queries, contact 0763000000"
+        val transferSms = "15951.24 KES has been successfully sent to Geoffrey Kibuchi Maina 0*********3050 INVESTMENT & MORGAGES BANK. Ref. A08F4E6E51A9B on 02 Nov 2026 at 16:32 EAT. Charges 59.76 KES"
+
+        val debitTx = MpesaParser.parse(debitSms)
+        val transferTx = MpesaParser.parse(transferSms)
+
+        assertNotNull(debitTx)
+        assertNotNull(transferTx)
+
+        // Clear any leftover pending
+        TransactionRepository.removePendingTransaction(debitTx!!.transactionCode)
+        TransactionRepository.removePendingTransaction(transferTx!!.transactionCode)
+
+        // Case A: Debit alert arrives first, then transfer arrives -> debit alert should be replaced by transfer
+        TransactionRepository.addPendingTransaction(debitTx)
+        assertTrue(TransactionRepository.pendingTransactions.value.any { it.transactionCode == "S6239316" })
+
+        TransactionRepository.addPendingTransaction(transferTx)
+        assertFalse(TransactionRepository.pendingTransactions.value.any { it.transactionCode == "S6239316" })
+        assertTrue(TransactionRepository.pendingTransactions.value.any { it.transactionCode == "A08F4E6E51A9B" })
+
+        // Case B: If transfer is already pending, subsequent debit alert is dropped
+        TransactionRepository.addPendingTransaction(debitTx)
+        assertFalse(TransactionRepository.pendingTransactions.value.any { it.transactionCode == "S6239316" })
+
+        // Case C: Batch addition deduplication
+        TransactionRepository.removePendingTransaction(transferTx.transactionCode)
+        val addedCount = TransactionRepository.addPendingTransactions(listOf(debitTx, transferTx))
+        assertEquals(1, addedCount)
+        assertTrue(TransactionRepository.pendingTransactions.value.any { it.transactionCode == "A08F4E6E51A9B" })
+        assertFalse(TransactionRepository.pendingTransactions.value.any { it.transactionCode == "S6239316" })
+
+        // Cleanup
+        TransactionRepository.removePendingTransaction(transferTx.transactionCode)
+    }
 }

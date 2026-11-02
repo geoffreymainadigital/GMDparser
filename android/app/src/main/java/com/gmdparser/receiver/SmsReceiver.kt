@@ -39,7 +39,9 @@ class SmsReceiver : BroadcastReceiver() {
             TransactionRepository.addPendingTransaction(transaction)
 
             // Notify user for mandatory review and explicit confirmation
-            showConfirmationNotification(context, transaction.transactionCode, transaction.amount, transaction.description, transaction.account)
+            if (TransactionRepository.pendingTransactions.value.any { it.transactionCode == transaction.transactionCode }) {
+                showConfirmationNotification(context, transaction.transactionCode, transaction.amount, transaction.description, transaction.account)
+            }
 
         } catch (e: Exception) {
             // Fail safely without crashing receiver
